@@ -6,8 +6,9 @@ import (
 	"testing"
 )
 
-func Benchmark_EEAInv(b *testing.B) {
-	const BYTES = 32
+const BYTES = 32
+
+func Benchmark_Unsafe_LibEEAInv(b *testing.B) {
 	var a [BYTES]byte
 	var SM2p, _ = new(big.Int).SetString("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFF", 16)
 
@@ -16,12 +17,7 @@ func Benchmark_EEAInv(b *testing.B) {
 
 	for i:=0; i<b.N; i++ {
 
-		for j := 0; j < BYTES-8; j++ {
-			a[j] = (byte)(rand.Uint32() % 256)
-		}
-		for j := BYTES - 8; j < BYTES; j++ {
-			a[j] = 0
-		}
+		generateRandom(&a)
 
 		var val = new(big.Int).SetBytes(a[:])
 		var inv big.Int
@@ -38,8 +34,7 @@ func Benchmark_EEAInv(b *testing.B) {
 	}
 }
 
-func Benchmark_FermatInv(b *testing.B) {
-	const BYTES = 32
+func Benchmark_NaiveFermatInv(b *testing.B) {
 	var a [BYTES]byte
 	var SM2p, _ = new(big.Int).SetString("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFF", 16)
 	var SM2pm2 big.Int
@@ -50,12 +45,7 @@ func Benchmark_FermatInv(b *testing.B) {
 
 	for i:=0; i<b.N; i++ {
 
-		for j := 0; j < BYTES-8; j++ {
-			a[j] = (byte)(rand.Uint32() % 256)
-		}
-		for j := BYTES - 8; j < BYTES; j++ {
-			a[j] = 0
-		}
+		generateRandom(&a)
 
 		var val = new(big.Int).SetBytes(a[:])
 		var inv big.Int
@@ -73,9 +63,7 @@ func Benchmark_FermatInv(b *testing.B) {
 	}
 }
 
-func Benchmark_sm2Inv(b *testing.B) {
-
-	const BYTES = 32
+func Benchmark_FiatInv(b *testing.B) {
 
 	var res [LIMBS]uint64
 	var out, g1, g2, g3 [LIMBS]uint64
@@ -86,12 +74,8 @@ func Benchmark_sm2Inv(b *testing.B) {
 	b.ResetTimer()
 
 	for i:=0; i<b.N; i++ {
-		for j:=0; j<BYTES-8; j++ {
-			a[j] = (uint8)(rand.Uint32() % 256)
-		}
-		for j:=BYTES-8; j<BYTES; j++ {
-			a[j] = 0
-		}
+
+		generateRandom(&a)
 
 		sm2FromBytes(&g1, &a)
 		sm2FromBytes(&g2, &a)
@@ -106,6 +90,11 @@ func Benchmark_sm2Inv(b *testing.B) {
 
 		sm2Mul((*sm2MontgomeryDomainFieldElement)(&res), (*sm2MontgomeryDomainFieldElement)(&out), (*sm2MontgomeryDomainFieldElement)(&g1))
 		sm2FromMontgomery((*sm2NonMontgomeryDomainFieldElement)(&out), (*sm2MontgomeryDomainFieldElement)(&res))
+
+		if out[0] != 1 || out[1] != 0 || out[2] != 0 || out[3] != 0 {
+			b.Fail()
+		}
+
 		sm2ToBytes(&a, &out)
 
 		if a[0] != 1 {
@@ -119,3 +108,17 @@ func Benchmark_sm2Inv(b *testing.B) {
 
 	}
 }
+
+func generateRandom(a *[BYTES]byte) {
+
+	for j:=0; j<BYTES-8; j++ {
+		a[j] = (uint8)(rand.Uint32() % 256)
+	}
+	for j:=BYTES-8; j<BYTES; j++ {
+		a[j] = 0
+	}
+
+
+}
+
+
