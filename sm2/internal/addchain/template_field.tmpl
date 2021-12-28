@@ -1,8 +1,8 @@
 // Copyright 2021 bilibili. All rights reserved. Author: Guo, Weiji guoweiji@bilibili.com
 // 哔哩哔哩版权所有 2021。作者：郭伟基 guoweiji@bilibili.com
 // 代码为使用addchain工具自动生成，勿编辑
-//    addchain search "115792089210356248756420345214020892766061623724957744567843809356293439045923 - 2" > sm2_scalar.ac
-//    addchain gen -tmpl template_scalar.tmpl sm2_scalar.ac > ../fiat/addchain_sm2_64_scalar_inverse.go
+//    addchain search "2^256 - 2^224 - 2^96 + 2^64 - 1 - 2" >sm2_field.ac
+//    addchain gen -tmpl template_field.tmpl sm2_field.ac > ../fiat/addchain_sm2_64_field_inverse.go
 //
 // addchain项目的网络地址为：https://github.com/mmcloughlin/addchain
 //
@@ -23,9 +23,9 @@
 
 package fiat
 
-// Invert an element in the SM2 scalar field (mod n). Note: this is NOT a SM2 Curve Field inversion (mod p).
-// Output: z = 1/x mod (SM2 n) if x != 0, and 0 otherwise
-func sm2ScalarFermatInvert_FiatAC(z *sm2ScalarMontgomeryDomainFieldElement, x *sm2ScalarMontgomeryDomainFieldElement) {
+// Invert an element in the SM2 curve field (mod p).
+// Output: z = 1/x mod (SM2 p) if x != 0, and 0 otherwise
+func sm2FermatInvert_FiatAC(z *sm2MontgomeryDomainFieldElement, x *sm2MontgomeryDomainFieldElement)  {
 	//
 	{{- range lines (format .Script) }}
 	//	{{ . }}
@@ -38,28 +38,28 @@ func sm2ScalarFermatInvert_FiatAC(z *sm2ScalarMontgomeryDomainFieldElement, x *s
 	// Allocate Temporaries.
 		var (
 			{{- range .Program.Temporaries }}
-			{{ . }} = new(sm2ScalarMontgomeryDomainFieldElement)
+			{{ . }} = new(sm2MontgomeryDomainFieldElement)
 			{{- end -}}
 		)
 
 		{{ range $i := .Program.Instructions }}
 		// {{ printf "Step %d: %s = x^%#x" $i.Output.Index $i.Output (index $.Chain $i.Output.Index) }}
 		{{- with add $i.Op }}
-		sm2ScalarMul({{ $i.Output }}, {{ .X }}, {{ .Y }})
+		sm2Mul({{ $i.Output }}, {{ .X }}, {{ .Y }})
 		{{ end -}}
 
 		{{- with double $i.Op }}
-		sm2ScalarSquare({{ $i.Output }}, {{ .X }})
+		sm2Square({{ $i.Output }}, {{ .X }})
 		{{ end -}}
 
 		{{- with shift $i.Op -}}
 		{{- $first := 0 -}}
 		{{- if ne $i.Output.Identifier .X.Identifier }}
-		sm2ScalarSquare({{ $i.Output }}, {{ .X }})
+		sm2Square({{ $i.Output }}, {{ .X }})
 		{{- $first = 1 -}}
 		{{- end }}
 		for s := {{ $first }}; s < {{ .S }}; s++ {
-			sm2ScalarSquare({{ $i.Output }}, {{ $i.Output }})
+			sm2Square({{ $i.Output }}, {{ $i.Output }})
 		}
 		{{ end -}}
 		{{- end }}
