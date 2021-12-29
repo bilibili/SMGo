@@ -15,7 +15,7 @@ This implementation uses generated codes from [Fiat-Crypto](https://github.com/m
 
 基于Golang的标准库，本实现基于雅可比坐标计算点加和倍点的时候，使用[Complete addition formulas for prime order elliptic curves](https://eprint.iacr.org/2015/1060) §A.2 所提供的算法。请注意，SM2定义的曲线符合"a = -3"的前提。
 
-Based on the standard Golang library, this implementation uses the algorithm from [Complete addition formulas for prime order elliptic curves](https://eprint.iacr.org/2015/1060) §A.2 to calculate Point-Add and Point-Double in the Jacobian coordinates. Please note that the curve SM2 defines fits the prerequisite of "a = -3".
+Based on the standard Golang library, this implementation uses the algorithm from [Complete addition formulas for prime order elliptic curves](https://eprint.iacr.org/2015/1060) §A.2 to calculate Point-Add and Point-Double in the Jacobian coordinates. Please note that the curve definition of SM2 meets the prerequisite of "a = -3".
 
 <h3>SM3</h3>
 
