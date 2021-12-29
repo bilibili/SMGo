@@ -4,6 +4,7 @@
 
 The Golang implementation of the SM2/3/4 ciphers, suitable for platforms with 64-bit multiplier.
 
+<h3>SM2</h3>
 本实现使用常数时间算法，通过牺牲一小部分性能获得更好的安全性，不会在签名时或执行DH协议时通过运行时间泄漏私钥或者签名随机数信息。
 
 This implementation uses constant time algorithm, and trades in a small runtime cost for better security. It does not leak timing information of private key or random number during signing or DH protocol.
@@ -12,6 +13,11 @@ This implementation uses constant time algorithm, and trades in a small runtime 
 
 This implementation uses generated codes from [Fiat-Crypto](https://github.com/mit-plv/fiat-crypto) and [addchain](https://github.com/mmcloughlin/addchain) . [Fiat-Crypto](https://github.com/mit-plv/fiat-crypto) provides "correct by construction" codes for fast prime field calculations, and [addchain](https://github.com/mmcloughlin/addchain) provides addition chain decomposition (slighly sub-optimal) for the multiplicative inverse calculation based on Fermat's Little Theorem, in a designated prime field.
 
-基于Golang的标准库，本实现基于雅可比坐标计算点加和倍点的时候，使用[Complete addition formulas for prime order elliptic curves](https://eprint.iacr.org/2015/1060) §A.2 所提供的算法。
+基于Golang的标准库，本实现基于雅可比坐标计算点加和倍点的时候，使用[Complete addition formulas for prime order elliptic curves](https://eprint.iacr.org/2015/1060) §A.2 所提供的算法。请注意，SM2定义的曲线符合"a = -3"的前提。
 
-Based on the standard Golang library, this implementation uses the algorithm from [Complete addition formulas for prime order elliptic curves](https://eprint.iacr.org/2015/1060) §A.2 to calculate Point-Add and Point-Double in the Jacobian coordinates.
+Based on the standard Golang library, this implementation uses the algorithm from [Complete addition formulas for prime order elliptic curves](https://eprint.iacr.org/2015/1060) §A.2 to calculate Point-Add and Point-Double in the Jacobian coordinates. Please note that the curve SM2 defines fits the prerequisite of "a = -3".
+
+<h3>SM3</h3>
+
+<h3>SM4</h3>
+
