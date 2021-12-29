@@ -1,41 +1,22 @@
 // Copyright 2021 bilibili. All rights reserved. Author: Guo, Weiji guoweiji@bilibili.com
 // 哔哩哔哩版权所有 2021。作者：郭伟基 guoweiji@bilibili.com
 
-//go:build ignore
-
-package fiat
+package internal
 
 
 import (
 	"encoding/hex"
 	"math/rand"
 	"reflect"
+	"smgo/sm2/internal/fiat"
 	"testing"
 )
-// slow and UNSAFE version first: let's run double and add
-// not meant for external use, serves as baseline for correctness
-func (p *SM2Point) scalarMult_Unsafe_DaA(q *SM2Point, scalar []byte) *SM2Point {
-	var tmp = NewSM2Point()
-	for _, b := range scalar {
-		for bitNum := 0; bitNum < 8; bitNum++ {
-			tmp.Double(tmp)
-			if b&0x80 == 0x80 {
-				tmp.Add(tmp, q)
-			}
-			b <<= 1
-		}
-	}
-
-	p.Set(tmp)
-	return p
-}
-
-func makeElement(s string) (*SM2Element, error) {
+func makeElement(s string) (*fiat.SM2Element, error) {
 	var e, er =hex.DecodeString(s)
 	if er != nil {
 		panic("cannot decode hex due to " + er.Error())
 	}
-	return new (SM2Element).SetBytes(e)
+	return new (fiat.SM2Element).SetBytes(e)
 }
 
 func TestSM2Point_ScalarMult_1(t *testing.T) {
@@ -86,7 +67,7 @@ func TestSM2Point_ScalarMult_4(t *testing.T) {
 	pub := &SM2Point{
 		x: px,
 		y: py,
-		z: new(SM2Element).One(),
+		z: new(fiat.SM2Element).One(),
 	}
 
 
@@ -100,13 +81,12 @@ func TestSM2Point_ScalarMult_4(t *testing.T) {
 func BenchmarkSM2Point_ScalarMult_Unsafe_DaA(b *testing.B) {
 	bytes := new([32]byte)
 	g := NewSM2Generator()
-	v := NewSM2Point()
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i:=0; i<b.N; i++ {
 		rand.Read(bytes[:])
-		v.scalarMult_Unsafe_DaA(g, bytes[:])
+		scalarMult_Unsafe_DaA(g, bytes[:])
 	}
 }
 
@@ -116,8 +96,7 @@ func testWithStrings(p, x, y string, t *testing.T) {
 
 func testWithStringsAndPoint(p, x, y string, point *SM2Point, t *testing.T) {
 	var k, _ = makeElement(p)
-	var res = NewSM2Point()
-	res.scalarMult_Unsafe_DaA(point, k.Bytes())
+	var res, _ = scalarMult_Unsafe_DaA(point, k.Bytes())
 
 	var qx, _ = makeElement(x)
 	var qy, _ = makeElement(y)
@@ -125,7 +104,7 @@ func testWithStringsAndPoint(p, x, y string, point *SM2Point, t *testing.T) {
 	var q = SM2Point{
 		x: qx,
 		y: qy,
-		z: new(SM2Element).One(),
+		z: new(fiat.SM2Element).One(),
 	}
 
 	if !reflect.DeepEqual(res.Bytes(), q.Bytes()) {
