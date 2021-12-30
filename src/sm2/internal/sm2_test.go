@@ -96,7 +96,7 @@ func TestSM2Point_ScalarMult_to_inf(t *testing.T) {
 
 // Tests if calculation leads to infinity how the program handles
 func TestSM2Point_ScalarMult_warparound_inf(t *testing.T) {
-	np1 := sm2.Params().N
+	np1 := new(big.Int).Set(sm2.Params().N)
 	np1.Add(np1, new(big.Int).SetInt64(1))
 	res, err := scalarMult_Unsafe_DaA(NewSM2Generator(), np1.Bytes())
 	if err != nil {
@@ -106,6 +106,28 @@ func TestSM2Point_ScalarMult_warparound_inf(t *testing.T) {
 
 	if !reflect.DeepEqual(res.Bytes(), NewSM2Generator().Bytes()) {
 		t.Fail()
+	}
+}
+
+// systematically test if the scalar multiplication can handle values much larger than N
+func TestCompleteness(t *testing.T) {
+	var bytes [41]byte
+
+	for i:=0; i<100; i++ {
+		rand.Read(bytes[:])
+		raw := new (big.Int).SetBytes(bytes[:])
+		inrange := new (big.Int).Mod(raw, sm2.Params().N)
+		raw = raw.Mul(sm2.Params().N, new (big.Int).SetUint64(rand.Uint64()))
+		raw.Add(raw, inrange)
+
+		res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), inrange.Bytes())
+		res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), raw.Bytes())
+
+		if !reflect.DeepEqual(res1.Bytes(), res2.Bytes()) {
+			fmt.Printf("round #%d, %x\n", i, sm2.Params().N)
+			t.Fail()
+		}
+
 	}
 }
 
@@ -135,6 +157,15 @@ func testWithStringsAndPoint(p, x, y string, point *SM2Point, t *testing.T) {
 
 	res, _ := scalarMult_Unsafe_DaA(point, makeElement(p).Bytes())
 	if !reflect.DeepEqual(res.Bytes(), q.Bytes()) {
+		t.Fail()
+	}
+
+	larger := makeElement(p).ToBigInt()
+	larger.Add(larger, sm2.Params().N) // this shall not change the result if the Add and Double are implemented "completely"
+	bytes := larger.Bytes()
+	fmt.Printf("larger scalar has %d bytes", len(bytes))
+	res2, _ := scalarMult_Unsafe_DaA(point, bytes)
+	if !reflect.DeepEqual(res2.Bytes(), res.Bytes()) {
 		t.Fail()
 	}
 }
