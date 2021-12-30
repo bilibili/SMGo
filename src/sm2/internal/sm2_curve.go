@@ -37,6 +37,7 @@ func (curve sm2Curve) Params() *elliptic.CurveParams {
 }
 
 // ScalarMult Scalar multiplication, returns [x]P when no error.
+// x is big endian and its integer value should lie in range of [1, n-1]
 // ***secure implementation***, this could be used for ECDH
 func ScalarMult(P *SM2Point, x []byte) (*SM2Point, error) {
 	out := NewSM2Point()
@@ -44,6 +45,7 @@ func ScalarMult(P *SM2Point, x []byte) (*SM2Point, error) {
 }
 
 // ScalarBaseMult scalar base multiplication, retusn [k]G when no error
+// k is big endian and its integer value should lie in range of [1, n-1]
 // ***secure implementation***, this could be used for
 // sign or key generation, all sensitive operations
 // underlying uses 7-NAF optimization therefore 64 precomputed points
@@ -51,11 +53,13 @@ func ScalarMult(P *SM2Point, x []byte) (*SM2Point, error) {
 // side channel risks
 func ScalarBaseMult(k []byte) (*SM2Point, error) {
 	out := NewSM2Point()
+
 	return out, nil
 }
 
 // ScalarMixedMult_Unsafe mixed scalar multiplication, returns [k]G + [x]P when no error
-//usually used for signature verification and not sensitive
+// k and x are big endian and their integer values should lie in range of [1, n-1]
+// usually used for signature verification and not sensitive
 func ScalarMixedMult_Unsafe(k []byte, P *SM2Point, x []byte) (*SM2Point, error) {
 	out := NewSM2Point()
 	return out, nil
@@ -63,6 +67,7 @@ func ScalarMixedMult_Unsafe(k []byte, P *SM2Point, x []byte) (*SM2Point, error) 
 
 // slow and UNSAFE version first: let's run double and add
 // not meant for external use, serves as baseline for correctness
+// 注意，GM/T 0003.1-2012第四节所规定的数据类型转换，要求使用big endian（即自然序，最左边的权重最大，例如123表示100+20+3）
 func scalarMult_Unsafe_DaA(q *SM2Point, scalar []byte) (*SM2Point, error) {
 	out := NewSM2Point()
 	for _, b := range scalar {

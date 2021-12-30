@@ -6,6 +6,8 @@ package internal
 
 import (
 	"encoding/hex"
+	"fmt"
+	"math/big"
 	"math/rand"
 	"reflect"
 	"smgo/sm2/internal/fiat"
@@ -77,6 +79,34 @@ func TestSM2Point_ScalarMult_4(t *testing.T) {
 		"B89AA9263D5632F6EE82222E4D63198E78E095C24042CBE715C23F711422D74C",
 		pub,
 		t)
+}
+
+// Tests if calculation leads to infinity how the program handles
+func TestSM2Point_ScalarMult_to_inf(t *testing.T) {
+	res, err := scalarMult_Unsafe_DaA(NewSM2Generator(), sm2.Params().N.Bytes())
+	if err != nil {
+		fmt.Printf("Error: %s", err.Error())
+		t.Fail()
+	}
+	fmt.Printf("[n]G = (%s, %s, %s) \n%x\n", res.x.ToBigInt().String(), res.y.ToBigInt().String(), res.z.ToBigInt().String(), res.Bytes())
+	if res.z.IsZero() == 0 {
+		t.Fail()
+	}
+}
+
+// Tests if calculation leads to infinity how the program handles
+func TestSM2Point_ScalarMult_warparound_inf(t *testing.T) {
+	np1 := sm2.Params().N
+	np1.Add(np1, new(big.Int).SetInt64(1))
+	res, err := scalarMult_Unsafe_DaA(NewSM2Generator(), np1.Bytes())
+	if err != nil {
+		fmt.Printf("Error: %s", err.Error())
+		t.Fail()
+	}
+
+	if !reflect.DeepEqual(res.Bytes(), NewSM2Generator().Bytes()) {
+		t.Fail()
+	}
 }
 
 func BenchmarkSM2Point_ScalarMult_Unsafe_DaA(b *testing.B) {
