@@ -11,6 +11,7 @@ package internal
 
 import (
 	"errors"
+	"math/big"
 	"smgo/sm2/internal/fiat"
 )
 
@@ -142,6 +143,12 @@ func (p *SM2Point) bytes(out *[SM2BytesLengthUncompressed]byte) []byte {
 	buf = append(buf, xx.Bytes()...)
 	buf = append(buf, yy.Bytes()...)
 	return buf
+}
+
+func (p *SM2Point) GetX() *big.Int {
+	zinv := new(fiat.SM2Element).Invert(p.z)
+	xx := new(fiat.SM2Element).Mul(p.x, zinv)
+	return xx.ToBigInt()
 }
 
 // Add sets q = p1 + p2, and returns q. The points may overlap.

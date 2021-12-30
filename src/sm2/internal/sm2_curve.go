@@ -13,6 +13,9 @@ type sm2Curve struct {
 }
 
 var sm2 sm2Curve
+func Sm2() sm2Curve {
+	return sm2
+}
 
 func init() {
 	sm2.params = &elliptic.CurveParams{
@@ -77,7 +80,7 @@ func ScalarBaseMult(k []byte) (*SM2Point, error) {
 //}
 
 var sm2PrecomputedForDaA [256]*SM2Point
-func scalarBaseMult_Precomputed_DaA(k []byte) (*SM2Point, error) {
+func ScalarBaseMult_Precomputed_DaA(k []byte) (*SM2Point, error) {
 	out := NewSM2Point()
 	for i, b := range k {
 		for bitNum := 0; bitNum < 8; bitNum++ {
