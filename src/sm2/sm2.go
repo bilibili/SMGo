@@ -9,16 +9,16 @@ import (
 	//"smgo/sm2/internal"
 )
 
-//generate private key with system default random source
-//note that private key must lie in range [1, n-2] as we need
-//to calculate 1/(d + 1) for signature
+// GenerateKey generate private key with system default random source
+// note that private key must lie in range [1, n-2] as we need
+// to calculate 1/(d + 1) for signature
 func GenerateKey() (priv, x, y [32]byte, err error) {
 	return GenerateKeyWithRand(rand.Reader)
 }
 
-//generate private key with provided random source
-//note that private key must lie in range [1, n-2] as we need
-//to calculate 1/(d + 1) for signature
+// GenerateKeyWithRand generate private key with provided random source
+// note that private key must lie in range [1, n-2] as we need
+// to calculate 1/(d + 1) for signature
 func GenerateKeyWithRand(rand io.Reader) (priv, x, y [32]byte, err error) {
 	var tmp [32]byte
 	return tmp, tmp, tmp, nil
