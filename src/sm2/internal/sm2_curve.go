@@ -36,14 +36,10 @@ func (curve sm2Curve) Params() *elliptic.CurveParams {
 	return curve.params
 }
 
-// below functions do not create heap objects or return one.
-// An object is internally created to ensure it is "clean", and on stack
-// to limit heap use. It is then copied upon return.
-
 // ScalarMult Scalar multiplication, returns [x]P when no error.
 // ***secure implementation***, this could be used for ECDH
-func ScalarMult(P *SM2Point, x []byte) (SM2Point, error) {
-	var out SM2Point
+func ScalarMult(P *SM2Point, x []byte) (*SM2Point, error) {
+	out := NewSM2Point()
 	return out, nil
 }
 
@@ -53,27 +49,27 @@ func ScalarMult(P *SM2Point, x []byte) (SM2Point, error) {
 // underlying uses 7-NAF optimization therefore 64 precomputed points
 // use safe algorithm to copy from the precomputed values to eliminate
 // side channel risks
-func ScalarBaseMult(k []byte) (SM2Point, error) {
-	var out SM2Point
+func ScalarBaseMult(k []byte) (*SM2Point, error) {
+	out := NewSM2Point()
 	return out, nil
 }
 
 // ScalarMixedMult_Unsafe mixed scalar multiplication, returns [k]G + [x]P when no error
 //usually used for signature verification and not sensitive
-func ScalarMixedMult_Unsafe(k []byte, P *SM2Point, x []byte) (SM2Point, error) {
-	var out SM2Point
+func ScalarMixedMult_Unsafe(k []byte, P *SM2Point, x []byte) (*SM2Point, error) {
+	out := NewSM2Point()
 	return out, nil
 }
 
 // slow and UNSAFE version first: let's run double and add
 // not meant for external use, serves as baseline for correctness
-func scalarMult_Unsafe_DaA(q *SM2Point, scalar []byte) (SM2Point, error) {
-	var out SM2Point
+func scalarMult_Unsafe_DaA(q *SM2Point, scalar []byte) (*SM2Point, error) {
+	out := NewSM2Point()
 	for _, b := range scalar {
 		for bitNum := 0; bitNum < 8; bitNum++ {
-			out.Double(&out)
+			out.Double(out)
 			if b&0x80 == 0x80 {
-				out.Add(&out, q)
+				out.Add(out, q)
 			}
 			b <<= 1
 		}
