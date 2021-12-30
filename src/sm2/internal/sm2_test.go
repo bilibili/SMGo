@@ -113,7 +113,7 @@ func TestSM2Point_ScalarMult_warparound_inf(t *testing.T) {
 func TestCompleteness(t *testing.T) {
 	var bytes [41]byte
 
-	for i:=0; i<100; i++ {
+	for i:=0; i<1000; i++ {
 		rand.Read(bytes[:])
 		raw := new (big.Int).SetBytes(bytes[:])
 		inrange := new (big.Int).Mod(raw, sm2.Params().N)
@@ -131,6 +131,20 @@ func TestCompleteness(t *testing.T) {
 	}
 }
 
+func TestScalarBaseMult_Precomputed_DaA(t *testing.T) {
+	var bytes [32]byte
+
+	for i:=0; i< 1000; i++ {
+		rand.Read(bytes[:])
+
+		res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), bytes[:])
+		res2, _ := scalarBaseMult_Precomputed_DaA(bytes[:])
+		if !reflect.DeepEqual(res1.Bytes(), res2.Bytes()) {
+			t.Fail()
+		}
+	}
+}
+
 // Tests if the result wraps around infinity how the program handles
 func BenchmarkSM2Point_ScalarMult_Unsafe_DaA(b *testing.B) {
 	bytes := new([32]byte)
@@ -141,6 +155,17 @@ func BenchmarkSM2Point_ScalarMult_Unsafe_DaA(b *testing.B) {
 	for i:=0; i<b.N; i++ {
 		rand.Read(bytes[:])
 		scalarMult_Unsafe_DaA(g, bytes[:])
+	}
+}
+
+func BenchmarkScalarBaseMult_Precomputed_DaA(b *testing.B) {
+	bytes := new([32]byte)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i:=0; i<b.N; i++ {
+		rand.Read(bytes[:])
+		scalarBaseMult_Precomputed_DaA(bytes[:])
 	}
 }
 
