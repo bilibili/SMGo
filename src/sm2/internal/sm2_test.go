@@ -88,7 +88,7 @@ func TestSM2Point_ScalarMult_to_inf(t *testing.T) {
 		fmt.Printf("Error: %s", err.Error())
 		t.Fail()
 	}
-	fmt.Printf("[n]G = (%s, %s, %s) \n%x\n", res.x.ToBigInt().String(), res.y.ToBigInt().String(), res.z.ToBigInt().String(), res.Bytes())
+	fmt.Printf("[n]G = (%s, %s, %s) %x\n", res.x.ToBigInt().String(), res.y.ToBigInt().String(), res.z.ToBigInt().String(), res.Bytes())
 	if res.z.IsZero() == 0 {
 		t.Fail()
 	}
@@ -109,6 +109,7 @@ func TestSM2Point_ScalarMult_warparound_inf(t *testing.T) {
 	}
 }
 
+// Tests if the result wraps around infinity how the program handles
 func BenchmarkSM2Point_ScalarMult_Unsafe_DaA(b *testing.B) {
 	bytes := new([32]byte)
 	g := NewSM2Generator()
