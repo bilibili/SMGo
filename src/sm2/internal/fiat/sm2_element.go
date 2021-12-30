@@ -13,6 +13,7 @@ package fiat
 import (
 	"crypto/subtle"
 	"errors"
+	"math/big"
 )
 
 // SM2Element is an integer modulo 2^256 - 2^224 - 2^96 + 2^64 - 1.
@@ -69,6 +70,16 @@ func (e *SM2Element) bytes(out *[SM2ElementLen]byte) []byte {
 	sm2ToBytes(out, (*sm2UntypedFieldElement)(&tmp))
 	sm2InvertEndianness(out[:])
 	return out[:]
+}
+
+func (e *SM2Element) ToBigInt() *big.Int {
+	bytes := e.Bytes()
+	return new (big.Int).SetBytes(bytes)
+}
+
+func (e *SM2Element) FromBigInt(x *big.Int) *SM2Element {
+	e, _ = new (SM2Element).SetBytes(x.Bytes())
+	return e
 }
 
 // sm2MinusOneEncoding is the encoding of -1 mod p, so p - 1, the

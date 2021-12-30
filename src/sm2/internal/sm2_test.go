@@ -11,12 +11,13 @@ import (
 	"smgo/sm2/internal/fiat"
 	"testing"
 )
-func makeElement(s string) (*fiat.SM2Element, error) {
+func makeElement(s string) (*fiat.SM2Element) {
 	var e, er =hex.DecodeString(s)
 	if er != nil {
 		panic("cannot decode hex due to " + er.Error())
 	}
-	return new (fiat.SM2Element).SetBytes(e)
+	r, er := new (fiat.SM2Element).SetBytes(e)
+	return r
 }
 
 func TestSM2Point_ScalarMult_1(t *testing.T) {
@@ -61,12 +62,12 @@ func TestSM2Point_ScalarMult_4(t *testing.T) {
 	// t：A756E53127F3F43B851C47CFEEFD9E43A2D133CA258EF4EA73FBF4683ACDA13A
 	// x00'：FDAC1EFAA770E4635885CA1BBFB360A584B238FB2902ECF09DDC935F60BF4F9B
 	// y00': B89AA9263D5632F6EE82222E4D63198E78E095C24042CBE715C23F711422D74C
+	// pubx: 09F9DF311E5421A150DD7D161E4BC5C672179FAD1833FC076BB08FF356F35020
+	// puby: CCEA490CE26775A52DC6EA718CC1AA600AED05FBF35E084A6632F6072DA9AD13
 
-	px, _ := makeElement("09F9DF311E5421A150DD7D161E4BC5C672179FAD1833FC076BB08FF356F35020")
-	py, _ := makeElement("CCEA490CE26775A52DC6EA718CC1AA600AED05FBF35E084A6632F6072DA9AD13")
 	pub := &SM2Point{
-		x: px,
-		y: py,
+		x: makeElement("09F9DF311E5421A150DD7D161E4BC5C672179FAD1833FC076BB08FF356F35020"),
+		y: makeElement("CCEA490CE26775A52DC6EA718CC1AA600AED05FBF35E084A6632F6072DA9AD13"),
 		z: new(fiat.SM2Element).One(),
 	}
 
@@ -95,18 +96,13 @@ func testWithStrings(p, x, y string, t *testing.T) {
 }
 
 func testWithStringsAndPoint(p, x, y string, point *SM2Point, t *testing.T) {
-	var k, _ = makeElement(p)
-	var res, _ = scalarMult_Unsafe_DaA(point, k.Bytes())
-
-	var qx, _ = makeElement(x)
-	var qy, _ = makeElement(y)
-
 	var q = SM2Point{
-		x: qx,
-		y: qy,
+		x: makeElement(x),
+		y: makeElement(y),
 		z: new(fiat.SM2Element).One(),
 	}
 
+	res, _ := scalarMult_Unsafe_DaA(point, makeElement(p).Bytes())
 	if !reflect.DeepEqual(res.Bytes(), q.Bytes()) {
 		t.Fail()
 	}

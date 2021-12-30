@@ -10,24 +10,30 @@
 package internal
 
 import (
-	"encoding/hex"
 	"errors"
 	"smgo/sm2/internal/fiat"
 )
 
-var sm2bBytes, _ = hex.DecodeString("28E9FA9E9D9F5E344D5A9E4BCF6509A7F39789F515AB8F92DDBCBD414D940E93")
-var sm2B, _ = new(fiat.SM2Element).SetBytes(sm2bBytes)
-
-var sm2gBytes, _ = hex.DecodeString("0432C4AE2C1F1981195F9904466A39C9948FE30BBFF2660BE1715A4589334C74C7BC3736A2F4F6779C59BDCEE36B692153D0A9877CC62A474002DF32E52139F0A0")
-var sm2G, _ = NewSM2Point().SetBytes(sm2gBytes)
-
 const SM2ElementLength = 32
+const SM2BytesLengthUncompressed = 1 + 2*SM2ElementLength
 
 // SM2Point is a SM2 point. The zero value is NOT valid.
 type SM2Point struct {
 	// The point is represented in projective coordinates (X:Y:Z),
 	// where x = X/Z and y = Y/Z.
 	x, y, z *fiat.SM2Element
+}
+
+var sm2B *fiat.SM2Element
+var sm2G *SM2Point
+
+func initPoints() {
+	sm2B = new (fiat.SM2Element).FromBigInt(sm2.Params().B)
+ 	sm2G = &SM2Point{
+		x: new (fiat.SM2Element).FromBigInt(sm2.Params().Gx),
+		y: new (fiat.SM2Element).FromBigInt(sm2.Params().Gy),
+		z: new (fiat.SM2Element).One(),
+	}
 }
 
 // NewSM2Point returns a new SM2Point representing the point at infinity point.
@@ -67,7 +73,7 @@ func (p *SM2Point) SetBytes(b []byte) (*SM2Point, error) {
 		return p.Set(NewSM2Point()), nil
 
 	// Uncompressed form.
-	case len(b) == 1+2*SM2ElementLength && b[0] == 4:
+	case len(b) == 1 + 2*SM2ElementLength && b[0] == 4:
 		x, err := new(fiat.SM2Element).SetBytes(b[1 : 1+SM2ElementLength])
 		if err != nil {
 			return nil, err
@@ -119,11 +125,11 @@ func sm2CheckOnCurve(x, y *fiat.SM2Element) error {
 func (p *SM2Point) Bytes() []byte {
 	// This function is outlined to make the allocations inline in the caller
 	// rather than happen on the heap.
-	var out [133]byte
+	var out [SM2BytesLengthUncompressed]byte
 	return p.bytes(&out)
 }
 
-func (p *SM2Point) bytes(out *[133]byte) []byte {
+func (p *SM2Point) bytes(out *[SM2BytesLengthUncompressed]byte) []byte {
 	if p.z.IsZero() == 1 {
 		return append(out[:0], 0)
 	}
