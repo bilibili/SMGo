@@ -49,8 +49,9 @@ func (curve sm2Curve) Params() *elliptic.CurveParams {
 // x is big endian and its integer value should lie in range of [1, n-1]
 // ***secure implementation***, this could be used for ECDH
 func ScalarMult(P *SM2Point, x []byte) (*SM2Point, error) {
-	out := NewSM2Point()
-	return out, nil
+	//out := NewSM2Point()
+	//return out, nil
+	return scalarMult_Unsafe_DaA(P, x)
 }
 
 // ScalarBaseMult scalar base multiplication, return [k]G when no error

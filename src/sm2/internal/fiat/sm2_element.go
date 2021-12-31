@@ -77,11 +77,6 @@ func (e *SM2Element) ToBigInt() *big.Int {
 	return new (big.Int).SetBytes(bytes)
 }
 
-func (e *SM2Element) FromBigInt(x *big.Int) *SM2Element {
-	e, _ = new (SM2Element).SetBytes(x.Bytes())
-	return e
-}
-
 // sm2MinusOneEncoding is the encoding of -1 mod p, so p - 1, the
 // highest canonical encoding. It is used by SetBytes to check for non-canonical
 // encodings such as p + k, 2p + k, etc.

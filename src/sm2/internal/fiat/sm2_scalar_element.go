@@ -77,18 +77,6 @@ func (e *SM2ScalarElement) ToBigInt() *big.Int {
 	return new (big.Int).SetBytes(bytes)
 }
 
-// FromBigInt sets e = x, and returns e.
-// If x is higher than n (0xFFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54123),
-// FromBigInt returns nil and an error, and e is unchanged.
-func (e *SM2ScalarElement) FromBigInt(x *big.Int) (*SM2ScalarElement, error) {
-	r, err := new (SM2ScalarElement).SetBytes(x.Bytes())
-	if err != nil {
-		return nil, err
-	}
-	e = r
-	return e, nil
-}
-
 // sm2ScalarMinusOneEncoding is the encoding of -1 mod n, so n - 1, the
 // highest canonical encoding. It is used by SetBytes to check for non-canonical
 // encodings such as n + k, 2n + k, etc.

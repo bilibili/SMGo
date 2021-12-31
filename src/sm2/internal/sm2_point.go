@@ -29,10 +29,12 @@ var sm2B *fiat.SM2Element
 var sm2G *SM2Point
 
 func initPoints() {
-	sm2B = new (fiat.SM2Element).FromBigInt(sm2.Params().B)
+	sm2B, _ = new (fiat.SM2Element).SetBytes(sm2.Params().B.Bytes())
+	xEle, _ := new (fiat.SM2Element).SetBytes(sm2.Params().Gx.Bytes())
+	yEle, _ := new (fiat.SM2Element).SetBytes(sm2.Params().Gy.Bytes())
  	sm2G = &SM2Point{
-		x: new (fiat.SM2Element).FromBigInt(sm2.Params().Gx),
-		y: new (fiat.SM2Element).FromBigInt(sm2.Params().Gy),
+		x: xEle,
+		y: yEle,
 		z: new (fiat.SM2Element).One(),
 	}
 }

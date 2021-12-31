@@ -46,7 +46,11 @@ func TestPrivateKey(priv *[]byte) int {
 	return -1 * subtle.ConstantTimeCompare(*priv, nminus1[:])
 }
 
-// SignHashed signs the data which have been hashed from message and public parameters
+// SignHashed signs the data which have been hashed from message and public parameters.
+//  rand: caller must supply a cryptographically secure random number generator
+//  e: the value from hashing the message and public parameters according to the spec
+//  priv: the private key has 32 big endian bytes and its encoded value shall not be n - 1
+//
 // Standard demands that priv should lie in [1, n-2], SignHashed is rather permissive in that
 // it handles if priv is larger than or equal to n, except for priv = -1 mod n, which is not
 // a valid private key for SM2 signature purpose by definition (we need to calculate 1/(priv + 1)
@@ -112,7 +116,7 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 			d1Int.Sub(&d1Int, n)
 		}
 
-		d1.FromBigInt(&d1Int) // priv = n - 1 已经被排除，因此不会导致 d1 = 0
+		d1.SetBytes(d1Int.Bytes()) // priv = n - 1 已经被排除，因此不会导致 d1 = 0
 		d1Inv.Invert(&d1) // **常数时间**算法 constant time inversion here, about 10% performance hit
 
 		sInt.Mul(&rkInt, d1Inv.ToBigInt())
@@ -125,4 +129,48 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 
 		return rInt.Bytes(), sInt.Bytes(), nil
 	}
+}
+
+func VerifyHashed_Slow (pubx, puby, e, r, s *[]byte) (bool) {
+	var rInt, sInt, eInt, t big.Int
+
+	rInt.SetBytes(*r)
+	sInt.SetBytes(*s)
+
+	if rInt.Cmp(one) < 0 || sInt.Cmp(one) < 0 || rInt.Cmp(n) >= 0 || sInt.Cmp(n) >= 0 {
+		return false
+	}
+
+	eInt.SetBytes(*e)
+	t.Add(&rInt, &sInt)
+	t.Mod(&t, n)
+	if t.Sign() == 0 {
+		return false
+	}
+
+	// slow calculation below TODO
+	sG, es := internal.ScalarBaseMult_Precomputed_DaA(*s)
+	if es != nil {
+		return false
+	}
+
+	var pub [65]byte
+	buf := append(pub[:0], 4)
+	buf = append(buf, *pubx...)
+	buf = append(buf, *puby...)
+
+	P := internal.NewSM2Point()
+	P.SetBytes(pub[:])
+
+	tP, et := internal.ScalarMult(P, t.Bytes())
+	if et != nil {
+		return false
+	}
+
+	sGtP := internal.NewSM2Point().Add(sG, tP)
+	R := sGtP.GetX()
+	R.Add(R, &eInt)
+	R.Mod(R, n)
+
+	return R.Cmp(&rInt) == 0
 }
