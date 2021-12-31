@@ -84,7 +84,6 @@ func ScalarBaseMult_Precomputed_DaA(k []byte) (*SM2Point, error) {
 	out := NewSM2Point()
 	for i, b := range k {
 		for bitNum := 0; bitNum < 8; bitNum++ {
-			//out.Double(out)
 			if b&0x80 == 0x80 {
 				out.Add(out, sm2PrecomputedForDaA[i*8 + bitNum]) // not secure here, should call select TODO
 			}
