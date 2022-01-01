@@ -42,7 +42,7 @@ func BenchmarkVerifyHashed_Slow(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		v, err := VerifyHashed_Slow(&x, &y, &e, &r,& s)
+		v, err := VerifyHashed(&x, &y, &e, &r,& s)
 		if err != nil {
 			fmt.Println(err.Error())
 		}
@@ -90,7 +90,7 @@ func Test_Verify(t *testing.T) {
 	r, _ := hex.DecodeString("F5A03B0648D2C4630EEAC513E1BB81A15944DA3827D5B74143AC7EACEEE720B3")
 	s, _ := hex.DecodeString("B1B6AA29DF212FD8763182BC0D421CA1BB9038FD1F7F42D4840B69C485BBC1AA")
 
-	v, err := VerifyHashed_Slow(&pubx, &puby, &e, &r, &s)
+	v, err := VerifyHashed(&pubx, &puby, &e, &r, &s)
 	if err != nil {
 		fmt.Println(err.Error())
 	}

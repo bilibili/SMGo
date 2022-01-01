@@ -138,12 +138,13 @@ func ensure32Bytes(i *big.Int) []byte {
 	return buf[:]
 }
 
-// VerifyHashed_Slow verifies if a signature is valid or not.
+// VerifyHashed verifies if a signature is valid or not.
 // All parameters should be given in byte arrays big endian and in 32 bytes
-func VerifyHashed_Slow (pubx, puby, e, r, s *[]byte) (bool, error) {
+func VerifyHashed(pubx, puby, e, r, s *[]byte) (bool, error) {
 
 	if len(*pubx) != 32 || len(*puby) != 32 || len(*e) != 32 || len(*r) != 32 || len(*s) != 32 {
-		return false, errors.New("parameter not in 32 bytes")
+		return false, errors.New(fmt.Sprintf("parameter not in 32 bytes: %d, %d, %d, %d, %d\n",
+			len(*pubx), len(*puby), len(*e), len(*r), len(*s)))
 	}
 
 	var rInt, sInt, eInt, t big.Int
@@ -161,21 +162,24 @@ func VerifyHashed_Slow (pubx, puby, e, r, s *[]byte) (bool, error) {
 		return false, errors.New("encountered r + s = n")
 	}
 
-	// slow calculation below TODO
+	var pubBytes [65]byte
+	buf := append(pubBytes[:0], 4)
+	buf = append(buf, *pubx...)
+	buf = append(buf, *puby...)
+
+	pub, err := internal.NewSM2Point().SetBytes(pubBytes[:])
+	if err != nil {
+		return false, errors.New("not a valid public key")
+	}
+
+	// done sanity check
+	// slow calculation below, should adopt mixed method and use some NAF optimization etc. TODO
 	sG, es := internal.ScalarBaseMult_Precomputed_DaA(*s)
 	if es != nil {
 		return false, es
 	}
 
-	var pub [65]byte
-	buf := append(pub[:0], 4)
-	buf = append(buf, *pubx...)
-	buf = append(buf, *puby...)
-
-	P := internal.NewSM2Point()
-	P.SetBytes(pub[:])
-
-	tP, et := internal.ScalarMult(P, t.Bytes())
+	tP, et := internal.ScalarMult(pub, t.Bytes())
 	if et != nil {
 		return false, et
 	}
