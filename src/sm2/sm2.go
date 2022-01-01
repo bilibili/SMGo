@@ -29,8 +29,8 @@ var one = big.NewInt(1)
 var n = internal.Sm2().Params().N
 var nminus1 = new(big.Int).Sub(n, one).Bytes()
 
-// TestPrivateKey tests if the priv has 32 bytes, and if it is a valid private key
-// for SM2 signature purpose. Returns twice of length difference if not zero, or -1 if
+// TestPrivateKey tests if the priv has at most 32 bytes, and if it is a valid private key
+// for SM2 signature purpose. Returns the length difference if longer than 32, or -1 if
 // priv == n - 1, or 0 if everything checks out
 //
 // TestPrivateKey is made public purposefully.
@@ -40,8 +40,8 @@ var nminus1 = new(big.Int).Sub(n, one).Bytes()
 // 即，将 x 的 hex 编码的最后一位减去1
 func TestPrivateKey(priv *[]byte) int {
 	l := len(*priv) - 32
-	if l != 0 {
-		return l*2
+	if l > 0 {
+		return l
 	}
 	return -1 * subtle.ConstantTimeCompare(*priv, nminus1[:])
 }
@@ -50,12 +50,12 @@ func TestPrivateKey(priv *[]byte) int {
 //  rand: caller must supply a cryptographically secure random number generator
 //  e: the value from hashing the message and public parameters according to the spec
 //  priv: the private key has 32 big endian bytes and its encoded value shall not be n - 1
+//  r, s: has 32 bytes each
 //
 // Standard demands that priv should lie in [1, n-2], SignHashed is rather permissive in that
 // it handles if priv is larger than or equal to n, except for priv = -1 mod n, which is not
 // a valid private key for SM2 signature purpose by definition (we need to calculate 1/(priv + 1)
-// and we cannot divide by zero). Still, SignHashed only accepts private key in 32 bytes.
-// For longer one, please do mod n; for shorter one, please think about which end to zero-pad.
+// and we cannot divide by zero). Still, SignHashed only accepts private key not longer than 32 bytes.
 // See doc of TestPrivateKey if you encounter an error message and you'd like to decode the reason code
 func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 	test := TestPrivateKey(priv)
@@ -85,7 +85,7 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 			return
 		}
 
-		var eInt, rInt, sInt, rkInt, dInt, d1Int big.Int
+		var eInt, rInt, sInt, rkInt, dInt, d1Int, tmp big.Int
 		var d1, d1Inv fiat.SM2ScalarElement
 
 		x := kG.GetX() // 避免计算y坐标，可以节约计算量
@@ -105,53 +105,66 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 			continue
 		}
 
-		// 标准要求计算  (k - r * priv) / (1 + priv)
-		// 其等价于 （(k + r）/ (1  + priv)) - r，使用后者可以节省一次乘法，而且k + r上面已经计算过了(rk)
-		// 注意，求逆的时候我们需要使用常数时间算法，虽然慢一点（10%），但可以保证安全性
 		dInt.SetBytes(*priv)
 		d1Int.Add(&dInt, one)
 
-		// 后面的FromBigInt要求参数不能大于n
-		if d1Int.Cmp(n) > 0 {
-			d1Int.Sub(&d1Int, n)
-		}
+		//SM2ScalarElement.SetBytes要求长度为32，因此，如果私钥实际长度短于32字节（标准不排除此种情形），左边补零（标准规定使用大端字节序）
+		d1Bytes := d1Int.Bytes()
+		var buf [32]byte
+		copy(buf[32-len(d1Bytes) : ], d1Int.Bytes())
 
-		d1.SetBytes(d1Int.Bytes()) // priv = n - 1 已经被排除，因此不会导致 d1 = 0
+		d1.SetBytes(buf[:]) // priv = n - 1 已经被排除，因此不会导致 d1 = 0
 		d1Inv.Invert(&d1) // **常数时间**算法 constant time inversion here, about 10% performance hit
 
-		sInt.Mul(&rkInt, d1Inv.ToBigInt())
-		sInt.Sub(&sInt, &rInt) // 结果为正数
-		sInt.Mod(&sInt, n) // 结果为非负
+		// 标准要求计算  (k - r * priv) / (1 + priv)
+		tmp.Mul(&rInt, &dInt)
+		tmp.Sub(&k, &tmp)
+		sInt.Mul(&tmp, d1Inv.ToBigInt())
+		sInt.Mod(&sInt, n)
 
 		if sInt.Sign() == 0 {
 			continue
 		}
 
-		return rInt.Bytes(), sInt.Bytes(), nil
+		// 注意，标准要求使用大端字节序，因此，如果输出结果高位字节为0，big.Int.Bytes()将输出少于32字节
+		return ensure32Bytes(&rInt), ensure32Bytes(&sInt), nil
 	}
 }
 
-func VerifyHashed_Slow (pubx, puby, e, r, s *[]byte) (bool) {
+func ensure32Bytes(i *big.Int) []byte {
+	bytes := i.Bytes()
+	var buf [32]byte
+	copy(buf[32 - len(bytes) : ], bytes)
+	return buf[:]
+}
+
+// VerifyHashed_Slow verifies if a signature is valid or not.
+// All parameters should be given in byte arrays big endian and in 32 bytes
+func VerifyHashed_Slow (pubx, puby, e, r, s *[]byte) (bool, error) {
+
+	if len(*pubx) != 32 || len(*puby) != 32 || len(*e) != 32 || len(*r) != 32 || len(*s) != 32 {
+		return false, errors.New("parameter not in 32 bytes")
+	}
+
 	var rInt, sInt, eInt, t big.Int
 
 	rInt.SetBytes(*r)
 	sInt.SetBytes(*s)
 
 	if rInt.Cmp(one) < 0 || sInt.Cmp(one) < 0 || rInt.Cmp(n) >= 0 || sInt.Cmp(n) >= 0 {
-		return false
+		return false, errors.New("r or s not in range [1, n-1]")
 	}
 
-	eInt.SetBytes(*e)
 	t.Add(&rInt, &sInt)
 	t.Mod(&t, n)
 	if t.Sign() == 0 {
-		return false
+		return false, errors.New("encountered r + s = n")
 	}
 
 	// slow calculation below TODO
 	sG, es := internal.ScalarBaseMult_Precomputed_DaA(*s)
 	if es != nil {
-		return false
+		return false, es
 	}
 
 	var pub [65]byte
@@ -164,13 +177,14 @@ func VerifyHashed_Slow (pubx, puby, e, r, s *[]byte) (bool) {
 
 	tP, et := internal.ScalarMult(P, t.Bytes())
 	if et != nil {
-		return false
+		return false, et
 	}
 
 	sGtP := internal.NewSM2Point().Add(sG, tP)
 	R := sGtP.GetX()
+	eInt.SetBytes(*e)
 	R.Add(R, &eInt)
 	R.Mod(R, n)
 
-	return R.Cmp(&rInt) == 0
+	return R.Cmp(&rInt) == 0, nil
 }

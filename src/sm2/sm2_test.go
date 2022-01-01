@@ -3,6 +3,7 @@ package sm2
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"math/big"
 	"reflect"
 	"smgo/sm2/internal"
@@ -41,7 +42,11 @@ func BenchmarkVerifyHashed_Slow(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		if !VerifyHashed_Slow(&x, &y, &e, &r,& s) {
+		v, err := VerifyHashed_Slow(&x, &y, &e, &r,& s)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+		if !v {
 			b.Fail()
 		}
 	}
@@ -85,7 +90,11 @@ func Test_Verify(t *testing.T) {
 	r, _ := hex.DecodeString("F5A03B0648D2C4630EEAC513E1BB81A15944DA3827D5B74143AC7EACEEE720B3")
 	s, _ := hex.DecodeString("B1B6AA29DF212FD8763182BC0D421CA1BB9038FD1F7F42D4840B69C485BBC1AA")
 
-	if ! VerifyHashed_Slow(&pubx, &puby, &e, &r, &s) {
+	v, err := VerifyHashed_Slow(&pubx, &puby, &e, &r, &s)
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	if !v {
 		t.Fail()
 	}
 }
@@ -105,13 +114,7 @@ func Test_RejectNminus1(t *testing.T) {
 
 	bytes =	make([]byte, 40)
 	a := TestPrivateKey(&bytes)
-	if a != 16 {
-		t.Fail()
-	}
-
-	bytes =	make([]byte, 20)
-	a = TestPrivateKey(&bytes)
-	if a != -24 {
+	if a != 8 {
 		t.Fail()
 	}
 

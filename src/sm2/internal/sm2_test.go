@@ -143,6 +143,32 @@ func TestScalarBaseMult_Precomputed_DaA(t *testing.T) {
 			t.Fail()
 		}
 	}
+
+	// Test zero-padded values
+	rand.Read(bytes[:])
+	bytes[0] = 0
+	bytes[1] = 0
+	res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), bytes[:])
+	res2, _ := ScalarBaseMult_Precomputed_DaA(bytes[:])
+	if !reflect.DeepEqual(res1.Bytes(), res2.Bytes()) {
+		t.Fail()
+	}
+
+	var bytes2 [33]byte
+	rand.Read(bytes2[:])
+
+	_, err2 := ScalarBaseMult_Precomputed_DaA(bytes2[:])
+	if err2 == nil {
+		t.Fail()
+	}
+
+	var bytes3 [31]byte
+	rand.Read(bytes3[:])
+
+	_, err3 := ScalarBaseMult_Precomputed_DaA(bytes3[:])
+	if err3 == nil {
+		t.Fail()
+	}
 }
 
 // Tests if the result wraps around infinity how the program handles

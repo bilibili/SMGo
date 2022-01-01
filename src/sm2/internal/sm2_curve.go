@@ -5,6 +5,7 @@ package internal
 
 import (
 	"crypto/elliptic"
+	"errors"
 	"math/big"
 )
 
@@ -81,7 +82,14 @@ func ScalarBaseMult(k []byte) (*SM2Point, error) {
 //}
 
 var sm2PrecomputedForDaA [256]*SM2Point
+// ScalarBaseMult_Precomputed_DaA
+// k should have 32 bytes. If k's actual value is smaller, it should
+// be zero-padded from left
 func ScalarBaseMult_Precomputed_DaA(k []byte) (*SM2Point, error) {
+	if len(k) != 32 {
+		return nil, errors.New("k not in 32 bytes")
+	}
+
 	out := NewSM2Point()
 	for i, b := range k {
 		for bitNum := 0; bitNum < 8; bitNum++ {
