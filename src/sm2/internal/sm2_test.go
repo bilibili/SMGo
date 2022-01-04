@@ -28,10 +28,11 @@ func TestSM2Point_ScalarMult_1(t *testing.T) {
 	// 私钥：3945208F 7B2144B1 3F36E38A C6D39F95 88939369 2860B51A 42FB81EF 4DF7C5B8
 	// 公钥x：09F9DF31 1E5421A1 50DD7D16 1E4BC5C6 72179FAD 1833FC07 6BB08FF3 56F35020
 	// 公钥y: CCEA490C E26775A5 2DC6EA71 8CC1AA60 0AED05FB F35E084A 6632F607 2DA9AD13
-	testWithStrings("3945208F7B2144B13F36E38AC6D39F95889393692860B51A42FB81EF4DF7C5B8",
+	if !testWithStrings("3945208F7B2144B13F36E38AC6D39F95889393692860B51A42FB81EF4DF7C5B8",
 		"09F9DF311E5421A150DD7D161E4BC5C672179FAD1833FC076BB08FF356F35020",
-		"CCEA490CE26775A52DC6EA718CC1AA600AED05FBF35E084A6632F6072DA9AD13",
-		t)
+		"CCEA490CE26775A52DC6EA718CC1AA600AED05FBF35E084A6632F6072DA9AD13") {
+		t.Fail()
+	}
 }
 
 func TestSM2Point_ScalarMult_2(t *testing.T) {
@@ -40,10 +41,11 @@ func TestSM2Point_ScalarMult_2(t *testing.T) {
 	// k：59276E27D506861A16680F3AD9C02DCCEF3CC1FA3CDBE4CE6D54B80DEAC1BC21
 	// x1：04EBFC718E8D1798620432268E77FEB6415E2EDE0E073C0F4F640ECD2E149A73
 	// y1: E858F9D81E5430A57B36DAAB8F950A3C64E6EE6A63094D99283AFF767E124DF0
-	testWithStrings("59276E27D506861A16680F3AD9C02DCCEF3CC1FA3CDBE4CE6D54B80DEAC1BC21",
+	if !testWithStrings("59276E27D506861A16680F3AD9C02DCCEF3CC1FA3CDBE4CE6D54B80DEAC1BC21",
 		"04EBFC718E8D1798620432268E77FEB6415E2EDE0E073C0F4F640ECD2E149A73",
-		"E858F9D81E5430A57B36DAAB8F950A3C64E6EE6A63094D99283AFF767E124DF0",
-		t)
+		"E858F9D81E5430A57B36DAAB8F950A3C64E6EE6A63094D99283AFF767E124DF0") {
+		t.Fail()
+	}
 }
 
 func TestSM2Point_ScalarMult_3(t *testing.T) {
@@ -52,10 +54,11 @@ func TestSM2Point_ScalarMult_3(t *testing.T) {
 	// s'：B1B6AA29DF212FD8763182BC0D421CA1BB9038FD1F7F42D4840B69C485BBC1AA
 	// x0'：2B9CE14E3C8D1FFC46D693FA0B54F2BDC4825A506607655DE22894B5C99D3746
 	// y0': 277BFE04D1E526B4E1C32726435761FBCE0997C26390919C4417B3A0A8639A59
-	testWithStrings("B1B6AA29DF212FD8763182BC0D421CA1BB9038FD1F7F42D4840B69C485BBC1AA",
+	if !testWithStrings("B1B6AA29DF212FD8763182BC0D421CA1BB9038FD1F7F42D4840B69C485BBC1AA",
 		"2B9CE14E3C8D1FFC46D693FA0B54F2BDC4825A506607655DE22894B5C99D3746",
-		"277BFE04D1E526B4E1C32726435761FBCE0997C26390919C4417B3A0A8639A59",
-		t)
+		"277BFE04D1E526B4E1C32726435761FBCE0997C26390919C4417B3A0A8639A59") {
+		t.Fail()
+	}
 }
 
 func TestSM2Point_ScalarMult_4(t *testing.T) {
@@ -74,16 +77,18 @@ func TestSM2Point_ScalarMult_4(t *testing.T) {
 	}
 
 
-	testWithStringsAndPoint("A756E53127F3F43B851C47CFEEFD9E43A2D133CA258EF4EA73FBF4683ACDA13A",
+	if !testWithStringsAndPoint("A756E53127F3F43B851C47CFEEFD9E43A2D133CA258EF4EA73FBF4683ACDA13A",
 		"FDAC1EFAA770E4635885CA1BBFB360A584B238FB2902ECF09DDC935F60BF4F9B",
 		"B89AA9263D5632F6EE82222E4D63198E78E095C24042CBE715C23F711422D74C",
-		pub,
-		t)
+		pub) {
+		t.Fail()
+	}
 }
 
 // Tests if calculation leads to infinity how the program handles
 func TestSM2Point_ScalarMult_to_inf(t *testing.T) {
-	res, err := scalarMult_Unsafe_DaA(NewSM2Generator(), sm2.Params().N.Bytes())
+	nBytes := sm2.Params().N.Bytes()
+	res, err := scalarMult_Unsafe_DaA(NewSM2Generator(), &nBytes)
 	if err != nil {
 		fmt.Printf("Error: %s", err.Error())
 		t.Fail()
@@ -98,7 +103,8 @@ func TestSM2Point_ScalarMult_to_inf(t *testing.T) {
 func TestSM2Point_ScalarMult_warparound_inf(t *testing.T) {
 	np1 := new(big.Int).Set(sm2.Params().N)
 	np1.Add(np1, new(big.Int).SetInt64(1))
-	res, err := scalarMult_Unsafe_DaA(NewSM2Generator(), np1.Bytes())
+	np1Bytes := np1.Bytes()
+	res, err := scalarMult_Unsafe_DaA(NewSM2Generator(), &np1Bytes)
 	if err != nil {
 		fmt.Printf("Error: %s", err.Error())
 		t.Fail()
@@ -120,8 +126,9 @@ func TestCompleteness(t *testing.T) {
 		raw = raw.Mul(sm2.Params().N, new (big.Int).SetUint64(rand.Uint64()))
 		raw.Add(raw, inrange)
 
-		res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), inrange.Bytes())
-		res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), raw.Bytes())
+		inrangeBytes, rawBytes := inrange.Bytes(), raw.Bytes()
+		res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &inrangeBytes)
+		res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &rawBytes)
 
 		if !reflect.DeepEqual(res1.Bytes(), res2.Bytes()) {
 			fmt.Printf("round #%d, %x\n", i, sm2.Params().N)
@@ -132,12 +139,13 @@ func TestCompleteness(t *testing.T) {
 }
 
 func TestScalarBaseMult_Precomputed_DaA(t *testing.T) {
-	var bytes [32]byte
+	var bytes = make([]byte, 32)
+
 
 	for i:=0; i< 1000; i++ {
-		rand.Read(bytes[:])
+		rand.Read(bytes)
 
-		res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), bytes[:])
+		res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &bytes)
 		res2, _ := scalarBaseMult_Precomputed_DaA(bytes[:])
 		if !reflect.DeepEqual(res1.Bytes(), res2.Bytes()) {
 			t.Fail()
@@ -145,10 +153,10 @@ func TestScalarBaseMult_Precomputed_DaA(t *testing.T) {
 	}
 
 	// Test zero-padded values
-	rand.Read(bytes[:])
+	rand.Read(bytes)
 	bytes[0] = 0
 	bytes[1] = 0
-	res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), bytes[:])
+	res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &bytes)
 	res2, _ := scalarBaseMult_Precomputed_DaA(bytes[:])
 	if !reflect.DeepEqual(res1.Bytes(), res2.Bytes()) {
 		t.Fail()
@@ -173,14 +181,14 @@ func TestScalarBaseMult_Precomputed_DaA(t *testing.T) {
 
 // Tests if the result wraps around infinity how the program handles
 func BenchmarkSM2Point_ScalarMult_Unsafe_DaA(b *testing.B) {
-	bytes := new([32]byte)
+	bytes := make([]byte, 32)
 	g := NewSM2Generator()
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i:=0; i<b.N; i++ {
 		rand.Read(bytes[:])
-		scalarMult_Unsafe_DaA(g, bytes[:])
+		scalarMult_Unsafe_DaA(g, &bytes)
 	}
 }
 
@@ -195,43 +203,47 @@ func BenchmarkScalarBaseMult_Precomputed_DaA(b *testing.B) {
 	}
 }
 
-func testWithStrings(p, x, y string, t *testing.T) {
-	testWithStringsAndPoint(p, x, y, NewSM2Generator(), t)
+func testWithStrings(p, x, y string) bool {
+	return testWithStringsAndPoint(p, x, y, NewSM2Generator())
 }
 
-func testWithStringsAndPoint(p, x, y string, point *SM2Point, t *testing.T) {
+func testWithStringsAndPoint(p, x, y string, point *SM2Point) bool {
 	var q = SM2Point{
 		x: makeElement(x),
 		y: makeElement(y),
 		z: new(fiat.SM2Element).One(),
 	}
 
-	res, _ := scalarMult_Unsafe_DaA(point, makeElement(p).Bytes())
+	var bytes []byte
+	bytes = makeElement(p).Bytes()
+	res, _ := scalarMult_Unsafe_DaA(point, &bytes)
 	if !reflect.DeepEqual(res.Bytes(), q.Bytes()) {
-		t.Fail()
+		return false
 	}
 
 	larger := makeElement(p).ToBigInt()
 	larger.Add(larger, sm2.Params().N) // this shall not change the result if the Add and Double are implemented "completely"
-	bytes := larger.Bytes()
-	fmt.Printf("larger scalar has %d bytes", len(bytes))
-	res2, _ := scalarMult_Unsafe_DaA(point, bytes)
+	bytes = larger.Bytes()
+	fmt.Printf("larger scalar has %d bytes\n", len(bytes))
+	res2, _ := scalarMult_Unsafe_DaA(point, &bytes)
 	if !reflect.DeepEqual(res2.Bytes(), res.Bytes()) {
-		t.Fail()
+		return false
 	}
+
+	return true
 }
 
 func Test_MontgomeryFriendlity(t *testing.T) {
 	SM2p :=  bigFromHex("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFF")
 	SM2n :=  bigFromHex("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54123")
 
-	tellMontgomeryFriendility(t, SM2p, 64)
-	tellMontgomeryFriendility(t, SM2p, 32)
-	tellMontgomeryFriendility(t, SM2n, 64)
-	tellMontgomeryFriendility(t, SM2n, 32)
+	tellMontgomeryFriendility(SM2p, 64)
+	tellMontgomeryFriendility(SM2p, 32)
+	tellMontgomeryFriendility(SM2n, 64)
+	tellMontgomeryFriendility(SM2n, 32)
 }
 
-func tellMontgomeryFriendility(t *testing.T, p *big.Int, s uint) {
+func tellMontgomeryFriendility(p *big.Int, s uint) {
 	ms := big.NewInt(1)
 	ms.Lsh(ms, s)
 

@@ -46,13 +46,13 @@ func (curve sm2Curve) Params() *elliptic.CurveParams {
 	return curve.params
 }
 
-// ScalarMult Scalar multiplication, returns [x]P when no error.
-// x is big endian and its integer value should lie in range of [1, n-1]
+// ScalarMult Scalar multiplication, returns [scalar]P when no error.
+// scalar is big endian and its integer value should lie in range of [1, n-1]
 // ***secure implementation***, this could be used for ECDH
-func ScalarMult(P *SM2Point, x *[]byte) (*SM2Point, error) {
+func ScalarMult(P *SM2Point, scalar *[]byte) (*SM2Point, error) {
 	//out := NewSM2Point()
 	//return out, nil
-	return scalarMult_Unsafe_DaA(P, x)
+	return scalarMult_Unsafe_DaA(P, scalar)
 }
 
 // ScalarBaseMult scalar base multiplication, return [k]G when no error
@@ -83,8 +83,18 @@ func ScalarMixedMult_Unsafe(gScalar *[]byte, P *SM2Point, scalar *[]byte) (*SM2P
 	return sGtP, nil
 }
 
-var sm2PrecomputedForDaA [256]*SM2Point
+var sm2SkipBitExtration [][]*SM2Point
+// scalarBaseMult_SkipBitExtraction uses pre-computed table of multiples
+// of base point to calculate base-mult. Not sure about the algorithm name,
+// similar algorithm is seen from BoringSSL, with 4-bit x 2 and costs
+// 31 DOUBLE + 62 ADD. See BoringSSL/crypto/fipsmodule/ec/make_tables.go
+// We use 6 bit x 4 and cost 10 DOUBLE + 37 ADD. Name it SkipBitExtration
+// based on the pattern of the bit access from the algorithm.
+func scalarBaseMult_BitExtraction(k *[]byte) (*SM2Point, error) {
+	return nil, nil
+}
 
+var sm2PrecomputedForDaA [256]*SM2Point
 // scalarBaseMult_Precomputed_DaA
 // k should have 32 bytes. If k's actual value is smaller, it should
 // be zero-padded from left
