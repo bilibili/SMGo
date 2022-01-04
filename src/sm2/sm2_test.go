@@ -11,10 +11,9 @@ import (
 )
 
 func BenchmarkSignHashed(b *testing.B) {
-	priv := make([]byte, 32)
-	e := make([]byte, 32)
+	priv, _, _, _ := GenerateKey(rand.Reader)
 
-	rand.Read(priv)
+	e := make([]byte, 32)
 	rand.Read(e)
 
 	b.ReportAllocs()
@@ -25,19 +24,15 @@ func BenchmarkSignHashed(b *testing.B) {
 }
 
 func BenchmarkVerifyHashed_Slow(b *testing.B) {
-	priv := make([]byte, 32)
-	e := make([]byte, 32)
+	priv, x, y, _ := GenerateKey(rand.Reader)
 
-	rand.Read(priv)
+	e := make([]byte, 32)
+	rand.Read(e)
 	rand.Read(e)
 	r, s, err := SignHashed(rand.Reader, &priv, &e)
 	if err != nil {
 		b.Fail()
 	}
-
-	pub, _ := internal.ScalarBaseMult_Precomputed_DaA(priv)
-	x := pub.Bytes()[1:33]
-	y := pub.Bytes()[33:]
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -61,6 +56,25 @@ func (myRand) Read(b []byte) (n int, err error) {
 	}
 
 	return 32, nil
+}
+
+func TestGenerateKey(t *testing.T) {
+	for i:=0; i<100000; i++ { // with 100,000 count of random generation, it is expected random numbers larger than n will be generated
+		priv, x, y, err := GenerateKey(rand.Reader)
+
+		if err != nil {
+			t.Fail()
+		}
+
+		dInt := new(big.Int).SetBytes(priv)
+		if dInt.Cmp(nMinus1) >= 0 {
+			t.Fail()
+		}
+
+		if !CheckOnCurve(&x, &y) {
+			t.Fail()
+		}
+	}
 }
 
 func Test_Sign(t *testing.T) {
@@ -104,7 +118,8 @@ func Test_RejectNminus1(t *testing.T) {
 	for i:=1; i<1000; i++ {
 		k := new(big.Int).Mul(internal.Sm2().Params().N, big.NewInt(int64(i)))
 		k.Sub(k, big.NewInt(1))
-		_, _, err := SignHashed(nil, &nminus1, nil)
+		bytes := nMinus1.Bytes()
+		_, _, err := SignHashed(nil, &bytes, nil)
 		if err == nil {
 			t.Fail()
 		}
@@ -125,7 +140,8 @@ func Test_RejectNminus1(t *testing.T) {
 		t.Fail()
 	}
 
-	a = TestPrivateKey(&nminus1)
+	bytes = nMinus1.Bytes()
+	a = TestPrivateKey(&bytes)
 	if a != -1 {
 		t.Fail()
 	}

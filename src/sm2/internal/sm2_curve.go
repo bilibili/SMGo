@@ -59,27 +59,9 @@ func ScalarMult(P *SM2Point, x []byte) (*SM2Point, error) {
 // k is big endian and its integer value should lie in range of [1, n-1]
 // ***secure implementation***, this could be used for
 // sign or key generation, all sensitive operations
-// underlying uses 7-NAF optimization therefore 64 precomputed points
-// use safe algorithm to copy from the precomputed values to eliminate
-// side channel risks
-// w-NAF基本思想是将标量因子重写，使得结果的表示中0比较多，再加上通过对[x]G的预计算，完全节省Double操作，并且只需要 256/(w+1)的加法操作
-// 从而大大加快计算速度。在这里，我们使用w = 7，因此只需要32次加法操作即可完成对基点的标量乘法计算
-// 具体而言，我们预计算一个表格，其中依次存储如下数值：[1]G, [3]G, [5]G, ..., [63]G
-// 然后，我们将k表示为 k = sigma (2^7i)ki, i = 0, 1, 2, ..., 31
-func ScalarBaseMult(k []byte) (*SM2Point, error) {
-	out := NewSM2Point()
-
-	return out, nil
+func ScalarBaseMult(k *[]byte) (*SM2Point, error) {
+	return ScalarBaseMult_Precomputed_DaA(*k)
 }
-
-//func to7Naf(k [] byte) []int {
-//	s := new(big.Int).SetBytes(k)
-//	s.Mod(s, sm2.Params().N)
-//
-//	for s.Sign() > 0 {
-//
-//	}
-//}
 
 var sm2PrecomputedForDaA [256]*SM2Point
 // ScalarBaseMult_Precomputed_DaA

@@ -4,7 +4,6 @@
 package sm2
 
 import (
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"io"
@@ -13,37 +12,83 @@ import (
 	"smgo/sm2/internal/fiat"
 )
 
-// GenerateKeyWithRand generate private key with provided random source
+// GenerateKey generate private key with provided random source
 // note that private key will lie in range [1, n-2] as we need
 // to calculate 1/(d + 1) for signature
-// private key is used as stack variable and then copied out so that this
+// rand: must NOT be nil. Must be a cryptographically secure random number generator, usually
+// caller can simply use rand.Reader from crypto/rand, but alternatives could
+// be used especially a hardware backed one, as long as it is cryptographically secure
+// x, y: the X and Y coordination of the public key in 32 bytes. Leading bytes could be zero
+// so be cautious converting between byte array and big integer.
+//
+// Security notes: private key is used as stack variable and then copied out so that this
 // function can securely destroy the key material instead of leaving it in
 // heap after generation
-func GenerateKeyWithRand(rand io.Reader) (priv []byte, x, y *[]byte, err error) {
+func GenerateKey(rand io.Reader) (priv, x, y []byte, err error) {
+	if rand == nil {
+		err = errors.New("rand is nil")
+		return
+	}
+
 	priv = make([]byte, 32)
-	var tmp []byte
-	return priv, &tmp, &tmp, nil
+
+	for {
+		io.ReadFull(rand, priv)
+		if TestPrivateKey(&priv) == 0 {
+			break
+		}
+	}
+
+	var pub *internal.SM2Point
+	pub, err = internal.ScalarBaseMult(&priv)
+	if err != nil {
+		return
+	}
+
+	var pubBytes []byte
+	pubBytes = pub.Bytes()
+
+	return priv, pubBytes[1:33], pubBytes[33:], nil
+}
+
+// CheckOnCurve checks if the point given in x and y coordinates, lies on the curve.
+func CheckOnCurve(x, y *[]byte) bool {
+	var xe, ye *fiat.SM2Element
+	var err error
+	xe, err = new(fiat.SM2Element).SetBytes(*x)
+	if err != nil {
+		return false
+	}
+	ye, err = new(fiat.SM2Element).SetBytes(*y)
+	if err != nil {
+		return false
+	}
+	return internal.Sm2CheckOnCurve(xe, ye) == nil
 }
 
 var one = big.NewInt(1)
 var n = internal.Sm2().Params().N
-var nminus1 = new(big.Int).Sub(n, one).Bytes()
+var nMinus1 = new(big.Int).Sub(n, one)
 
-// TestPrivateKey tests if the priv has at most 32 bytes, and if it is a valid private key
-// for SM2 signature purpose. Returns the length difference if longer than 32, or -1 if
-// priv == n - 1, or 0 if everything checks out
+// TestPrivateKey tests if the priv has at most 32 bytes, and if it is in range [1, n-2]
+// Returns the length difference if longer than 32, or -1 if ont in the range,
+// or 0 if everything checks out
 //
 // TestPrivateKey is made public purposefully.
-//
-// 一个可以用来测试取值范围的简单事实：n 以 0xF开头，即n > 2^255，因此，对于256位整数而言，
-// 满足 x = 1 mod n 的 x 只有一个可能:0xFFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54122
-// 即，将 x 的 hex 编码的最后一位减去1
 func TestPrivateKey(priv *[]byte) int {
 	l := len(*priv) - 32
 	if l > 0 {
 		return l
 	}
-	return -1 * subtle.ConstantTimeCompare(*priv, nminus1[:])
+
+	// compiler likes will make a heap object allocated in stack, but let's not rely on it
+	// instead, force a stack variable
+	var k big.Int
+	k.SetBytes(*priv)
+	if k.Cmp(nMinus1) >= 0 {
+		return -1
+	}
+	return 0
 }
 
 // SignHashed signs the data which have been hashed from message and public parameters.
@@ -52,11 +97,7 @@ func TestPrivateKey(priv *[]byte) int {
 //  priv: the private key has 32 big endian bytes and its encoded value shall not be n - 1
 //  r, s: has 32 bytes each
 //
-// Standard demands that priv should lie in [1, n-2], SignHashed is rather permissive in that
-// it handles if priv is larger than or equal to n, except for priv = -1 mod n, which is not
-// a valid private key for SM2 signature purpose by definition (we need to calculate 1/(priv + 1)
-// and we cannot divide by zero). Still, SignHashed only accepts private key not longer than 32 bytes.
-// See doc of TestPrivateKey if you encounter an error message and you'd like to decode the reason code
+// Standard demands that priv should lie in [1, n-2], SignHashed only accepts private key in that range.
 func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 	test := TestPrivateKey(priv)
 	if  test != 0 {
@@ -74,7 +115,13 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 
 		var k big.Int
 		k.SetBytes(K[:])
+
 		//k.Mod(k, n) // 注意，这个操作使得k并非在[1, n-1]之间均匀分布，而是偏向于 [1, 2^256 - n] 这个区间，所以我们最好重新抽取一次随机数
+
+		// Notes about constant-time comparison: underlying it is machine word size word-by-word comparison
+		// So it really does not leak much info especially in 64-bit machines.
+		// Given that SM2 n is FFFFFFFeFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54123
+		// most of the time it will return false upon first word comparison
 		if k.Cmp(n) >= 0 {
 			continue
 		}

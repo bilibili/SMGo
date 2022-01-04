@@ -85,7 +85,7 @@ func (p *SM2Point) SetBytes(b []byte) (*SM2Point, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := sm2CheckOnCurve(x, y); err != nil {
+		if err := Sm2CheckOnCurve(x, y); err != nil {
 			return nil, err
 		}
 		p.x.Set(x)
@@ -102,7 +102,7 @@ func (p *SM2Point) SetBytes(b []byte) (*SM2Point, error) {
 	}
 }
 
-func sm2CheckOnCurve(x, y *fiat.SM2Element) error {
+func Sm2CheckOnCurve(x, y *fiat.SM2Element) error {
 	// x³ - 3x + b.
 	x3 := new(fiat.SM2Element).Square(x)
 	x3.Mul(x3, x)
