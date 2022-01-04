@@ -85,6 +85,11 @@ func TestPrivateKey(priv *[]byte) int {
 	// instead, force a stack variable
 	var k big.Int
 	k.SetBytes(*priv)
+
+	// Notes about constant-time comparison: underlying it is machine word size word-by-word comparison
+	// So it really does not leak much info especially in 64-bit machines.
+	// Given that SM2 n is FFFFFFFeFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54123
+	// most of the time it will return false upon first word comparison
 	if k.Cmp(nMinus1) >= 0 {
 		return -1
 	}
@@ -127,7 +132,8 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 		}
 
 		var kG *internal.SM2Point
-		kG, err = internal.ScalarBaseMult_Precomputed_DaA(k.Bytes())
+		KK := K[:]
+		kG, err = internal.ScalarBaseMult(&KK)
 		if err != nil {
 			return
 		}
@@ -210,29 +216,28 @@ func VerifyHashed(pubx, puby, e, r, s *[]byte) (bool, error) {
 	}
 
 	var pubBytes [65]byte
+	var err error
+	var result, pub *internal.SM2Point
+
 	buf := append(pubBytes[:0], 4)
 	buf = append(buf, *pubx...)
 	buf = append(buf, *puby...)
 
-	pub, err := internal.NewSM2Point().SetBytes(pubBytes[:])
+	pub, err = internal.NewSM2Point().SetBytes(pubBytes[:])
 	if err != nil {
 		return false, errors.New("not a valid public key")
 	}
 
 	// done sanity check
-	// slow calculation below, should adopt mixed method and use some NAF optimization etc. TODO
-	sG, es := internal.ScalarBaseMult_Precomputed_DaA(*s)
-	if es != nil {
-		return false, es
+	var tBytes []byte
+	tBytes = t.Bytes()
+
+	result, err = internal.ScalarMixedMult_Unsafe(s, pub, &tBytes)
+	if err != nil {
+		return false, err
 	}
 
-	tP, et := internal.ScalarMult(pub, t.Bytes())
-	if et != nil {
-		return false, et
-	}
-
-	sGtP := internal.NewSM2Point().Add(sG, tP)
-	R := sGtP.GetX()
+	R := result.GetX()
 	eInt.SetBytes(*e)
 	R.Add(R, &eInt)
 	R.Mod(R, n)

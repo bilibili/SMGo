@@ -138,7 +138,7 @@ func TestScalarBaseMult_Precomputed_DaA(t *testing.T) {
 		rand.Read(bytes[:])
 
 		res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), bytes[:])
-		res2, _ := ScalarBaseMult_Precomputed_DaA(bytes[:])
+		res2, _ := scalarBaseMult_Precomputed_DaA(bytes[:])
 		if !reflect.DeepEqual(res1.Bytes(), res2.Bytes()) {
 			t.Fail()
 		}
@@ -149,7 +149,7 @@ func TestScalarBaseMult_Precomputed_DaA(t *testing.T) {
 	bytes[0] = 0
 	bytes[1] = 0
 	res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), bytes[:])
-	res2, _ := ScalarBaseMult_Precomputed_DaA(bytes[:])
+	res2, _ := scalarBaseMult_Precomputed_DaA(bytes[:])
 	if !reflect.DeepEqual(res1.Bytes(), res2.Bytes()) {
 		t.Fail()
 	}
@@ -157,7 +157,7 @@ func TestScalarBaseMult_Precomputed_DaA(t *testing.T) {
 	var bytes2 [33]byte
 	rand.Read(bytes2[:])
 
-	_, err2 := ScalarBaseMult_Precomputed_DaA(bytes2[:])
+	_, err2 := scalarBaseMult_Precomputed_DaA(bytes2[:])
 	if err2 == nil {
 		t.Fail()
 	}
@@ -165,7 +165,7 @@ func TestScalarBaseMult_Precomputed_DaA(t *testing.T) {
 	var bytes3 [31]byte
 	rand.Read(bytes3[:])
 
-	_, err3 := ScalarBaseMult_Precomputed_DaA(bytes3[:])
+	_, err3 := scalarBaseMult_Precomputed_DaA(bytes3[:])
 	if err3 == nil {
 		t.Fail()
 	}
@@ -191,7 +191,7 @@ func BenchmarkScalarBaseMult_Precomputed_DaA(b *testing.B) {
 	b.ResetTimer()
 	for i:=0; i<b.N; i++ {
 		rand.Read(bytes[:])
-		ScalarBaseMult_Precomputed_DaA(bytes[:])
+		scalarBaseMult_Precomputed_DaA(bytes[:])
 	}
 }
 

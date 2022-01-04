@@ -49,7 +49,7 @@ func (curve sm2Curve) Params() *elliptic.CurveParams {
 // ScalarMult Scalar multiplication, returns [x]P when no error.
 // x is big endian and its integer value should lie in range of [1, n-1]
 // ***secure implementation***, this could be used for ECDH
-func ScalarMult(P *SM2Point, x []byte) (*SM2Point, error) {
+func ScalarMult(P *SM2Point, x *[]byte) (*SM2Point, error) {
 	//out := NewSM2Point()
 	//return out, nil
 	return scalarMult_Unsafe_DaA(P, x)
@@ -60,14 +60,35 @@ func ScalarMult(P *SM2Point, x []byte) (*SM2Point, error) {
 // ***secure implementation***, this could be used for
 // sign or key generation, all sensitive operations
 func ScalarBaseMult(k *[]byte) (*SM2Point, error) {
-	return ScalarBaseMult_Precomputed_DaA(*k)
+	return scalarBaseMult_Precomputed_DaA(*k)
+}
+
+// ScalarMixedMult_Unsafe mixed scalar multiplication, returns [gScalar]G + [scalar]P when no error
+// gScalar and scalar are big endian and their integer values should lie in range of [1, n-1]
+// usually used for signature verification and not sensitive
+// This is an internal function. Do NOT use it out of this library. Use sm. functions.
+func ScalarMixedMult_Unsafe(gScalar *[]byte, P *SM2Point, scalar *[]byte) (*SM2Point, error) {
+	// slow calculation below, should adopt mixed method and use some NAF optimization etc. TODO
+	S, es := ScalarBaseMult(gScalar)
+	if es != nil {
+		return nil, es
+	}
+
+	T, et := ScalarMult(P, scalar)
+	if et != nil {
+		return nil, et
+	}
+
+	sGtP := NewSM2Point().Add(S, T)
+	return sGtP, nil
 }
 
 var sm2PrecomputedForDaA [256]*SM2Point
-// ScalarBaseMult_Precomputed_DaA
+
+// scalarBaseMult_Precomputed_DaA
 // k should have 32 bytes. If k's actual value is smaller, it should
 // be zero-padded from left
-func ScalarBaseMult_Precomputed_DaA(k []byte) (*SM2Point, error) {
+func scalarBaseMult_Precomputed_DaA(k []byte) (*SM2Point, error) {
 	if len(k) != 32 {
 		return nil, errors.New("k not in 32 bytes")
 	}
@@ -85,20 +106,12 @@ func ScalarBaseMult_Precomputed_DaA(k []byte) (*SM2Point, error) {
 	return out, nil
 }
 
-// ScalarMixedMult_Unsafe mixed scalar multiplication, returns [k]G + [x]P when no error
-// k and x are big endian and their integer values should lie in range of [1, n-1]
-// usually used for signature verification and not sensitive
-func ScalarMixedMult_Unsafe(k []byte, P *SM2Point, x []byte) (*SM2Point, error) {
-	out := NewSM2Point()
-	return out, nil
-}
-
 // slow and UNSAFE version first: let's run double and add
 // not meant for external use, serves as baseline for correctness
 // 注意，GM/T 0003.1-2012第四节所规定的数据类型转换，要求使用big endian（即自然序，最左边的权重最大，例如123表示100+20+3）
-func scalarMult_Unsafe_DaA(q *SM2Point, scalar []byte) (*SM2Point, error) {
+func scalarMult_Unsafe_DaA(q *SM2Point, scalar *[]byte) (*SM2Point, error) {
 	out := NewSM2Point()
-	for _, b := range scalar {
+	for _, b := range *scalar {
 		for bitNum := 0; bitNum < 8; bitNum++ {
 			out.Double(out)
 			if b&0x80 == 0x80 {
