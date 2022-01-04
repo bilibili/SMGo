@@ -221,3 +221,27 @@ func testWithStringsAndPoint(p, x, y string, point *SM2Point, t *testing.T) {
 	}
 }
 
+func Test_MontgomeryFriendlity(t *testing.T) {
+	SM2p :=  bigFromHex("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFF")
+	SM2n :=  bigFromHex("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54123")
+
+	tellMontgomeryFriendility(t, SM2p, 64)
+	tellMontgomeryFriendility(t, SM2p, 32)
+	tellMontgomeryFriendility(t, SM2n, 64)
+	tellMontgomeryFriendility(t, SM2n, 32)
+}
+
+func tellMontgomeryFriendility(t *testing.T, p *big.Int, s uint) {
+	ms := big.NewInt(1)
+	ms.Lsh(ms, s)
+
+	pInv := new(big.Int).ModInverse(p, ms)
+	pInv.Add(pInv, big.NewInt(1))
+	pInv.Mod(pInv, ms)
+	if pInv.Sign() != 0 {
+		fmt.Println(fmt.Sprintf("0x%s is NOT %d-Montgomery friendly.", p.Text(16), s))
+	} else {
+		fmt.Println(fmt.Sprintf("0x%s is %d-Montgomery friendly.", p.Text(16), s))
+	}
+}
+
