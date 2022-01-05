@@ -60,7 +60,7 @@ func ScalarMult(P *SM2Point, scalar *[]byte) (*SM2Point, error) {
 // ***secure implementation***, this could be used for
 // sign or key generation, all sensitive operations
 func ScalarBaseMult(k *[]byte) (*SM2Point, error) {
-	return scalarBaseMult_Precomputed_DaA(*k)
+	return scalarBaseMult_Precomputed_DaA(k)
 }
 
 // ScalarMixedMult_Unsafe mixed scalar multiplication, returns [gScalar]G + [scalar]P when no error
@@ -83,14 +83,23 @@ func ScalarMixedMult_Unsafe(gScalar *[]byte, P *SM2Point, scalar *[]byte) (*SM2P
 	return sGtP, nil
 }
 
-var sm2SkipBitExtration [][]*SM2Point
 // scalarBaseMult_SkipBitExtraction uses pre-computed table of multiples
-// of base point to calculate base-mult. Not sure about the algorithm name,
-// similar algorithm is seen from BoringSSL, with 4-bit x 2 and costs
+// of base point to calculate base-mult.
+// k should have 32 bytes. If k's actual value is smaller, it should
+// be zero-padded from left
+//
+// Not sure about the algorithm name and nothing found from searching.
+// Similar algorithm is seen from BoringSSL, with 4-bit x 2 and costs
 // 31 DOUBLE + 62 ADD. See BoringSSL/crypto/fipsmodule/ec/make_tables.go
-// We use 6 bit x 4 and cost 10 DOUBLE + 37 ADD. Name it SkipBitExtration
-// based on the pattern of the bit access from the algorithm.
-func scalarBaseMult_BitExtraction(k *[]byte) (*SM2Point, error) {
+//
+// We use 6 bit x 3 to cover 252 bits and 15 pre-computed points to cover
+// the remaining 4 bits. The cost is 13 DOUBLE + 40 ADD.
+//
+// Name it SkipBitExtration based on the pattern of the bit access of
+// the algorithm. We need to pre-compute 204 points, which is less than
+// 13 KB static data. This should fit into the L1 cache of most modern
+// processors, at least those 64 bit ones.
+func scalarBaseMult_SkipBitExtraction(k *[]byte) (*SM2Point, error) {
 	return nil, nil
 }
 
@@ -98,13 +107,13 @@ var sm2PrecomputedForDaA [256]*SM2Point
 // scalarBaseMult_Precomputed_DaA
 // k should have 32 bytes. If k's actual value is smaller, it should
 // be zero-padded from left
-func scalarBaseMult_Precomputed_DaA(k []byte) (*SM2Point, error) {
-	if len(k) != 32 {
+func scalarBaseMult_Precomputed_DaA(k *[]byte) (*SM2Point, error) {
+	if len(*k) != 32 {
 		return nil, errors.New("k not in 32 bytes")
 	}
 
 	out := NewSM2Point()
-	for i, b := range k {
+	for i, b := range *k {
 		for bitNum := 0; bitNum < 8; bitNum++ {
 			if b&0x80 == 0x80 {
 				out.Add(out, sm2PrecomputedForDaA[i*8 + bitNum]) // not secure here, should call select TODO
