@@ -76,20 +76,6 @@ func FromMontgomery(x, y [4]uint64) *SM2Point {
 	}
 }
 
-// ToMontgomeryAffine extracts the X and Y in Montgomery domain.
-// x, y: the affine coordinates in Montgomery domain.
-// This is useful for generating the pre-computed table.
-func (p *SM2Point) ToMontgomeryAffine() (x, y *fiat.SM2Element) {
-	if p.z.IsZero() == 1 {
-		return new(fiat.SM2Element), new(fiat.SM2Element)
-	}
-
-	zinv := new(fiat.SM2Element).Invert(p.z) // safe inversion although it does not matter here
-	xx := new(fiat.SM2Element).Mul(p.x, zinv)
-	yy := new(fiat.SM2Element).Mul(p.y, zinv)
-	return xx, yy
-}
-
 // SetBytes sets p to the compressed, uncompressed, or infinity value encoded in
 // b, as specified in SEC 1, Version 2.0, Section 2.3.4. If the point is not on
 // the curve, it returns nil and an error, and the receiver is unchanged.

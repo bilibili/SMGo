@@ -36,13 +36,6 @@ func (e *SM2Element) SetRaw(raw [4]uint64) *SM2Element {
 	return e
 }
 
-// TODO put into seperate build flag to disable both functions in released package
-func (e *SM2Element) GetRaw() [4]uint64 {
-	var ret [4]uint64
-	copy(ret[:], e.x[:])
-	return ret
-}
-
 // One sets e = 1, and returns e.
 func (e *SM2Element) One() *SM2Element {
 	sm2SetOne(&e.x)

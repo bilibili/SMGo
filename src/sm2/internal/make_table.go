@@ -3,6 +3,8 @@
 
 //go:build ignore
 
+// You must build this app with custom build tag tablegen
+
 package main
 
 import (
