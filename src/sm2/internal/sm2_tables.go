@@ -5,10 +5,10 @@
 // Base point pre computation
 // --------------------------
 //
-// Take 6-3-14-4 as example:
+// Take 6-3-14-4 as example: 
 // --begin example--
 //
-// The first table is organized in 3 (subTableCount) sub-tables of 63 points (2^6 -1) (window),
+// The first table is organized in 3 (subTableCount) sub-tables of 63 points (2^6 -1) (window), 
 // with first one looks what follows, in which G* = [2^4]G: (remainder), 42 = 3 x 14
 //
 // index | bits    | point
@@ -24,16 +24,16 @@
 // The second table contains 15 elements, that is, G, 2G, ..., 15G. (If remainder is 0
 // or 1 then the second table could be omitted.)
 //
-// The base multiplication algorithm should run 14 iterations.
+// The base multiplication algorithm should run 14 iterations. 
 // -- end example--
 //
-// All table elements should be accessed in constant time and in a
+// All table elements should be accessed in constant time and in a 
 // fashion that leaks no caching information.
 
 package internal
 
 
-// We split 256 bits into two tables: the first table serves the upper 252 bits
+// We split 256 bits into two tables: the first table serves the upper 252 bits 
 // (left most), and the second table serves the lower 4 bits (right most).
 // 256 = 6 x 3 x 14 + 4
 var sm2PrecomputedBaseMultiples_6_3_14 = [3][63]*SM2Point {
@@ -236,7 +236,8 @@ var sm2PrecomputedBaseMultiples_6_3_14 = [3][63]*SM2Point {
 		FromMontgomery([4]uint64{6081560650597117913, 14972249986701438717, 17627262639844725995, 14430861750893378772}, [4]uint64{14870904873636429648, 383578361983672744, 12061080111571931139, 4581905480222313279}),
 	},
 }
-// We split 256 bits into two tables: the first table serves the upper 255 bits
+
+// We split 256 bits into two tables: the first table serves the upper 255 bits 
 // (left most), and the second table serves the lower 1 bits (right most).
 // 256 = 5 x 3 x 17 + 1
 var sm2PrecomputedBaseMultiples_5_3_17 = [3][31]*SM2Point {
@@ -343,3 +344,4 @@ var sm2PrecomputedBaseMultiples_5_3_17 = [3][31]*SM2Point {
 		FromMontgomery([4]uint64{9395700197936933671, 5895191122371807041, 1199049197904744463, 11659467716942796353}, [4]uint64{5044291919435388761, 175153991040298816, 11415837030799585782, 1284765499237736936}),
 	},
 }
+

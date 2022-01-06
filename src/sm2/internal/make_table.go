@@ -6,19 +6,27 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"math/big"
+	"os"
 	"smgo/sm2/internal"
 )
 
 func main() {
-	writeHeader()
-	writeTable(6, 3, 14, 4)
-	writeTable(5, 3, 17, 1)
+	buf := new(bytes.Buffer)
+	writeHeader(buf)
+	writeTable(buf,6, 3, 14, 4)
+	writeTable(buf,5, 3, 17, 1)
+
+	err := os.WriteFile("sm2/internal/sm2_tables.go", buf.Bytes(), 0644)
+	if err != nil {
+		panic(err.Error())
+	}
 }
 
-func writeHeader() {
+func writeHeader(buf *bytes.Buffer) {
 	const fileHeader = `// Copyright 2021 bilibili. All rights reserved. Author: Guo, Weiji guoweiji@bilibili.com
 // 哔哩哔哩版权所有 2021。作者：郭伟基 guoweiji@bilibili.com
 //
@@ -54,22 +62,22 @@ func writeHeader() {
 package internal
 
 `
-	fmt.Println(fileHeader)
+	fmt.Fprintln(buf, fileHeader)
 }
 
-func writeTable(window, subTableCount, iterations, remainder int) {
+func writeTable(buf *bytes.Buffer, window, subTableCount, iterations, remainder int) {
 	const commentProto = `// We split 256 bits into two tables: the first table serves the upper %d bits 
 // (left most), and the second table serves the lower %d bits (right most).
 // 256 = %d x %d x %d + %d`
 	comment := fmt.Sprintf(commentProto, window * subTableCount * iterations, remainder,
 		window, subTableCount, iterations, remainder)
-	fmt.Println(comment)
+	fmt.Fprintln(buf, comment)
 
 	const tableLineProto = "var sm2PrecomputedBaseMultiples_%d_%d_%d = [%d][%d]*SM2Point {"
 	tableWidth := (int)(math.Pow(2, (float64)(window)) - 1)
 	tableLine := fmt.Sprintf(tableLineProto, window, subTableCount, iterations,
 		subTableCount, tableWidth)
-	fmt.Println(tableLine)
+	fmt.Fprintln(buf, tableLine)
 
 	var subTables [][]*internal.SM2Point = make([][]*internal.SM2Point, subTableCount)
 	for i:=0; i<subTableCount; i++ {
@@ -106,14 +114,14 @@ func writeTable(window, subTableCount, iterations, remainder int) {
 	}
 
 	for i:=0; i<subTableCount; i++ {
-		fmt.Printf("\t{\n\t\t//sub table #%d\n", i+1)
+		fmt.Fprintf(buf,"\t{\n\t\t//sub table #%d\n", i+1)
 
-		writeSubTable(subTables[i])
+		writeSubTable(buf, subTables[i])
 
-		fmt.Println("\t},")
+		fmt.Fprintln(buf, "\t},")
 	}
 
-	fmt.Println("}") // close the table
+	fmt.Fprintln(buf,"}\n") // close the table
 }
 
 func intPowerMult(p *internal.SM2Point, exp int) *internal.SM2Point {
@@ -128,11 +136,11 @@ func intPowerMult(p *internal.SM2Point, exp int) *internal.SM2Point {
 	return ret
 }
 
-func writeSubTable(subTable []*internal.SM2Point) {
+func writeSubTable(buf *bytes.Buffer, subTable []*internal.SM2Point) {
 	for _, p := range subTable {
 		x, y := p.ToMontgomeryAffine()
 		xx, yy := [4]uint64(x.GetRaw()), [4]uint64(y.GetRaw())
-		fmt.Printf("\t\tFromMontgomery([4]uint64{%d, %d, %d, %d}, [4]uint64{%d, %d, %d, %d}),\n",
+		fmt.Fprintf(buf,"\t\tFromMontgomery([4]uint64{%d, %d, %d, %d}, [4]uint64{%d, %d, %d, %d}),\n",
 			xx[0], xx[1], xx[2], xx[3], yy[0], yy[1], yy[2], yy[3])
 	}
 }
