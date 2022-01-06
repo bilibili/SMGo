@@ -46,7 +46,7 @@ func GenerateKey(rand io.Reader) (priv, x, y []byte, err error) {
 	}
 
 	var pubBytes []byte
-	pubBytes = pub.Bytes()
+	pubBytes = pub.Bytes_Unsafe()
 
 	return priv, pubBytes[1:33], pubBytes[33:], nil
 }
@@ -141,7 +141,7 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 		var eInt, rInt, sInt, rkInt, dInt, d1Int, tmp big.Int
 		var d1, d1Inv fiat.SM2ScalarElement
 
-		x := kG.GetX() // 避免计算y坐标，可以节约计算量
+		x := kG.GetAffineX_Unsafe() // 避免计算y坐标，可以节约计算量。由于x不需要保密，可以使用快速版本
 
 		eInt.SetBytes(*e)
 		rInt.Add(x, &eInt)
@@ -179,7 +179,7 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 			continue
 		}
 
-		// 注意，标准要求使用大端字节序，因此，如果输出结果高位字节为0，big.Int.Bytes()将输出少于32字节
+		// 注意，标准要求使用大端字节序，因此，如果输出结果高位字节为0，big.Int.Bytes_Unsafe()将输出少于32字节
 		return ensure32Bytes(&rInt), ensure32Bytes(&sInt), nil
 	}
 }
@@ -237,7 +237,7 @@ func VerifyHashed(pubx, puby, e, r, s *[]byte) (bool, error) {
 		return false, err
 	}
 
-	R := result.GetX()
+	R := result.GetAffineX_Unsafe()
 	eInt.SetBytes(*e)
 	R.Add(R, &eInt)
 	R.Mod(R, n)

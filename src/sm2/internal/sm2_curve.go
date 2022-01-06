@@ -83,7 +83,7 @@ func ScalarMixedMult_Unsafe(gScalar *[]byte, P *SM2Point, scalar *[]byte) (*SM2P
 	return sGtP, nil
 }
 
-// scalarBaseMult_SkipBitExtraction uses pre-computed table of multiples
+// scalarBaseMult_SkipBitExtraction_6_3_14 uses pre-computed table of multiples
 // of base point to calculate base-mult.
 // k should have 32 bytes. If k's actual value is smaller, it should
 // be zero-padded from left
@@ -92,14 +92,24 @@ func ScalarMixedMult_Unsafe(gScalar *[]byte, P *SM2Point, scalar *[]byte) (*SM2P
 // Similar algorithm is seen from BoringSSL, with 4-bit x 2 and costs
 // 31 DOUBLE + 62 ADD. See BoringSSL/crypto/fipsmodule/ec/make_tables.go
 //
-// We use 6 bit x 3 to cover 252 bits and 15 pre-computed points to cover
-// the remaining 4 bits. The cost is 13 DOUBLE + 40 ADD.
+// We use 6 bit x 3 x 14 to cover 252 bits and 15 pre-computed points to cover
+// the remaining 4 bits. The runtime cost is 13 DOUBLE + 40 ADD.
+// Note: 1 DOUBLE costs about 0.9 ADD.
 //
 // Name it SkipBitExtration based on the pattern of the bit access of
 // the algorithm. We need to pre-compute 204 points, which is less than
 // 13 KB static data. This should fit into the L1 cache of most modern
 // processors, at least those 64 bit ones.
-func scalarBaseMult_SkipBitExtraction(k *[]byte) (*SM2Point, error) {
+func scalarBaseMult_SkipBitExtraction_6_3_14(k *[]byte) (*SM2Point, error) {
+	return nil, nil
+}
+
+// scalarBaseMult_SkipBitExtraction_5_3_17 is similar to scalarBaseMult_SkipBitExtraction_6_3_14
+// 5 bit x 3 x 17 to cover 255 bits, and conditionally add G (in constant time
+// and no branching)
+// The runtime cost is 16 DOUBLE + 49 ADD, plus, about half caching of static data
+// as compared to 6-3-14 scheme.
+func scalarBaseMult_SkipBitExtraction_5_3_17(k *[]byte) (*SM2Point, error) {
 	return nil, nil
 }
 

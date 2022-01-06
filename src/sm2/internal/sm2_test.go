@@ -3,7 +3,6 @@
 
 package internal
 
-
 import (
 	"encoding/hex"
 	"fmt"
@@ -93,7 +92,7 @@ func TestSM2Point_ScalarMult_to_inf(t *testing.T) {
 		fmt.Printf("Error: %s", err.Error())
 		t.Fail()
 	}
-	fmt.Printf("[n]G = (%s, %s, %s) %x\n", res.x.ToBigInt().String(), res.y.ToBigInt().String(), res.z.ToBigInt().String(), res.Bytes())
+	fmt.Printf("[n]G = (%s, %s, %s) %x\n", res.x.ToBigInt().String(), res.y.ToBigInt().String(), res.z.ToBigInt().String(), res.Bytes_Unsafe())
 	if res.z.IsZero() == 0 {
 		t.Fail()
 	}
@@ -110,7 +109,7 @@ func TestSM2Point_ScalarMult_warparound_inf(t *testing.T) {
 		t.Fail()
 	}
 
-	if !reflect.DeepEqual(res.Bytes(), NewSM2Generator().Bytes()) {
+	if !reflect.DeepEqual(res.Bytes_Unsafe(), NewSM2Generator().Bytes_Unsafe()) {
 		t.Fail()
 	}
 }
@@ -130,7 +129,7 @@ func TestCompleteness(t *testing.T) {
 		res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &inrangeBytes)
 		res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &rawBytes)
 
-		if !reflect.DeepEqual(res1.Bytes(), res2.Bytes()) {
+		if !reflect.DeepEqual(res1.Bytes_Unsafe(), res2.Bytes_Unsafe()) {
 			fmt.Printf("round #%d, %x\n", i, sm2.Params().N)
 			t.Fail()
 		}
@@ -147,7 +146,7 @@ func TestScalarBaseMult_Precomputed_DaA(t *testing.T) {
 
 		res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &bytes)
 		res2, _ := scalarBaseMult_Precomputed_DaA(&bytes)
-		if !reflect.DeepEqual(res1.Bytes(), res2.Bytes()) {
+		if !reflect.DeepEqual(res1.Bytes_Unsafe(), res2.Bytes_Unsafe()) {
 			t.Fail()
 		}
 	}
@@ -158,7 +157,7 @@ func TestScalarBaseMult_Precomputed_DaA(t *testing.T) {
 	bytes[1] = 0
 	res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &bytes)
 	res2, _ := scalarBaseMult_Precomputed_DaA(&bytes)
-	if !reflect.DeepEqual(res1.Bytes(), res2.Bytes()) {
+	if !reflect.DeepEqual(res1.Bytes_Unsafe(), res2.Bytes_Unsafe()) {
 		t.Fail()
 	}
 
@@ -226,6 +225,60 @@ func BenchmarkSM2Point_Double(b *testing.B) {
 	}
 }
 
+func genRandomPoint() *SM2Point {
+	bytes := make([]byte, 31)
+	rand.Read(bytes)
+	p, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &bytes)
+	return p
+}
+
+func BenchmarkSM2Point_GetAffineX(b *testing.B) {
+	p := genRandomPoint() // random point to avoid certain z with fast calculation, for example, z == 1
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i:=0; i<b.N; i++ {
+		p.GetAffineX()
+	}
+}
+
+func BenchmarkSM2Point_GetAffineX_Unsafe(b *testing.B) {
+	p := genRandomPoint()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i:=0; i<b.N; i++ {
+		p.GetAffineX_Unsafe()
+	}
+}
+
+func BenchmarkSM2Point_Bytes(b *testing.B) {
+	p := genRandomPoint()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i:=0; i<b.N; i++ {
+		p.Bytes()
+	}
+}
+
+func BenchmarkSM2Point_Bytes_Unsafe(b *testing.B) {
+	p := genRandomPoint()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i:=0; i<b.N; i++ {
+		p.Bytes_Unsafe()
+	}
+}
+
+func TestSM2Point_Bytes(t *testing.T) {
+	for i:=0; i<100000; i++ {
+		p := genRandomPoint()
+		safe := p.Bytes()
+		unsafe := p.Bytes_Unsafe()
+		if !reflect.DeepEqual(safe, unsafe) {
+			t.Fail()
+		}
+	}
+}
+
 func testWithStrings(p, x, y string) bool {
 	return testWithStringsAndPoint(p, x, y, NewSM2Generator())
 }
@@ -240,7 +293,7 @@ func testWithStringsAndPoint(p, x, y string, point *SM2Point) bool {
 	var bytes []byte
 	bytes = makeElement(p).Bytes()
 	res, _ := scalarMult_Unsafe_DaA(point, &bytes)
-	if !reflect.DeepEqual(res.Bytes(), q.Bytes()) {
+	if !reflect.DeepEqual(res.Bytes_Unsafe(), q.Bytes_Unsafe()) {
 		return false
 	}
 
@@ -249,7 +302,7 @@ func testWithStringsAndPoint(p, x, y string, point *SM2Point) bool {
 	bytes = larger.Bytes()
 	fmt.Printf("larger scalar has %d bytes\n", len(bytes))
 	res2, _ := scalarMult_Unsafe_DaA(point, &bytes)
-	if !reflect.DeepEqual(res2.Bytes(), res.Bytes()) {
+	if !reflect.DeepEqual(res2.Bytes_Unsafe(), res.Bytes_Unsafe()) {
 		return false
 	}
 

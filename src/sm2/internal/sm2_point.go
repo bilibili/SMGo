@@ -65,6 +65,31 @@ func (p *SM2Point) Set(q *SM2Point) *SM2Point {
 	return p
 }
 
+// FromMontgomery is used to reconstruct the SM2Point object from x and y
+// which are already in Montgomery domain. Z is assumed to be One therefore omitted.
+// This is useful for importing the pre-computed table.
+func FromMontgomery(x, y [4]uint64) *SM2Point {
+	return &SM2Point{
+		x: new(fiat.SM2Element).SetRaw(x),
+		y: new(fiat.SM2Element).SetRaw(y),
+		z: new(fiat.SM2Element).One(),
+	}
+}
+
+// ToMontgomeryAffine extracts the X and Y in Montgomery domain.
+// x, y: the affine coordinates in Montgomery domain.
+// This is useful for generating the pre-computed table.
+func (p *SM2Point) ToMontgomeryAffine() (x, y *fiat.SM2Element) {
+	if p.z.IsZero() == 1 {
+		return new(fiat.SM2Element), new(fiat.SM2Element)
+	}
+
+	zinv := new(fiat.SM2Element).Invert(p.z) // safe inversion although it does not matter here
+	xx := new(fiat.SM2Element).Mul(p.x, zinv)
+	yy := new(fiat.SM2Element).Mul(p.y, zinv)
+	return xx, yy
+}
+
 // SetBytes sets p to the compressed, uncompressed, or infinity value encoded in
 // b, as specified in SEC 1, Version 2.0, Section 2.3.4. If the point is not on
 // the curve, it returns nil and an error, and the receiver is unchanged.
@@ -122,35 +147,94 @@ func Sm2CheckOnCurve(x, y *fiat.SM2Element) error {
 	return nil
 }
 
-// Bytes returns the uncompressed or infinity encoding of p, as specified in
-// SEC 1, Version 2.0, Section 2.3.3. Note that the encoding of the point at
-// infinity is shorter than all other encodings.
+// Bytes returns the uncompressed or infinity encoding of p.
+// Note that the encoding of the point at infinity is shorter than
+// all other encodings.
+// This is the SAFE version, could be used for ECDH purpose for example.
 func (p *SM2Point) Bytes() []byte {
 	// This function is outlined to make the allocations inline in the caller
 	// rather than happen on the heap.
 	var out [SM2BytesLengthUncompressed]byte
-	return p.bytes(&out)
+	return p.bytes(&out, true)
 }
 
-func (p *SM2Point) bytes(out *[SM2BytesLengthUncompressed]byte) []byte {
+// Bytes_Unsafe returns the uncompressed or infinity encoding of p.
+// Note that the encoding of the point at
+// infinity is shorter than all other encodings. This is the unsafe version.
+func (p *SM2Point) Bytes_Unsafe() []byte {
+	// This function is outlined to make the allocations inline in the caller
+	// rather than happen on the heap.
+	var out [SM2BytesLengthUncompressed]byte
+	return p.bytes(&out, false)
+}
+
+func (p *SM2Point) bytes(out *[SM2BytesLengthUncompressed]byte, safe bool) []byte {
 	if p.z.IsZero() == 1 {
 		return append(out[:0], 0)
 	}
 
-	zinv := new(fiat.SM2Element).Invert(p.z)
-	xx := new(fiat.SM2Element).Mul(p.x, zinv)
-	yy := new(fiat.SM2Element).Mul(p.y, zinv)
+	if safe {
+		zinv := new(fiat.SM2Element).Invert(p.z) // safe inversion
+		xx := new(fiat.SM2Element).Mul(p.x, zinv)
+		yy := new(fiat.SM2Element).Mul(p.y, zinv)
 
-	buf := append(out[:0], 4)
-	buf = append(buf, xx.Bytes()...)
-	buf = append(buf, yy.Bytes()...)
-	return buf
+		buf := append(out[:0], 4)
+		buf = append(buf, xx.Bytes()...)
+		buf = append(buf, yy.Bytes()...)
+		return buf
+	} else {
+		xx := p.x.ToBigInt()
+		yy := p.y.ToBigInt()
+		zz := p.z.ToBigInt()
+
+		zzInv := new(big.Int).ModInverse(zz, Sm2().Params().P) // unsafe inversion
+		xx.Mul(xx, zzInv)
+		yy.Mul(yy, zzInv)
+
+		xx.Mod(xx, Sm2().Params().P)
+		yy.Mod(yy, Sm2().Params().P)
+
+		buf := append(out[:0], 4)
+		xxBytes, yyBytes := xx.Bytes(), yy.Bytes()
+		padx, pady := SM2ElementLength - len(xxBytes), SM2ElementLength - len(yyBytes)
+		for i:=0; i<padx; i++ {
+			buf = append(buf, 0)
+		}
+		buf = append(buf, xxBytes...)
+		for i:=0; i<pady; i++ {
+			buf = append(buf, 0)
+		}
+		buf = append(buf, yyBytes...)
+		return buf
+	}
 }
 
-func (p *SM2Point) GetX() *big.Int {
+// GetAffineX return X in Affine as big integer. It saves some costs by
+// avoiding the calculation of Y. This is a safe version for the case that
+// the affine coordinates must be extracted safely.
+func (p *SM2Point) GetAffineX() *big.Int {
+	if p.z.IsZero() == 1 {
+		return big.NewInt(0)
+	}
+
 	zinv := new(fiat.SM2Element).Invert(p.z)
 	xx := new(fiat.SM2Element).Mul(p.x, zinv)
 	return xx.ToBigInt()
+}
+
+// GetAffineX_Unsafe functions the same as GetAffineX. It uses a faster yet
+// non-constant time algorithm to calculate the inverse of z.
+func (p *SM2Point) GetAffineX_Unsafe() *big.Int {
+	if p.z.IsZero() == 1 {
+		return big.NewInt(0)
+	}
+
+	xx := p.x.ToBigInt()
+	zz := p.z.ToBigInt()
+
+	zzInv := new(big.Int).ModInverse(zz, Sm2().Params().P)
+	xx.Mul(xx, zzInv)
+	return xx.Mod(xx, Sm2().Params().P)
 }
 
 // Add sets q = p1 + p2, and returns q. The points may overlap.

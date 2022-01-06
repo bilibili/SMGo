@@ -5,14 +5,20 @@
 
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+	"math/big"
+	"smgo/sm2/internal"
+)
 
 func main() {
-	writeSm2Table()
+	writeHeader()
+	writeTable(6, 3, 14, 4)
+	writeTable(5, 3, 17, 1)
 }
 
-
-func writeSm2Table() {
+func writeHeader() {
 	const fileHeader = `// Copyright 2021 bilibili. All rights reserved. Author: Guo, Weiji guoweiji@bilibili.com
 // 哔哩哔哩版权所有 2021。作者：郭伟基 guoweiji@bilibili.com
 //
@@ -20,35 +26,113 @@ func writeSm2Table() {
 // Base point pre computation
 // --------------------------
 //
-// 256 = log_2(64) x 3 x 14 + 4
-// We split 256 bits into two tables: the first table serves the upper 252 bits 
-// (left most), and the second table serves the lower 4 bits (right most).
+// Take 6-3-14-4 as example: 
+// --begin example--
 //
-// The first table is organized in 3 sub-tables of 63 points, with first one looks
-// what follows, in which G* = [16]G:
+// The first table is organized in 3 (subTableCount) sub-tables of 63 points (2^6 -1) (window), 
+// with first one looks what follows, in which G* = [2^4]G: (remainder), 42 = 3 x 14
 //
 // index | bits    | point
 // ------+---------+------------------------------
 //     1 | 0 0 0 0 0 1 | [1]G*
 //     2 | 0 0 0 0 1 0 | [2^42]G*
-// ...
+//    ...
 //    63 | 1 1 1 1 1 1 | [2^210 + 2^168 + 2^126 + 2^84 + 2^42 + 1]G*
 // ------+---------+------------------------------
 // The second sub table is the elements in the first multiplied by 2^14.
 // The third sub table, by 2^28
 //
-// The second table contains 15 elements, that is, G, 2G, ..., 15G. 
+// The second table contains 15 elements, that is, G, 2G, ..., 15G. (If remainder is 0
+// or 1 then the second table could be omitted.)
+//
+// The base multiplication algorithm should run 14 iterations. 
+// -- end example--
 //
 // All table elements should be accessed in constant time and in a 
 // fashion that leaks no caching information.
 
 package internal
 
-import "smgo/sm2/internal/fiat"
+`
+	fmt.Println(fileHeader)
+}
 
-const sm2PrecomputedBaseMultiples fiat.SM2Element[4][63][2] = `
+func writeTable(window, subTableCount, iterations, remainder int) {
+	const commentProto = `// We split 256 bits into two tables: the first table serves the upper %d bits 
+// (left most), and the second table serves the lower %d bits (right most).
+// 256 = %d x %d x %d + %d`
+	comment := fmt.Sprintf(commentProto, window * subTableCount * iterations, remainder,
+		window, subTableCount, iterations, remainder)
+	fmt.Println(comment)
 
-	fmt.Print(fileHeader)
+	const tableLineProto = "var sm2PrecomputedBaseMultiples_%d_%d_%d = [%d][%d]*SM2Point {"
+	tableWidth := (int)(math.Pow(2, (float64)(window)) - 1)
+	tableLine := fmt.Sprintf(tableLineProto, window, subTableCount, iterations,
+		subTableCount, tableWidth)
+	fmt.Println(tableLine)
 
+	var subTables [][]*internal.SM2Point = make([][]*internal.SM2Point, subTableCount)
+	for i:=0; i<subTableCount; i++ {
+		subTables[i] = make([]*internal.SM2Point, tableWidth)
+	}
 
+	var basics []*internal.SM2Point = make([]*internal.SM2Point, window)
+	gStar := internal.NewSM2Generator()
+	for i:=1; i<=remainder; i++ {
+		gStar.Double(gStar)
+	}
+	basics[0] = gStar
+	for i:=1; i<window; i++ {
+		basics[i] = intPowerMult(gStar, subTableCount * iterations * i)
+	}
+
+	subTables[0][0] = gStar
+	for i:=1; i<tableWidth; i++ {
+		p := internal.NewSM2Point()
+		b := i
+		for j:=0; j<window && b!=0; j++ {
+			if b & 1 == 1 {
+				p.Add(p, basics[j])
+			}
+			b >>= 1
+		}
+		subTables[0][i] = p
+	}
+
+	for i:=1; i<subTableCount; i++ {
+		for j:=0; j<tableWidth; j++ {
+			subTables[i][j] = intPowerMult(subTables[0][j], i*iterations)
+		}
+	}
+
+	for i:=0; i<subTableCount; i++ {
+		fmt.Printf("\t{\n\t\t//sub table #%d\n", i+1)
+
+		writeSubTable(subTables[i])
+
+		fmt.Println("\t},")
+	}
+
+	fmt.Println("}") // close the table
+}
+
+func intPowerMult(p *internal.SM2Point, exp int) *internal.SM2Point {
+	power := (int64)(math.Pow(float64(2), float64(exp)))
+	powerBytes := big.NewInt(power).Bytes()
+
+	ret, err := internal.ScalarMult(p, &powerBytes)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	return ret
+}
+
+func writeSubTable(subTable []*internal.SM2Point) {
+	for _, p := range subTable {
+		x, y := p.ToMontgomeryAffine()
+		xx, yy := [4]uint64(x.GetRaw()), [4]uint64(y.GetRaw())
+		fmt.Printf("\t\tFromMontgomery([4]uint64{%d, %d, %d, %d}, [4]uint64{%d, %d, %d, %d}),\n",
+			xx[0], xx[1], xx[2], xx[3], yy[0], yy[1], yy[2], yy[3])
+	}
 }
