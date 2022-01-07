@@ -10,15 +10,16 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"math"
 	"math/big"
 	"os"
+	"reflect"
 	"smgo/sm2/internal"
 )
 
 func main() {
 	buf := new(bytes.Buffer)
 	writeHeader(buf)
+	writeTable(buf,4, 2, 32, 0)
 	writeTable(buf,6, 3, 14, 4)
 	writeTable(buf,5, 3, 17, 1)
 
@@ -75,43 +76,60 @@ func writeTable(buf *bytes.Buffer, window, subTableCount, iterations, remainder 
 		window, subTableCount, iterations, remainder)
 	fmt.Fprintln(buf, comment)
 
-	const tableLineProto = "var sm2PrecomputedBaseMultiples_%d_%d_%d = [%d][%d]*SM2Point {"
-	tableWidth := (int)(math.Pow(2, (float64)(window)) - 1)
-	tableLine := fmt.Sprintf(tableLineProto, window, subTableCount, iterations,
-		subTableCount, tableWidth)
+	const tableLineProto = "var sm2Precomputed_%d_%d_%d = [][]*SM2Point {"
+	tableWidth := int(raiseToPower2(window).Int64()) - 1
+	tableLine := fmt.Sprintf(tableLineProto, window, subTableCount, iterations)
 	fmt.Fprintln(buf, tableLine)
+	fmt.Printf("generating table %s\n", tableLine)
 
 	var subTables [][]*internal.SM2Point = make([][]*internal.SM2Point, subTableCount)
 	for i:=0; i<subTableCount; i++ {
 		subTables[i] = make([]*internal.SM2Point, tableWidth)
 	}
 
+	fmt.Print("generating g* point...")
 	var basics []*internal.SM2Point = make([]*internal.SM2Point, window)
 	gStar := internal.NewSM2Generator()
 	for i:=1; i<=remainder; i++ {
 		gStar.Double(gStar)
-	}
-	basics[0] = gStar
-	for i:=1; i<window; i++ {
-		basics[i] = intPowerMult(gStar, subTableCount * iterations * i)
+		fmt.Print("d")
 	}
 
+	fmt.Printf("\nverifying g*\n")
+	gStarExpected := intPower2Mult(internal.NewSM2Generator(), remainder)
+	if !reflect.DeepEqual(gStar.Bytes(), gStarExpected.Bytes()) {
+		panic("g* generated incorrectly")
+	}
+
+	fmt.Println("generating lookup table")
+	basics[0] = gStar
+	for i:=1; i<window; i++ {
+		basics[i] = intPower2Mult(gStar, subTableCount * iterations * i)
+	}
+
+	fmt.Println("filling first sub table")
 	subTables[0][0] = gStar
 	for i:=1; i<tableWidth; i++ {
 		p := internal.NewSM2Point()
-		b := i
+		b := i+1
+
+		fmt.Printf("filling element #%d, ", i)
 		for j:=0; j<window && b!=0; j++ {
 			if b & 1 == 1 {
 				p.Add(p, basics[j])
+				fmt.Printf("+basics[%d],", j)
 			}
 			b >>= 1
 		}
+		fmt.Println("...done")
+
 		subTables[0][i] = p
 	}
 
 	for i:=1; i<subTableCount; i++ {
+		fmt.Printf("generating sub table %d with first sub table's element multiplied by 2^%d\n", i+1, i*iterations)
 		for j:=0; j<tableWidth; j++ {
-			subTables[i][j] = intPowerMult(subTables[0][j], i*iterations)
+			subTables[i][j] = intPower2Mult(subTables[0][j], i*iterations)
 		}
 	}
 
@@ -124,13 +142,33 @@ func writeTable(buf *bytes.Buffer, window, subTableCount, iterations, remainder 
 	}
 
 	fmt.Fprintln(buf,"}\n") // close the table
+
+	if remainder > 1 { // generate second table
+		const secondTableLineProto = "var sm2Precomputed_%d_%d_%d_Remainder = []*SM2Point {"
+		secondTableLine := fmt.Sprintf(secondTableLineProto, window, subTableCount, iterations)
+		fmt.Fprintln(buf, secondTableLine)
+
+		writePoint(buf, internal.NewSM2Generator())
+
+		power := int(raiseToPower2(remainder).Int64())
+		for i:=2; i<power; i++ {
+			p := intMult(internal.NewSM2Generator(), big.NewInt(int64(i)))
+			writePoint(buf, p)
+		}
+
+		fmt.Fprintln(buf,"}\n") // close the table
+	}
 }
 
-func intPowerMult(p *internal.SM2Point, exp int) *internal.SM2Point {
-	power := (int64)(math.Pow(float64(2), float64(exp)))
-	powerBytes := big.NewInt(power).Bytes()
+func intPower2Mult(p *internal.SM2Point, exp int) *internal.SM2Point {
+	power := new (big.Int).Lsh(big.NewInt(1), uint(exp))
+	return intMult(p, power)
+}
 
-	ret, err := internal.ScalarMult(p, &powerBytes)
+func intMult(p *internal.SM2Point, power *big.Int) *internal.SM2Point {
+	powerBytes := power.Bytes()
+
+	ret, err := internal.ScalarMult_Unsafe_DaA(p, &powerBytes)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -138,11 +176,19 @@ func intPowerMult(p *internal.SM2Point, exp int) *internal.SM2Point {
 	return ret
 }
 
+func raiseToPower2(exp int) *big.Int {
+	return new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(exp)), nil)
+}
+
 func writeSubTable(buf *bytes.Buffer, subTable []*internal.SM2Point) {
 	for _, p := range subTable {
-		x, y := p.ToMontgomeryAffine()
-		xx, yy := [4]uint64(x.GetRaw()), [4]uint64(y.GetRaw())
-		fmt.Fprintf(buf,"\t\tFromMontgomery([4]uint64{%d, %d, %d, %d}, [4]uint64{%d, %d, %d, %d}),\n",
-			xx[0], xx[1], xx[2], xx[3], yy[0], yy[1], yy[2], yy[3])
+		writePoint(buf, p)
 	}
+}
+
+func writePoint(buf *bytes.Buffer, p *internal.SM2Point) {
+	x, y := p.ToMontgomeryAffine()
+	xx, yy := [4]uint64(x.GetRaw()), [4]uint64(y.GetRaw())
+	fmt.Fprintf(buf,"\t\tFromMontgomery([4]uint64{%d, %d, %d, %d}, [4]uint64{%d, %d, %d, %d}),\n",
+		xx[0], xx[1], xx[2], xx[3], yy[0], yy[1], yy[2], yy[3])
 }

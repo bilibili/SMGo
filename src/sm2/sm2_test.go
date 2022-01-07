@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
-	"smgo/sm2/internal"
 	"testing"
 )
 
@@ -23,7 +22,7 @@ func BenchmarkSignHashed(b *testing.B) {
 	}
 }
 
-func BenchmarkVerifyHashed_Slow(b *testing.B) {
+func BenchmarkVerifyHashed(b *testing.B) {
 	priv, x, y, _ := GenerateKey(rand.Reader)
 
 	e := make([]byte, 32)
@@ -118,7 +117,7 @@ func Test_Verify(t *testing.T) {
 func Test_RejectNminus1(t *testing.T) {
 
 	for i:=1; i<1000; i++ {
-		k := new(big.Int).Mul(internal.Sm2().Params().N, big.NewInt(int64(i)))
+		k := new(big.Int).Mul(n, big.NewInt(int64(i)))
 		k.Sub(k, big.NewInt(1))
 		bytes := nMinus1.Bytes()
 		_, _, err := SignHashed(nil, &bytes, nil)

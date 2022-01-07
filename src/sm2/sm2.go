@@ -67,7 +67,7 @@ func CheckOnCurve(x, y *[]byte) bool {
 }
 
 var one = big.NewInt(1)
-var n = internal.Sm2().Params().N
+var n = internal.GetN()
 var nMinus1 = new(big.Int).Sub(n, one)
 
 // TestPrivateKey tests if the priv has at most 32 bytes, and if it is in range [1, n-2]

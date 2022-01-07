@@ -21,6 +21,68 @@ func makeElement(s string) (*fiat.SM2Element) {
 	return r
 }
 
+func TestSM2Point_ScalarBaseMult(t *testing.T) {
+	// 使用SM2参数定义规范所附录的数据进行基本的正确性测试 GM/T 0003.5 - 2012 A.2
+	// 其中，示例数据为：
+	// 私钥：3945208F 7B2144B1 3F36E38A C6D39F95 88939369 2860B51A 42FB81EF 4DF7C5B8
+	// 公钥x：09F9DF31 1E5421A1 50DD7D16 1E4BC5C6 72179FAD 1833FC07 6BB08FF3 56F35020
+	// 公钥y: CCEA490C E26775A5 2DC6EA71 8CC1AA60 0AED05FB F35E084A 6632F607 2DA9AD13
+	priv := bigFromHex("3945208F7B2144B13F36E38AC6D39F95889393692860B51A42FB81EF4DF7C5B8").Bytes()
+	pub, _ := scalarBaseMult_SkipBitExtraction_4_2_32(&priv)
+	expected := make([]byte, 65)
+	buf := append(expected[:0], 4)
+	x := bigFromHex("09F9DF311E5421A150DD7D161E4BC5C672179FAD1833FC076BB08FF356F35020").Bytes()
+	buf = append(buf, x...)
+	y := bigFromHex("CCEA490CE26775A52DC6EA718CC1AA600AED05FBF35E084A6632F6072DA9AD13").Bytes()
+	buf = append(buf, y...)
+	if !reflect.DeepEqual(expected, pub.Bytes()) {
+		t.Fail()
+	}
+}
+
+func TestSM2Point_ScalarBaseMult2(t *testing.T) {
+	priv := make([]byte, 32)
+	priv[31] = 0xff
+	priv[0] = 0xff
+	// the result should equal G
+	pub, _ := scalarBaseMult_SkipBitExtraction_4_2_32(&priv)
+	q, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &priv)
+	if !reflect.DeepEqual(q.Bytes(), pub.Bytes()) {
+		t.Fail()
+	}
+}
+
+func TestSM2Point_ScalarBaseMult2S(t *testing.T) {
+	priv := make([]byte, 32)
+	priv[31] = 0x1
+	// the result should equal G
+	pub, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &priv)
+	if !reflect.DeepEqual(NewSM2Generator().Bytes(), pub.Bytes()) {
+		t.Fail()
+	}
+}
+
+func TestSM2Point_ScalarBaseMult3(t *testing.T) {
+	priv := bigFromHex("7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF").Bytes()
+	pub, _ := scalarBaseMult_SkipBitExtraction_4_2_32(&priv)
+	expected, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &priv)
+	if !reflect.DeepEqual(expected.Bytes(), pub.Bytes()) {
+		t.Fail()
+	}
+}
+
+func TestSM2Point_ScalarBaseMult4(t *testing.T) {
+	priv := make([]byte, 32)
+	pub, err := scalarBaseMult_SkipBitExtraction_4_2_32(&priv)
+
+	if err != nil {
+		t.Fail()
+	}
+	if pub.z.IsZero() != 1 {
+		t.Fail()
+	}
+}
+
 func TestSM2Point_ScalarMult_1(t *testing.T) {
 	// 使用SM2参数定义规范所附录的数据进行基本的正确性测试 GM/T 0003.5 - 2012 A.2
 	// 其中，示例数据为：
@@ -137,7 +199,7 @@ func TestCompleteness(t *testing.T) {
 	}
 }
 
-func TestScalarBaseMult_Precomputed_DaA(t *testing.T) {
+func TestScalarBaseMult(t *testing.T) {
 	var bytes = make([]byte, 32)
 
 
@@ -145,7 +207,7 @@ func TestScalarBaseMult_Precomputed_DaA(t *testing.T) {
 		rand.Read(bytes)
 
 		res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &bytes)
-		res2, _ := scalarBaseMult_Precomputed_DaA(&bytes)
+		res2, _ := ScalarBaseMult(&bytes)
 		if !reflect.DeepEqual(res1.Bytes_Unsafe(), res2.Bytes_Unsafe()) {
 			t.Fail()
 		}
@@ -156,7 +218,7 @@ func TestScalarBaseMult_Precomputed_DaA(t *testing.T) {
 	bytes[0] = 0
 	bytes[1] = 0
 	res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &bytes)
-	res2, _ := scalarBaseMult_Precomputed_DaA(&bytes)
+	res2, _ := scalarBaseMult_SkipBitExtraction_6_3_14(&bytes)
 	if !reflect.DeepEqual(res1.Bytes_Unsafe(), res2.Bytes_Unsafe()) {
 		t.Fail()
 	}
@@ -164,7 +226,7 @@ func TestScalarBaseMult_Precomputed_DaA(t *testing.T) {
 	bytes2 := make([]byte, 33)
 	rand.Read(bytes2)
 
-	_, err2 := scalarBaseMult_Precomputed_DaA(&bytes2)
+	_, err2 := scalarBaseMult_SkipBitExtraction_6_3_14(&bytes2)
 	if err2 == nil {
 		t.Fail()
 	}
@@ -172,7 +234,7 @@ func TestScalarBaseMult_Precomputed_DaA(t *testing.T) {
 	bytes3 := make([]byte, 31)
 	rand.Read(bytes3[:])
 
-	_, err3 := scalarBaseMult_Precomputed_DaA(&bytes3)
+	_, err3 := scalarBaseMult_SkipBitExtraction_6_3_14(&bytes3)
 	if err3 == nil {
 		t.Fail()
 	}
@@ -191,14 +253,59 @@ func BenchmarkSM2Point_ScalarMult_Unsafe_DaA(b *testing.B) {
 	}
 }
 
-func BenchmarkScalarBaseMult_Precomputed_DaA(b *testing.B) {
+func BenchmarkScalarBaseMult(b *testing.B) {
 	bytes := make([]byte, 32)
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i:=0; i<b.N; i++ {
 		rand.Read(bytes[:])
-		scalarBaseMult_Precomputed_DaA(&bytes)
+		ScalarBaseMult(&bytes)
+	}
+}
+
+func Benchmark_scalarBaseMult_SkipBitExtraction_6_3_14(b *testing.B) {
+	bytes := make([]byte, 32)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i:=0; i<b.N; i++ {
+		rand.Read(bytes[:])
+		scalarBaseMult_SkipBitExtraction_6_3_14(&bytes)
+	}
+}
+
+func Benchmark_scalarBaseMult_SkipBitExtraction_5_3_17(b *testing.B) {
+	bytes := make([]byte, 32)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i:=0; i<b.N; i++ {
+		rand.Read(bytes[:])
+		scalarBaseMult_SkipBitExtraction_5_3_17(&bytes)
+	}
+}
+
+func Benchmark_scalarBaseMult_SkipBitExtraction_4_2_32(b *testing.B) {
+	bytes := make([]byte, 32)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i:=0; i<b.N; i++ {
+		rand.Read(bytes[:])
+		scalarBaseMult_SkipBitExtraction_4_2_32(&bytes)
+	}
+}
+
+func BenchmarkSM2Point_Select(b *testing.B) {
+	p := NewSM2Generator()
+	q := NewSM2Point().Double(p)
+	r := NewSM2Point()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i:=0; i<b.N; i++ {
+		r.Select(p, q, 1)
 	}
 }
 
@@ -330,6 +437,82 @@ func tellMontgomeryFriendility(p *big.Int, s uint) {
 		fmt.Println(fmt.Sprintf("0x%s is NOT %d-Montgomery friendly.", p.Text(16), s))
 	} else {
 		fmt.Println(fmt.Sprintf("0x%s is %d-Montgomery friendly.", p.Text(16), s))
+	}
+}
+
+func Test_extractHigherBits(t *testing.T) {
+	bytes := make([]byte, 32)
+	//0x[0ff0]...
+	for i:=0; i< 16; i++ {
+		bytes[2*i] = 0x0f
+		bytes[2*i+1] = 0xf0
+	}
+
+	// extract bits at 0, 42, 84, 126, 168, 210
+	// which should be (0, 1, 1, 0, 1, 0), or 0 + 2^1 + 2^2 + 0 + 2^4 = 22
+	bits := extractHigherBits(&bytes, 0, 6, 42)
+	if bits != 22 {
+		t.Fail()
+	}
+}
+
+func Test_extractBit(t *testing.T) {
+	bytes := make([]byte, 32)
+	bytes[0] = 0b00001111
+	bytes[31] = 0xf0
+	for i:=0; i<4; i++ {
+		//last 4 bits, which means bytes[31] should be all 0 here
+		bits := extractBit(&bytes, i)
+		if bits != 0 {
+			t.Fail()
+		}
+	}
+	for i:=4; i<8; i++ {
+		bits := extractBit(&bytes, i)
+		if bits != 1 {
+			t.Fail()
+		}
+	}
+	for i:=248; i<252; i++ {
+		bits := extractBit(&bytes, i)
+		if bits != 1 {
+			t.Fail()
+		}
+	}
+	for i:=252; i<256; i++ {
+		bits := extractBit(&bytes, i)
+		if bits != 0 {
+			t.Fail()
+		}
+	}
+}
+
+func Test_extractLowerBits(t *testing.T) {
+	bytes := make([]byte, 32)
+	bytes[31] = 0x1f
+	for i:=1; i<8; i++ {
+		bits := extractLowerBits(&bytes, i)
+		var passed bool
+		switch i {
+		case 1: passed = bits == 1
+		case 2: passed = bits == 3
+		case 3: passed = bits == 7
+		case 4: passed = bits == 15
+		case 5, 6, 7: passed = bits == 31
+		}
+		if !passed {
+			t.Fail()
+		}
+	}
+}
+
+func Test_selectPoints(t *testing.T) {
+	for i:=1; i<=len(sm2Precomputed_6_3_14_Remainder); i++ {
+		p := NewSM2Point()
+		selectPoints(p, sm2Precomputed_6_3_14_Remainder, 15, byte(i))
+		if !reflect.DeepEqual(p.Bytes(), sm2Precomputed_6_3_14_Remainder[i-1].Bytes()) {
+			t.Fail()
+		}
 	}
 }
 

@@ -173,12 +173,12 @@ func (p *SM2Point) bytes(out *[SM2BytesLengthUncompressed]byte, safe bool) []byt
 		yy := p.y.ToBigInt()
 		zz := p.z.ToBigInt()
 
-		zzInv := new(big.Int).ModInverse(zz, Sm2().Params().P) // unsafe inversion
+		zzInv := new(big.Int).ModInverse(zz, getCurve().Params().P) // unsafe inversion
 		xx.Mul(xx, zzInv)
 		yy.Mul(yy, zzInv)
 
-		xx.Mod(xx, Sm2().Params().P)
-		yy.Mod(yy, Sm2().Params().P)
+		xx.Mod(xx, getCurve().Params().P)
+		yy.Mod(yy, getCurve().Params().P)
 
 		buf := append(out[:0], 4)
 		xxBytes, yyBytes := xx.Bytes(), yy.Bytes()
@@ -198,6 +198,10 @@ func (p *SM2Point) bytes(out *[SM2BytesLengthUncompressed]byte, safe bool) []byt
 // GetAffineX return X in Affine as big integer. It saves some costs by
 // avoiding the calculation of Y. This is a safe version for the case that
 // the affine coordinates must be extracted safely.
+// Returns big integer. If returned is 0, callers, if in such needs, MUST determine
+// if this is due to a zero point, or a valid point (0, some_y). Usually if
+// the point results from scalar multiplication with scalar in range [1, n-1],
+// the latter will not happen.
 func (p *SM2Point) GetAffineX() *big.Int {
 	if p.z.IsZero() == 1 {
 		return big.NewInt(0)
@@ -218,9 +222,9 @@ func (p *SM2Point) GetAffineX_Unsafe() *big.Int {
 	xx := p.x.ToBigInt()
 	zz := p.z.ToBigInt()
 
-	zzInv := new(big.Int).ModInverse(zz, Sm2().Params().P)
+	zzInv := new(big.Int).ModInverse(zz, getCurve().Params().P)
 	xx.Mul(xx, zzInv)
-	return xx.Mod(xx, Sm2().Params().P)
+	return xx.Mod(xx, getCurve().Params().P)
 }
 
 // Add sets q = p1 + p2, and returns q. The points may overlap.
@@ -329,5 +333,13 @@ func (q *SM2Point) Select(p1, p2 *SM2Point, cond int) *SM2Point {
 	q.x.Select(p1.x, p2.x, cond)
 	q.y.Select(p1.y, p2.y, cond)
 	q.z.Select(p1.z, p2.z, cond)
+	return q
+}
+
+// Select sets (x, y) of q to p1 if cond == 1, and to p2 if cond == 0.
+// leaves q.z untouched
+func (q *SM2Point) PartialSelect(p1, p2 *SM2Point, cond int) *SM2Point {
+	q.x.Select(p1.x, p2.x, cond)
+	q.y.Select(p1.y, p2.y, cond)
 	return q
 }

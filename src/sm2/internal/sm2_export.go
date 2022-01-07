@@ -20,3 +20,7 @@ func (p *SM2Point) ToMontgomeryAffine() (x, y *fiat.SM2Element) {
 	yy := new(fiat.SM2Element).Mul(p.y, zinv)
 	return xx, yy
 }
+
+var (
+	ScalarMult_Unsafe_DaA = scalarMult_Unsafe_DaA
+)
