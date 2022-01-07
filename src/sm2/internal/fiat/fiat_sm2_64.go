@@ -1367,18 +1367,10 @@ func sm2Nonzero(out1 *uint64, arg1 *[4]uint64) {
 // Output Bounds:
 //   out1: [[0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff], [0x0 ~> 0xffffffffffffffff]]
 func sm2Selectznz(out1 *[4]uint64, arg1 sm2Uint1, arg2 *[4]uint64, arg3 *[4]uint64) {
-	var x1 uint64
-	sm2CmovznzU64(&x1, arg1, arg2[0], arg3[0])
-	var x2 uint64
-	sm2CmovznzU64(&x2, arg1, arg2[1], arg3[1])
-	var x3 uint64
-	sm2CmovznzU64(&x3, arg1, arg2[2], arg3[2])
-	var x4 uint64
-	sm2CmovznzU64(&x4, arg1, arg2[3], arg3[3])
-	out1[0] = x1
-	out1[1] = x2
-	out1[2] = x3
-	out1[3] = x4
+	sm2CmovznzU64(&out1[0], arg1, arg2[0], arg3[0])
+	sm2CmovznzU64(&out1[1], arg1, arg2[1], arg3[1])
+	sm2CmovznzU64(&out1[2], arg1, arg2[2], arg3[2])
+	sm2CmovznzU64(&out1[3], arg1, arg2[3], arg3[3])
 }
 
 // sm2ToBytes serializes a field element NOT in the Montgomery domain to bytes in little-endian order.
