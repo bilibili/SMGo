@@ -60,8 +60,8 @@ func ScalarMult(P *SM2Point, scalar *[]byte) (*SM2Point, error) {
 // ***secure implementation***, this could be used for
 // sign or key generation, all sensitive operations
 func ScalarBaseMult(k *[]byte) (*SM2Point, error) {
-	//return scalarBaseMult_SkipBitExtraction_4_2_32(k)
-	return scalarBaseMult_SkipBitExtraction_5_3_17(k)
+	return scalarBaseMult_SkipBitExtraction_4_2_32(k)
+	//return scalarBaseMult_SkipBitExtraction_5_3_17(k)
 	//return scalarBaseMult_SkipBitExtraction_6_3_14(k)
 }
 
