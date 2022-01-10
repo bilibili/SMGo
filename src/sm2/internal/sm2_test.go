@@ -297,6 +297,17 @@ func Benchmark_scalarBaseMult_SkipBitExtraction_4_2_32(b *testing.B) {
 	}
 }
 
+func Benchmark_scalarBaseMult_SkipBitExtraction_7_3_12(b *testing.B) {
+	bytes := make([]byte, 32)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i:=0; i<b.N; i++ {
+		rand.Read(bytes[:])
+		scalarBaseMult_SkipBitExtraction_7_3_12(&bytes)
+	}
+}
+
 func BenchmarkSM2Point_Select(b *testing.B) {
 	p := NewSM2Generator()
 	q := NewSM2Point().Double(p)

@@ -62,6 +62,7 @@ func ScalarBaseMult(k *[]byte) (*SM2Point, error) {
 	//return scalarBaseMult_SkipBitExtraction_4_2_32(k)
 	//return scalarBaseMult_SkipBitExtraction_5_3_17(k)
 	return scalarBaseMult_SkipBitExtraction_6_3_14(k)
+	//return scalarBaseMult_SkipBitExtraction_7_3_12(k)
 }
 
 // ScalarMixedMult_Unsafe mixed scalar multiplication, returns [gScalar]G + [scalar]P when no error
@@ -116,6 +117,10 @@ func scalarBaseMult_SkipBitExtraction_5_3_17(k *[]byte) (*SM2Point, error) {
 
 func scalarBaseMult_SkipBitExtraction_4_2_32(k *[]byte) (*SM2Point, error) {
 	return scalarBaseMult_SkipBitExtration(k, &sm2Precomputed_4_2_32, nil,4, 2, 32, 0)
+}
+
+func scalarBaseMult_SkipBitExtraction_7_3_12(k *[]byte) (*SM2Point, error) {
+	return scalarBaseMult_SkipBitExtration(k, &sm2Precomputed_7_3_12, &sm2Precomputed_7_3_12_Remainder,7, 3, 12, 4)
 }
 
 func scalarBaseMult_SkipBitExtration(k *[]byte, first *[][][]*[4]uint64, second *[][]*[4]uint64,

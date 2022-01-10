@@ -22,6 +22,7 @@ func main() {
 	writeTable(buf,4, 2, 32, 0)
 	writeTable(buf,6, 3, 14, 4)
 	writeTable(buf,5, 3, 17, 1)
+	writeTable(buf,7, 3, 12, 4)
 
 	err := os.WriteFile("sm2/internal/sm2_tables.go", buf.Bytes(), 0644)
 	if err != nil {
