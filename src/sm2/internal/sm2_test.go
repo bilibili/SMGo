@@ -218,7 +218,7 @@ func TestScalarBaseMult(t *testing.T) {
 	bytes[0] = 0
 	bytes[1] = 0
 	res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &bytes)
-	res2, _ := scalarBaseMult_SkipBitExtraction_6_3_14(&bytes)
+	res2, _ := ScalarBaseMult(&bytes)
 	if !reflect.DeepEqual(res1.Bytes_Unsafe(), res2.Bytes_Unsafe()) {
 		t.Fail()
 	}
@@ -226,7 +226,7 @@ func TestScalarBaseMult(t *testing.T) {
 	bytes2 := make([]byte, 33)
 	rand.Read(bytes2)
 
-	_, err2 := scalarBaseMult_SkipBitExtraction_6_3_14(&bytes2)
+	_, err2 := ScalarBaseMult(&bytes2)
 	if err2 == nil {
 		t.Fail()
 	}
@@ -234,7 +234,7 @@ func TestScalarBaseMult(t *testing.T) {
 	bytes3 := make([]byte, 31)
 	rand.Read(bytes3[:])
 
-	_, err3 := scalarBaseMult_SkipBitExtraction_6_3_14(&bytes3)
+	_, err3 := ScalarBaseMult(&bytes3)
 	if err3 == nil {
 		t.Fail()
 	}
