@@ -57,6 +57,8 @@ func writeHeader(buf *bytes.Buffer) {
 // or 1 then the second table could be omitted.)
 //
 // The base multiplication algorithm should run 14 iterations. 
+//
+// X and Y coordinates have been separated.
 // -- end example--
 //
 // All table elements should be accessed in constant time and in a 
@@ -76,7 +78,7 @@ func writeTable(buf *bytes.Buffer, window, subTableCount, iterations, remainder 
 		window, subTableCount, iterations, remainder)
 	fmt.Fprintln(buf, comment)
 
-	const tableLineProto = "var sm2Precomputed_%d_%d_%d = [][]*SM2Point {"
+	const tableLineProto = "var sm2Precomputed_%d_%d_%d = [][][]*[4]uint64 {" //x first, then y
 	tableWidth := int(raiseToPower2(window).Int64()) - 1
 	tableLine := fmt.Sprintf(tableLineProto, window, subTableCount, iterations)
 	fmt.Fprintln(buf, tableLine)
@@ -143,18 +145,19 @@ func writeTable(buf *bytes.Buffer, window, subTableCount, iterations, remainder 
 
 	fmt.Fprintln(buf,"}\n") // close the table
 
-	if remainder > 1 { // generate second table
-		const secondTableLineProto = "var sm2Precomputed_%d_%d_%d_Remainder = []*SM2Point {"
+	if remainder >= 1 { // generate second table
+		const secondTableLineProto = "var sm2Precomputed_%d_%d_%d_Remainder = [][]*[4]uint64 {"
 		secondTableLine := fmt.Sprintf(secondTableLineProto, window, subTableCount, iterations)
 		fmt.Fprintln(buf, secondTableLine)
 
-		writePoint(buf, internal.NewSM2Generator())
+		count := int(raiseToPower2(remainder).Int64()) - 1
+		points := make([]*internal.SM2Point, count)
 
-		power := int(raiseToPower2(remainder).Int64())
-		for i:=2; i<power; i++ {
-			p := intMult(internal.NewSM2Generator(), big.NewInt(int64(i)))
-			writePoint(buf, p)
+		for i:=0; i<count; i++ {
+			points[i] = intMult(internal.NewSM2Generator(), big.NewInt(int64(i+1)))
 		}
+
+		writeSubTable(buf, points)
 
 		fmt.Fprintln(buf,"}\n") // close the table
 	}
@@ -181,14 +184,17 @@ func raiseToPower2(exp int) *big.Int {
 }
 
 func writeSubTable(buf *bytes.Buffer, subTable []*internal.SM2Point) {
+	fmt.Fprintf(buf, "\t{\n")
 	for _, p := range subTable {
-		writePoint(buf, p)
+		writeAffine(buf, p.ToMontgomeryAffineX().GetRaw())
 	}
+	fmt.Fprintf(buf, "\t},\n\t{\n")
+	for _, p := range subTable {
+		writeAffine(buf, p.ToMontgomeryAffineY().GetRaw())
+	}
+	fmt.Fprintf(buf, "\t},\n")
 }
 
-func writePoint(buf *bytes.Buffer, p *internal.SM2Point) {
-	x, y := p.ToMontgomeryAffine()
-	xx, yy := [4]uint64(x.GetRaw()), [4]uint64(y.GetRaw())
-	fmt.Fprintf(buf,"\t\tFromMontgomery([4]uint64{%d, %d, %d, %d}, [4]uint64{%d, %d, %d, %d}),\n",
-		xx[0], xx[1], xx[2], xx[3], yy[0], yy[1], yy[2], yy[3])
+func writeAffine(buf *bytes.Buffer, raw [4]uint64) {
+	fmt.Fprintf(buf, "\t\t&([4]uint64{%d, %d, %d, %d}),\n", raw[0], raw[1], raw[2], raw[3])
 }

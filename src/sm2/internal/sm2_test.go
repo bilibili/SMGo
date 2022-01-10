@@ -28,7 +28,7 @@ func TestSM2Point_ScalarBaseMult(t *testing.T) {
 	// 公钥x：09F9DF31 1E5421A1 50DD7D16 1E4BC5C6 72179FAD 1833FC07 6BB08FF3 56F35020
 	// 公钥y: CCEA490C E26775A5 2DC6EA71 8CC1AA60 0AED05FB F35E084A 6632F607 2DA9AD13
 	priv := bigFromHex("3945208F7B2144B13F36E38AC6D39F95889393692860B51A42FB81EF4DF7C5B8").Bytes()
-	pub, _ := scalarBaseMult_SkipBitExtraction_4_2_32(&priv)
+	pub, _ := ScalarBaseMult(&priv)
 	expected := make([]byte, 65)
 	buf := append(expected[:0], 4)
 	x := bigFromHex("09F9DF311E5421A150DD7D161E4BC5C672179FAD1833FC076BB08FF356F35020").Bytes()
@@ -45,7 +45,7 @@ func TestSM2Point_ScalarBaseMult2(t *testing.T) {
 	priv[31] = 0xff
 	priv[0] = 0xff
 	// the result should equal G
-	pub, _ := scalarBaseMult_SkipBitExtraction_4_2_32(&priv)
+	pub, _ := ScalarBaseMult(&priv)
 	q, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &priv)
 	if !reflect.DeepEqual(q.Bytes(), pub.Bytes()) {
 		t.Fail()
@@ -64,7 +64,7 @@ func TestSM2Point_ScalarBaseMult2S(t *testing.T) {
 
 func TestSM2Point_ScalarBaseMult3(t *testing.T) {
 	priv := bigFromHex("7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF").Bytes()
-	pub, _ := scalarBaseMult_SkipBitExtraction_4_2_32(&priv)
+	pub, _ := ScalarBaseMult(&priv)
 	expected, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &priv)
 	if !reflect.DeepEqual(expected.Bytes(), pub.Bytes()) {
 		t.Fail()
@@ -73,7 +73,7 @@ func TestSM2Point_ScalarBaseMult3(t *testing.T) {
 
 func TestSM2Point_ScalarBaseMult4(t *testing.T) {
 	priv := make([]byte, 32)
-	pub, err := scalarBaseMult_SkipBitExtraction_4_2_32(&priv)
+	pub, err := ScalarBaseMult(&priv)
 
 	if err != nil {
 		t.Fail()
@@ -505,14 +505,3 @@ func Test_extractLowerBits(t *testing.T) {
 		}
 	}
 }
-
-func Test_selectPoints(t *testing.T) {
-	for i:=1; i<=len(sm2Precomputed_6_3_14_Remainder); i++ {
-		p := NewSM2Point()
-		selectPoints(p, sm2Precomputed_6_3_14_Remainder, 15, byte(i))
-		if !reflect.DeepEqual(p.Bytes(), sm2Precomputed_6_3_14_Remainder[i-1].Bytes()) {
-			t.Fail()
-		}
-	}
-}
-

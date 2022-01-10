@@ -7,18 +7,24 @@ package internal
 
 import "smgo/sm2/internal/fiat"
 
-// ToMontgomeryAffine extracts the X and Y in Montgomery domain.
-// x, y: the affine coordinates in Montgomery domain.
-// This is useful for generating the pre-computed table.
-func (p *SM2Point) ToMontgomeryAffine() (x, y *fiat.SM2Element) {
+func (p *SM2Point) ToMontgomeryAffineX() *fiat.SM2Element {
 	if p.z.IsZero() == 1 {
-		return new(fiat.SM2Element), new(fiat.SM2Element)
+		return new(fiat.SM2Element)
 	}
 
 	zinv := new(fiat.SM2Element).Invert(p.z) // safe inversion although it does not matter here
 	xx := new(fiat.SM2Element).Mul(p.x, zinv)
+	return xx
+}
+
+func (p *SM2Point) ToMontgomeryAffineY() *fiat.SM2Element {
+	if p.z.IsZero() == 1 {
+		return new(fiat.SM2Element)
+	}
+
+	zinv := new(fiat.SM2Element).Invert(p.z) // safe inversion although it does not matter here
 	yy := new(fiat.SM2Element).Mul(p.y, zinv)
-	return xx, yy
+	return yy
 }
 
 var (

@@ -145,6 +145,32 @@ func (v *SM2Element) Select(a, b *SM2Element, cond int) *SM2Element {
 	return v
 }
 
+func (v* SM2Element) MultiSelect(precomputed *[]*[4]uint64, conds *[]int, fallback *SM2Element, fallbackCond int) {
+	var out sm2UntypedFieldElement
+	var pre *sm2UntypedFieldElement
+	fb := (*sm2UntypedFieldElement)(&(fallback.x))
+
+	for i:=0; i<len(*conds); i++ {
+		cond := (uint64)((*conds)[i]) * 0xffffffffffffffff
+		pre = (*precomputed)[i]
+		out[0] |= pre[0] & cond
+		out[1] |= pre[1] & cond
+		out[2] |= pre[2] & cond
+		out[3] |= pre[3] & cond
+	}
+
+	fbCond := ^((uint64)(fallbackCond) * 0xffffffffffffffff)
+	out[0] |= fb[0] & fbCond
+	out[1] |= fb[1] & fbCond
+	out[2] |= fb[2] & fbCond
+	out[3] |= fb[3] & fbCond
+
+	v.x[0] = out[0]
+	v.x[1] = out[1]
+	v.x[2] = out[2]
+	v.x[3] = out[3]
+}
+
 func (z *SM2Element) Invert(x *SM2Element) *SM2Element {
 	sm2FermatInvert_FiatAC(&z.x, &x.x)
 	return z

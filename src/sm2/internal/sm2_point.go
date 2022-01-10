@@ -65,17 +65,6 @@ func (p *SM2Point) Set(q *SM2Point) *SM2Point {
 	return p
 }
 
-// FromMontgomery is used to reconstruct the SM2Point object from x and y
-// which are already in Montgomery domain. Z is assumed to be One therefore omitted.
-// This is useful for importing the pre-computed table.
-func FromMontgomery(x, y [4]uint64) *SM2Point {
-	return &SM2Point{
-		x: new(fiat.SM2Element).SetRaw(x),
-		y: new(fiat.SM2Element).SetRaw(y),
-		z: new(fiat.SM2Element).One(),
-	}
-}
-
 // SetBytes sets p to the compressed, uncompressed, or infinity value encoded in
 // b, as specified in SEC 1, Version 2.0, Section 2.3.4. If the point is not on
 // the curve, it returns nil and an error, and the receiver is unchanged.
@@ -336,10 +325,25 @@ func (q *SM2Point) Select(p1, p2 *SM2Point, cond int) *SM2Point {
 	return q
 }
 
-// Select sets (x, y) of q to p1 if cond == 1, and to p2 if cond == 0.
-// leaves q.z untouched
-func (q *SM2Point) PartialSelect(p1, p2 *SM2Point, cond int) *SM2Point {
-	q.x.Select(p1.x, p2.x, cond)
-	q.y.Select(p1.y, p2.y, cond)
+// this is in the Montgomery domain
+var sm2ElementOne = new(fiat.SM2Element).One()
+
+// MultiSelect select from multiple options based on the masks. With MultiSelect we should be
+// able to cut roughly half of selection cost compared to if we select the point one-by-one in a loop.
+//
+// xyMasks indicates for which element in the precomputed should the X and Y be selected from.
+// It should contain at most one value 1, the rest should all be value 0, otherwise behavior undefined.
+// If all of xyMasks are value 0, then q.x and q.y will remain as-is.
+//
+// zMask indicates if q.z should be selected from precomputed or not
+func (q *SM2Point) MultiSelect(precomputed *[][]*[4]uint64, xyMasks *[]int, zMask int) *SM2Point {
+	if precomputed == nil || xyMasks == nil || len((*precomputed)[0]) != len(*xyMasks) {
+		panic("invalid inputs")
+	}
+
+	q.x.MultiSelect(&(*precomputed)[0], &(*xyMasks), q.x, zMask)
+	q.y.MultiSelect(&(*precomputed)[1], &(*xyMasks), q.y, zMask)
+
+	q.z.Select(sm2ElementOne, q.z, zMask)
 	return q
 }

@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"smgo/sm2/internal/fiat"
 )
 
 type sm2Curve struct {
@@ -60,9 +59,9 @@ func ScalarMult(P *SM2Point, scalar *[]byte) (*SM2Point, error) {
 // ***secure implementation***, this could be used for
 // sign or key generation, all sensitive operations
 func ScalarBaseMult(k *[]byte) (*SM2Point, error) {
-	return scalarBaseMult_SkipBitExtraction_4_2_32(k)
+	//return scalarBaseMult_SkipBitExtraction_4_2_32(k)
 	//return scalarBaseMult_SkipBitExtraction_5_3_17(k)
-	//return scalarBaseMult_SkipBitExtraction_6_3_14(k)
+	return scalarBaseMult_SkipBitExtraction_6_3_14(k)
 }
 
 // ScalarMixedMult_Unsafe mixed scalar multiplication, returns [gScalar]G + [scalar]P when no error
@@ -103,7 +102,7 @@ func ScalarMixedMult_Unsafe(gScalar *[]byte, P *SM2Point, scalar *[]byte) (*SM2P
 // 13 KB static data. This should fit into the L1 cache of most modern
 // processors, at least those 64 bit ones.
 func scalarBaseMult_SkipBitExtraction_6_3_14(k *[]byte) (*SM2Point, error) {
-	return scalarBaseMult_SkipBitExtration(k, sm2Precomputed_6_3_14, sm2Precomputed_6_3_14_Remainder, 6, 3, 14, 4)
+	return scalarBaseMult_SkipBitExtration(k, &sm2Precomputed_6_3_14, &sm2Precomputed_6_3_14_Remainder, 6, 3, 14, 4)
 }
 
 // scalarBaseMult_SkipBitExtraction_5_3_17 is similar to scalarBaseMult_SkipBitExtraction_6_3_14
@@ -112,14 +111,14 @@ func scalarBaseMult_SkipBitExtraction_6_3_14(k *[]byte) (*SM2Point, error) {
 // The runtime cost is 16 DOUBLE + 49 ADD, plus, about half caching of static data
 // as compared to 6-3-14 scheme.
 func scalarBaseMult_SkipBitExtraction_5_3_17(k *[]byte) (*SM2Point, error) {
-	return scalarBaseMult_SkipBitExtration(k, sm2Precomputed_5_3_17, nil,5, 3, 17, 1)
+	return scalarBaseMult_SkipBitExtration(k, &sm2Precomputed_5_3_17, &sm2Precomputed_5_3_17_Remainder,5, 3, 17, 1)
 }
 
 func scalarBaseMult_SkipBitExtraction_4_2_32(k *[]byte) (*SM2Point, error) {
-	return scalarBaseMult_SkipBitExtration(k, sm2Precomputed_4_2_32, nil,4, 2, 32, 0)
+	return scalarBaseMult_SkipBitExtration(k, &sm2Precomputed_4_2_32, nil,4, 2, 32, 0)
 }
 
-func scalarBaseMult_SkipBitExtration(k *[]byte, first [][]*SM2Point, second []*SM2Point,
+func scalarBaseMult_SkipBitExtration(k *[]byte, first *[][][]*[4]uint64, second *[][]*[4]uint64,
 	window, subTableCount, iterations, remainder int) (*SM2Point, error) {
 
 	if window > 8 || remainder < 0 || remainder > 4 {
@@ -131,7 +130,7 @@ func scalarBaseMult_SkipBitExtration(k *[]byte, first [][]*SM2Point, second []*S
 	}
 
 	windowWidth := int(math.Pow(2, float64(window)) - 1)
-	if len(first[0]) != windowWidth {
+	if len((*first)[0][0]) != windowWidth {
 		panic("invalid parameter")
 	}
 
@@ -154,7 +153,7 @@ func scalarBaseMult_SkipBitExtration(k *[]byte, first [][]*SM2Point, second []*S
 			bits := extractHigherBits(k, i + j*iterations + remainder, window, subTableCount * iterations)
 
 			tmpPoint := NewSM2Point()
-			selectPoints(tmpPoint, first[j], windowWidth, bits)
+			selectPoints(tmpPoint, &(*first)[j], windowWidth, bits)
 			if !skip {
 				ret.Add(ret, tmpPoint)
 			} else {
@@ -168,16 +167,11 @@ func scalarBaseMult_SkipBitExtration(k *[]byte, first [][]*SM2Point, second []*S
 	if remainder >= 1 {
 		bits := extractLowerBits(k, remainder)
 
-		var points []*SM2Point
-		if remainder > 1 {
-			points = second
-		} else {
-			// second table is/could be nil when remainder is 1
-			points = []*SM2Point {sm2G}
-		}
+		var points [][]*[4]uint64
+		points = *second
 
 		tmpPoint := NewSM2Point()
-		selectPoints(tmpPoint, points, len(points), bits)
+		selectPoints(tmpPoint, &points, len(points[0]), bits)
 		ret.Add(ret, tmpPoint)
 	}
 
@@ -211,16 +205,17 @@ func extractLowerBits(k *[]byte, count int) byte {
 	return b & (1<<count - 1)
 }
 
-var sm2ElementOne = new(fiat.SM2Element).One()
-func selectPoints(out *SM2Point, precomputed []*SM2Point, width int, bits byte) *SM2Point {
+func selectPoints(out *SM2Point, precomputed *[][]*[4]uint64, width int, bits byte) *SM2Point {
+	// security caution: no branching depending on the value of bits - timing leak
+	// mask should be 0 or 1 depending on which one to be selected
+	xymasks := make([]int, width)
 	for i:=0; i<width; i++ {
-		// security caution: no branching depending on the value of bits - timing leak
-		// mask should be 0 or 1 depending on which one to be selected
-		mask := subtle.ConstantTimeByteEq(byte(i), bits - 1)
-		out.PartialSelect(precomputed[i], out, mask)
+		xymasks[i] = subtle.ConstantTimeByteEq(byte(i), bits - 1)
 	}
-	mask := 1 - subtle.ConstantTimeByteEq(bits, 0)
-	out.z.Select(sm2ElementOne, out.z, mask)
+
+	zmask := 1 - subtle.ConstantTimeByteEq(bits, 0)
+
+	out.MultiSelect(precomputed, &xymasks, zmask)
 	return out
 }
 
