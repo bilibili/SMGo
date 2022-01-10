@@ -150,8 +150,15 @@ func (v* SM2Element) MultiSelect(precomputed *[]*[4]uint64, conds *[]int, fallba
 	var pre *sm2UntypedFieldElement
 	fb := (*sm2UntypedFieldElement)(&(fallback.x))
 
-	for i:=0; i<len(*conds); i++ {
-		cond := (uint64)((*conds)[i]) * 0xffffffffffffffff
+	cond := (uint64)((*conds)[0]) * 0xffffffffffffffff
+	pre = (*precomputed)[0]
+	out[0] = pre[0] & cond
+	out[1] = pre[1] & cond
+	out[2] = pre[2] & cond
+	out[3] = pre[3] & cond
+
+	for i:=1; i<len(*conds); i++ {
+		cond = (uint64)((*conds)[i]) * 0xffffffffffffffff
 		pre = (*precomputed)[i]
 		out[0] |= pre[0] & cond
 		out[1] |= pre[1] & cond
