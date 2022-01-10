@@ -145,20 +145,21 @@ func (v *SM2Element) Select(a, b *SM2Element, cond int) *SM2Element {
 	return v
 }
 
-func (v* SM2Element) MultiSelect(precomputed *[]*[4]uint64, conds *[]int, fallback *SM2Element, fallbackCond int) {
+func (v* SM2Element) MultiSelect(precomputed *[]*[4]uint64, width int, bits byte, fallback *SM2Element, fallbackCond int) {
 	var out sm2UntypedFieldElement
 	var pre *sm2UntypedFieldElement
 	fb := (*sm2UntypedFieldElement)(&(fallback.x))
 
-	cond := (uint64)((*conds)[0]) * 0xffffffffffffffff
+
+	cond := (uint64)(subtle.ConstantTimeByteEq(byte(0), bits - 1)) * 0xffffffffffffffff
 	pre = (*precomputed)[0]
 	out[0] = pre[0] & cond
 	out[1] = pre[1] & cond
 	out[2] = pre[2] & cond
 	out[3] = pre[3] & cond
 
-	for i:=1; i<len(*conds); i++ {
-		cond = (uint64)((*conds)[i]) * 0xffffffffffffffff
+	for i:=1; i<width; i++ {
+		cond = (uint64)(subtle.ConstantTimeByteEq(byte(i), bits - 1)) * 0xffffffffffffffff
 		pre = (*precomputed)[i]
 		out[0] |= pre[0] & cond
 		out[1] |= pre[1] & cond

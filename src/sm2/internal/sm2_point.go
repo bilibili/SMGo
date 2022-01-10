@@ -10,6 +10,7 @@
 package internal
 
 import (
+	"crypto/subtle"
 	"errors"
 	"math/big"
 	"smgo/sm2/internal/fiat"
@@ -336,14 +337,16 @@ var sm2ElementOne = new(fiat.SM2Element).One()
 // If all of xyMasks are value 0, then q.x and q.y will remain as-is.
 //
 // zMask indicates if q.z should be selected from precomputed or not
-func (q *SM2Point) MultiSelect(precomputed *[][]*[4]uint64, xyMasks *[]int, zMask int) *SM2Point {
-	if precomputed == nil || xyMasks == nil || len((*precomputed)[0]) != len(*xyMasks) {
+func (q *SM2Point) MultiSelect(precomputed *[][]*[4]uint64, width int, bits byte) *SM2Point {
+	if precomputed == nil || len((*precomputed)[0]) != width {
 		panic("invalid inputs")
 	}
 
-	q.x.MultiSelect(&(*precomputed)[0], &(*xyMasks), q.x, zMask)
-	q.y.MultiSelect(&(*precomputed)[1], &(*xyMasks), q.y, zMask)
+	zmask := 1 - subtle.ConstantTimeByteEq(bits, 0)
 
-	q.z.Select(sm2ElementOne, q.z, zMask)
+	q.x.MultiSelect(&(*precomputed)[0], width, bits, q.x, zmask)
+	q.y.MultiSelect(&(*precomputed)[1], width, bits, q.y, zmask)
+
+	q.z.Select(sm2ElementOne, q.z, zmask)
 	return q
 }

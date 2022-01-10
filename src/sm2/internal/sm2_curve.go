@@ -5,7 +5,6 @@ package internal
 
 import (
 	"crypto/elliptic"
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"math"
@@ -213,14 +212,14 @@ func extractLowerBits(k *[]byte, count int) byte {
 func selectPoints(out *SM2Point, precomputed *[][]*[4]uint64, width int, bits byte) *SM2Point {
 	// security caution: no branching depending on the value of bits - timing leak
 	// mask should be 0 or 1 depending on which one to be selected
-	xymasks := make([]int, width)
-	for i:=0; i<width; i++ {
-		xymasks[i] = subtle.ConstantTimeByteEq(byte(i), bits - 1)
-	}
+	//xymasks := make([]int, width)
+	//for i:=0; i<width; i++ {
+	//	xymasks[i] = subtle.ConstantTimeByteEq(byte(i), bits - 1)
+	//}
+	//
+	//zmask := 1 - subtle.ConstantTimeByteEq(bits, 0)
 
-	zmask := 1 - subtle.ConstantTimeByteEq(bits, 0)
-
-	out.MultiSelect(precomputed, &xymasks, zmask)
+	out.MultiSelect(precomputed, width, bits)
 	return out
 }
 
