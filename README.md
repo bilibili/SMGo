@@ -5,9 +5,25 @@
 The Golang implementation of the SM2/3/4 ciphers, suitable for platforms with 64-bit multiplier.
 
 <h3>SM2</h3>
-本实现使用常数时间算法，通过牺牲一小部分性能获得更好的安全性，不会在签名时或执行DH协议时通过运行时间泄漏私钥或者签名随机数信息。
+本实现使用常数时间算法，通过牺牲一部分性能获得更好的安全性，不会在签名时或执行DH协议时通过运行时间泄漏私钥或者签名随机数信息。这主要包含三部分的安全设计和实现：
 
-This implementation uses constant time algorithm, and trades in a small runtime cost for better security. It does not leak timing information of private key or random number during signing or DH protocol.
+1、使用敏感信息做标量乘法的时候，不基于敏感信息作代码分支，避免通过侧信道泄漏信息
+
+2、使用预计算表加速计算的时候，不基于敏感信息进行查表操作，而使用Select方法，以防止通过缓存泄漏信息
+
+3、计算（1 + d）^ -1 mod N 的时候（d为私钥），不使用[扩展欧几里德算法](https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm) ，而使用基于[费马小定理](https://en.wikipedia.org/wiki/Fermat%27s_little_theorem) 的方法计算 (1 +d) ^ (N - 2) mod N
+
+This implementation uses constant time algorithm, and trades in some runtime cost for better security. It does not leak timing information of private key or random number during signing or DH protocol. This includes three designs and implementations:
+
+1, When doing scalar multiplication with sensitive information, this implementation does not branch codes based on the sensitive information so that no such information is leaked through side channel
+
+2, When looking up pre-computed tables to speed up calculation, this implementation does not look up the table based on the sensitive information. Select is used instead to prevent cache timing leak.
+
+3, When calculating （1 + d）^ -1 mod N (d is the private key), this implementation does not rely on the [EEA](https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm) . Instead it adopts a method based on [Fermat's Little Theorem](https://en.wikipedia.org/wiki/Fermat%27s_little_theorem) to calculate (1 +d) ^ (N - 2) mod N
+
+在其它部分计算已经充分优化的时候，常数时间算法增加了大约30%的开销。
+
+The constant time algorithms take about 30% of total cost after the rest of the computation has been optimized. 
 
 本实现使用了[Fiat-Crypto](https://github.com/mit-plv/fiat-crypto) 项目和[addchain](https://github.com/mmcloughlin/addchain) 项目所生成的代码。其中，[Fiat-Crypto](https://github.com/mit-plv/fiat-crypto) 项目提供了"构造即正确"的素域快速算法，而[addchain](https://github.com/mmcloughlin/addchain) 项目为基于费马小定理求素域乘法逆元的算法提供较为优化的加法链分解方法。
 
