@@ -484,7 +484,8 @@ func sm2ScalarSquare(out1 *sm2ScalarMontgomeryDomainFieldElement, arg1 *sm2Scala
 	x52, x51 = bits.Mul64(x1, arg1[1])
 	var x53 uint64
 	var x54 uint64
-	x54, x53 = bits.Mul64(x1, arg1[0])
+	//x54, x53 = bits.Mul64(x1, arg1[0])
+	x54, x53 = x10, x9
 	var x55 uint64
 	var x56 uint64
 	x55, x56 = bits.Add64(x54, x51, uint64(0x0))
@@ -557,10 +558,12 @@ func sm2ScalarSquare(out1 *sm2ScalarMontgomeryDomainFieldElement, arg1 *sm2Scala
 	x103, x102 = bits.Mul64(x2, arg1[2])
 	var x104 uint64
 	var x105 uint64
-	x105, x104 = bits.Mul64(x2, arg1[1])
+	//x105, x104 = bits.Mul64(x2, arg1[1])
+	x105, x104 = x50, x49
 	var x106 uint64
 	var x107 uint64
-	x107, x106 = bits.Mul64(x2, arg1[0])
+	//x107, x106 = bits.Mul64(x2, arg1[0])
+	x107, x106 = x8, x7
 	var x108 uint64
 	var x109 uint64
 	x108, x109 = bits.Add64(x107, x104, uint64(0x0))
@@ -630,13 +633,16 @@ func sm2ScalarSquare(out1 *sm2ScalarMontgomeryDomainFieldElement, arg1 *sm2Scala
 	x154, x153 = bits.Mul64(x3, arg1[3])
 	var x155 uint64
 	var x156 uint64
-	x156, x155 = bits.Mul64(x3, arg1[2])
+	//x156, x155 = bits.Mul64(x3, arg1[2])
+	x156, x155 = x101, x100
 	var x157 uint64
 	var x158 uint64
-	x158, x157 = bits.Mul64(x3, arg1[1])
+	//x158, x157 = bits.Mul64(x3, arg1[1])
+	x158, x157 = x48, x47
 	var x159 uint64
 	var x160 uint64
-	x160, x159 = bits.Mul64(x3, arg1[0])
+	//x160, x159 = bits.Mul64(x3, arg1[0])
+	x160, x159 = x6, x5
 	var x161 uint64
 	var x162 uint64
 	x161, x162 = bits.Add64(x160, x157, uint64(0x0))

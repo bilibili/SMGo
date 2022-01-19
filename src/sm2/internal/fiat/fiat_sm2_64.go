@@ -474,7 +474,8 @@ func sm2Square(out1 *sm2MontgomeryDomainFieldElement, arg1 *sm2MontgomeryDomainF
 	x50, x49 = bits.Mul64(x1, arg1[1])
 	var x51 uint64
 	var x52 uint64
-	x52, x51 = bits.Mul64(x1, arg1[0])
+	//x52, x51 = bits.Mul64(x1, arg1[0])
+	x52, x51 = x10, x9
 	var x53 uint64
 	var x54 uint64
 	x53, x54 = bits.Add64(x52, x49, uint64(0x0))
@@ -545,10 +546,12 @@ func sm2Square(out1 *sm2MontgomeryDomainFieldElement, arg1 *sm2MontgomeryDomainF
 	x99, x98 = bits.Mul64(x2, arg1[2])
 	var x100 uint64
 	var x101 uint64
-	x101, x100 = bits.Mul64(x2, arg1[1])
+	//x101, x100 = bits.Mul64(x2, arg1[1])
+	x101, x100 = x48, x47
 	var x102 uint64
 	var x103 uint64
-	x103, x102 = bits.Mul64(x2, arg1[0])
+	//x103, x102 = bits.Mul64(x2, arg1[0])
+	x103, x102 = x8, x7
 	var x104 uint64
 	var x105 uint64
 	x104, x105 = bits.Add64(x103, x100, uint64(0x0))
@@ -616,13 +619,16 @@ func sm2Square(out1 *sm2MontgomeryDomainFieldElement, arg1 *sm2MontgomeryDomainF
 	x148, x147 = bits.Mul64(x3, arg1[3])
 	var x149 uint64
 	var x150 uint64
-	x150, x149 = bits.Mul64(x3, arg1[2])
+	//x150, x149 = bits.Mul64(x3, arg1[2])
+	x150, x149 = x97, x96
 	var x151 uint64
 	var x152 uint64
-	x152, x151 = bits.Mul64(x3, arg1[1])
+	//x152, x151 = bits.Mul64(x3, arg1[1])
+	x152, x151 = x46, x45
 	var x153 uint64
 	var x154 uint64
-	x154, x153 = bits.Mul64(x3, arg1[0])
+	//x154, x153 = bits.Mul64(x3, arg1[0])
+	x154, x153 = x6, x5
 	var x155 uint64
 	var x156 uint64
 	x155, x156 = bits.Add64(x154, x151, uint64(0x0))
