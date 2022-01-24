@@ -120,7 +120,7 @@ func Test_RejectNminus1(t *testing.T) {
 		k := new(big.Int).Mul(n, big.NewInt(int64(i)))
 		k.Sub(k, big.NewInt(1))
 		bytes := nMinus1.Bytes()
-		_, _, err := SignHashed(nil, &bytes, nil)
+		_, _, err := SignHashed(rand.Reader, &bytes, &bytes)
 		if err == nil {
 			t.Fail()
 		}

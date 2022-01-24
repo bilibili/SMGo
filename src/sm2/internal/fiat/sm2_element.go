@@ -14,6 +14,7 @@ import (
 	"crypto/subtle"
 	"errors"
 	"math/big"
+	"smgo/sm2/internal/utils"
 )
 
 // SM2Element is an integer modulo 2^256 - 2^224 - 2^96 + 2^64 - 1.
@@ -97,13 +98,8 @@ func (e *SM2Element) SetBytes(v []byte) (*SM2Element, error) {
 	if len(v) != SM2ElementLen {
 		return nil, errors.New("invalid SM2Element encoding")
 	}
-	for i := range v {
-		if v[i] < sm2MinusOneEncoding[i] {
-			break
-		}
-		if v[i] > sm2MinusOneEncoding[i] {
-			return nil, errors.New("invalid SM2Element encoding")
-		}
+	if utils.ConstantTimeCmp(v, sm2MinusOneEncoding, SM2ElementLen) > 0 {
+		return nil, errors.New("invalid SM2Element encoding")
 	}
 	var in [SM2ElementLen]byte
 	copy(in[:], v)

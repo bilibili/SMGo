@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"smgo/sm2/internal"
 	"smgo/sm2/internal/fiat"
+	"smgo/sm2/internal/utils"
 )
 
 // GenerateKey generate private key with provided random source
@@ -68,10 +69,12 @@ func CheckOnCurve(x, y *[]byte) bool {
 
 var one = big.NewInt(1)
 var n = internal.GetN()
+var nBytes = n.Bytes()
 var nMinus1 = new(big.Int).Sub(n, one)
+var nMinus1Bytes = nMinus1.Bytes()
 
 // TestPrivateKey tests if the priv has at most 32 bytes, and if it is in range [1, n-2]
-// Returns the length difference if longer than 32, or -1 if ont in the range,
+// Returns the length difference if longer than 32, or -1 if not in the range,
 // or 0 if everything checks out
 //
 // TestPrivateKey is made public purposefully.
@@ -80,20 +83,16 @@ func TestPrivateKey(priv *[]byte) int {
 	if l > 0 {
 		return l
 	}
-
-	// compiler likes will make a heap object allocated in stack, but let's not rely on it
-	// instead, force a stack variable
-	var k big.Int
-	k.SetBytes(*priv)
-
-	// Notes about constant-time comparison: underlying it is machine word size word-by-word comparison
-	// So it really does not leak much info especially in 64-bit machines.
-	// Given that SM2 n is FFFFFFFeFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54123
-	// most of the time it will return false upon first word comparison
-	if k.Cmp(nMinus1) >= 0 {
-		return -1
+	if l < 0 {
+		return 0
 	}
-	return 0
+
+	cmp := utils.ConstantTimeCmp((*priv)[:], nMinus1Bytes[:], 32)
+	if cmp == -1 {
+		return 0
+	}
+
+	return -1
 }
 
 // SignHashed signs the data which have been hashed from message and public parameters.
@@ -121,13 +120,7 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 		var k big.Int
 		k.SetBytes(K[:])
 
-		//k.Mod(k, n) // 注意，这个操作使得k并非在[1, n-1]之间均匀分布，而是偏向于 [1, 2^256 - n] 这个区间，所以我们最好重新抽取一次随机数
-
-		// Notes about constant-time comparison: underlying it is machine word size word-by-word comparison
-		// So it really does not leak much info especially in 64-bit machines.
-		// Given that SM2 n is FFFFFFFeFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54123
-		// most of the time it will return false upon first word comparison
-		if k.Cmp(n) >= 0 {
+		if utils.ConstantTimeCmp(K[:], nBytes[:], 32) >= 0 {
 			continue
 		}
 
@@ -164,7 +157,7 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 		//SM2ScalarElement.SetBytes要求长度为32，因此，如果私钥实际长度短于32字节（标准不排除此种情形），左边补零（标准规定使用大端字节序）
 		d1Bytes := d1Int.Bytes()
 		var buf [32]byte
-		copy(buf[32-len(d1Bytes) : ], d1Int.Bytes())
+		copy(buf[32-len(d1Bytes) : ], d1Bytes)
 
 		d1.SetBytes(buf[:]) // priv = n - 1 已经被排除，因此不会导致 d1 = 0
 		d1Inv.Invert(&d1) // **常数时间**算法 constant time inversion here, about 10% performance hit
