@@ -141,7 +141,7 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 		var eInt, rInt, sInt, rkInt, dInt, d1Int, tmp big.Int
 		var d1, d1Inv fiat.SM2ScalarElement
 
-		x := kG.GetAffineX_Unsafe() // 避免计算y坐标，可以节约计算量。由于x不需要保密，可以使用快速版本
+		x := kG.GetAffineX_Unsafe() // 避免计算y坐标，可以节约计算量。由于x不需要保密，可以使用快速版本，但z的数值会泄露信息吗？TODO
 
 		eInt.SetBytes(*e)
 		rInt.Add(x, &eInt)
@@ -170,9 +170,11 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 		d1Inv.Invert(&d1) // **常数时间**算法 constant time inversion here, about 10% performance hit
 
 		// 标准要求计算  (k - r * priv) / (1 + priv)
-		tmp.Mul(&rInt, &dInt)
-		tmp.Sub(&k, &tmp)
+		// 这等价于 (k + r) / (1 + priv) - r
+		// 后者可以节约一次乘法
+		tmp.Add(&k, &rInt)
 		sInt.Mul(&tmp, d1Inv.ToBigInt())
+		sInt.Sub(&sInt, &rInt)
 		sInt.Mod(&sInt, n)
 
 		if sInt.Sign() == 0 {
