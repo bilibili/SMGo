@@ -117,9 +117,6 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 			return
 		}
 
-		var k big.Int
-		k.SetBytes(K[:])
-
 		if utils.ConstantTimeCmp(K[:], nBytes[:], 32) >= 0 {
 			continue
 		}
@@ -131,7 +128,7 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 			return
 		}
 
-		var eInt, rInt, sInt, rkInt, dInt, d1Int, tmp big.Int
+		var eInt, rInt, sInt, rkInt, dInt, d1Int big.Int
 		var d1, d1Inv fiat.SM2ScalarElement
 
 		x := kG.GetAffineX_Unsafe() // 避免计算y坐标，可以节约计算量。由于x不需要保密，可以使用快速版本，但z的数值会泄露信息吗？TODO
@@ -145,9 +142,13 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 			continue
 		}
 
+		var k big.Int
+		k.SetBytes(K[:])
+
 		rkInt.Add(&rInt, &k)
 		// 标准要求排除的第二种情形
-		if rkInt.Cmp(n) == 0 {
+		rkBytes := rkInt.Bytes()
+		if len(rkBytes) == 32 && utils.ConstantTimeCmp(rkBytes[:], nBytes[:], 32) == 0 {
 			continue
 		}
 
@@ -165,8 +166,7 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 		// 标准要求计算  (k - r * priv) / (1 + priv)
 		// 这等价于 (k + r) / (1 + priv) - r
 		// 后者可以节约一次乘法
-		tmp.Add(&k, &rInt)
-		sInt.Mul(&tmp, d1Inv.ToBigInt())
+		sInt.Mul(&rkInt, d1Inv.ToBigInt())
 		sInt.Sub(&sInt, &rInt)
 		sInt.Mod(&sInt, n)
 
