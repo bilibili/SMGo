@@ -3,7 +3,9 @@
 
 package fiat
 
-import "crypto/subtle"
+import (
+	"crypto/subtle"
+)
 
 func (v* SM2Element) MultiSelect(precomputed *[]*[4]uint64, width int, bits byte, fallback *SM2Element, fallbackCond int) {
 	var out sm2UntypedFieldElement
@@ -19,6 +21,24 @@ func (v* SM2Element) MultiSelect(precomputed *[]*[4]uint64, width int, bits byte
 	for i:=0; i<width; i++ {
 		cond := (uint64)(subtle.ConstantTimeByteEq(byte(i), bits - 1)) * 0xffffffffffffffff
 		pre = (*precomputed)[i]
+		out[0] |= pre[0] & cond
+		out[1] |= pre[1] & cond
+		out[2] |= pre[2] & cond
+		out[3] |= pre[3] & cond
+	}
+
+	v.x[0] = out[0]
+	v.x[1] = out[1]
+	v.x[2] = out[2]
+	v.x[3] = out[3]
+}
+
+func (v* SM2Element) MultiSelect2(precomputed *[]*SM2Element, width int, bits byte) {
+	var pre, out sm2UntypedFieldElement
+
+	for i:=0; i<width; i++ {
+		cond := (uint64)(subtle.ConstantTimeByteEq(byte(i), bits)) * 0xffffffffffffffff
+		pre = (*precomputed)[i].x
 		out[0] |= pre[0] & cond
 		out[1] |= pre[1] & cond
 		out[2] |= pre[2] & cond

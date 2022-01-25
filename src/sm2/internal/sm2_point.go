@@ -365,3 +365,31 @@ func (q *SM2Point) MultiSelect(precomputed *[][]*[4]uint64, width int, bits byte
 	q.z.Select(sm2ElementOne, q.z, zmask)
 	return q
 }
+
+// MultiSelect2
+// precondition: caller must ensure that exactly one of the candidates must be selected
+func (q *SM2Point) MultiSelect2(precomputed *[][]*fiat.SM2Element, width int, bits byte) *SM2Point {
+	if precomputed == nil || len((*precomputed)[0]) != width {
+		panic("invalid inputs")
+	}
+
+	q.x.MultiSelect2(&((*precomputed)[0]), width, bits)
+	q.y.MultiSelect2(&((*precomputed)[1]), width, bits)
+	q.z.MultiSelect2(&((*precomputed)[2]), width, bits)
+	return q
+}
+
+func TransformPrecomputed(precomputed *[]*SM2Point, width int) [][]*fiat.SM2Element {
+	var precomputedElements [][]*fiat.SM2Element
+	precomputedElements = make([][]*fiat.SM2Element, 3)
+	precomputedElements[0] = make([]*fiat.SM2Element, width)
+	precomputedElements[1] = make([]*fiat.SM2Element, width)
+	precomputedElements[2] = make([]*fiat.SM2Element, width)
+
+	for i := 0; i < width; i++ {
+		precomputedElements[0][i] = (*precomputed)[i].x
+		precomputedElements[1][i] = (*precomputed)[i].y
+		precomputedElements[2][i] = (*precomputed)[i].z
+	}
+	return precomputedElements
+}

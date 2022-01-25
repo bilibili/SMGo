@@ -5,7 +5,6 @@ package internal
 
 import (
 	"crypto/elliptic"
-	"crypto/subtle"
 	"errors"
 	"fmt"
 	"math"
@@ -63,6 +62,10 @@ func ScalarMult(P *SM2Point, scalar *[]byte) (*SM2Point, error) {
 		pPrecomputes[i] = NewSM2Point().Add(pPrecomputes[i-1], P)
 	}
 
+	pre := pPrecomputes[:]
+	precomputedElements := TransformPrecomputed(&pre, nafPrecomputes)
+
+
 	skip := true
 	ret := NewSM2Point()
 
@@ -76,25 +79,16 @@ func ScalarMult(P *SM2Point, scalar *[]byte) (*SM2Point, error) {
 
 		tmpPoint := NewSM2Point()
 
-		// TODO multi select later (with negation)
-		for j:=0; j<nafPrecomputes; j++ {
-			mask := subtle.ConstantTimeByteEq(b>>4, byte(j))
-			tmpPoint.Select(pPrecomputes[b>>4], tmpPoint, mask)
-		}
+		tmpPoint.MultiSelect2(&precomputedElements, nafPrecomputes, b>>4)
 		ret.Add(ret, tmpPoint)
 		skip = false
-		tmpPoint = NewSM2Point() // refresh it
 
 		ret.Double(ret)
 		ret.Double(ret)
 		ret.Double(ret)
 		ret.Double(ret)
 
-		// TODO multi select later (with negation)
-		for j:=0; j<nafPrecomputes; j++ {
-			mask := subtle.ConstantTimeByteEq(b&0x0f, byte(j))
-			tmpPoint.Select(pPrecomputes[b&0x0f], tmpPoint, mask)
-		}
+		tmpPoint.MultiSelect2(&precomputedElements, nafPrecomputes, b&0x0f)
 		ret.Add(ret, tmpPoint)
 	}
 
