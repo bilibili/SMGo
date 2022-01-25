@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"smgo/sm2/internal/utils"
 )
 
 type sm2Curve struct {
@@ -69,19 +70,71 @@ func ScalarBaseMult(k *[]byte) (*SM2Point, error) {
 // usually used for signature verification and not sensitive
 // This is an internal function. Do NOT use it out of this library. Use sm. functions.
 func ScalarMixedMult_Unsafe(gScalar *[]byte, P *SM2Point, scalar *[]byte) (*SM2Point, error) {
-	// slow calculation below, should adopt mixed method and use some NAF optimization etc. TODO
-	S, es := ScalarBaseMult(gScalar)
-	if es != nil {
-		return nil, es
+	const nafWindowWidth = 4
+	const nafPrecomputes = 1 << (nafWindowWidth -1) // 8
+
+	// P, 3P, 5P, ... [2i+1]P, ... 15P
+	var pPrecomputes [nafPrecomputes]*SM2Point
+	pPrecomputes[0] = P
+	var p2 = NewSM2Point().Double(P)
+	for i:=1; i<len(pPrecomputes); i++ {
+		pPrecomputes[i] = NewSM2Point().Add(pPrecomputes[i-1], p2)
 	}
 
-	T, et := ScalarMult(P, scalar)
-	if et != nil {
-		return nil, et
+	var singed4Naf [257]int
+	utils.DecomposeNAF(singed4Naf[:], scalar, 257, nafWindowWidth)
+	skip := true
+	ret := NewSM2Point()
+
+	const window = 6
+	const subTableCount = 3
+	const iterations = 14
+	const remainder = 4
+
+	for i:=256; i>=0; i-- {
+		if !skip {
+			ret.Double(ret)
+		}
+
+		if i<iterations {
+			// iterate through the sub-tables for 6-3-14 scheme
+			for j:=0; j<subTableCount; j++ {
+				bits := extractHigherBits(gScalar, i + j*iterations + remainder, window, subTableCount * iterations)
+				if bits > 0 {
+					x, y := sm2Precomputed_6_3_14[j][0][bits - 1], sm2Precomputed_6_3_14[j][1][bits - 1]
+					tmpPoint := NewFromXY(x, y)
+					ret.Add(ret, tmpPoint)
+					skip = false
+				}
+			}
+		}
+
+		naf := singed4Naf[i]
+		if naf == 0 {
+			continue
+		}
+
+		tmpPoint := NewSM2Point()
+		if naf > 0 {
+			idx := (naf - 1) >> 1
+			tmpPoint = pPrecomputes[idx]
+		} else if naf < 0 {
+			idx := (-naf - 1) >> 1
+			tmpPoint.Negate(pPrecomputes[idx])
+		}
+
+		ret.Add(ret, tmpPoint)
+		skip = false
 	}
 
-	sGtP := NewSM2Point().Add(S, T)
-	return sGtP, nil
+	bits := extractLowerBits(gScalar, remainder)
+	if bits > 0 {
+		x, y := sm2Precomputed_6_3_14_Remainder[0][bits-1], sm2Precomputed_6_3_14_Remainder[1][bits-1]
+		tmpPoint := NewFromXY(x, y)
+		ret.Add(ret, tmpPoint)
+	}
+
+	return ret, nil
 }
 
 // scalarBaseMult_SkipBitExtraction_6_3_14 uses pre-computed table of multiples

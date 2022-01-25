@@ -240,6 +240,62 @@ func TestScalarBaseMult(t *testing.T) {
 	}
 }
 
+func TestScalarMixedMult_Unsafe_baseonly(t *testing.T) {
+	var gScalar = make([]byte, 32)
+	var scalar = make([]byte, 32)
+
+	res1, _ := ScalarMixedMult_Unsafe(&gScalar, NewSM2Point(), &scalar)
+	res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &gScalar)
+	if !reflect.DeepEqual(res1.Bytes_Unsafe(), res2.Bytes_Unsafe()) {
+		t.Fail()
+	}
+}
+
+func TestScalarMixedMult_Unsafe_nobase(t *testing.T) {
+	var gScalar = make([]byte, 32)
+	var scalar = make([]byte, 32)
+
+	scalar[31] = 1
+
+	res1, _ := ScalarMixedMult_Unsafe(&gScalar, NewSM2Generator(), &scalar)
+	res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &scalar)
+	if !reflect.DeepEqual(res1.Bytes_Unsafe(), res2.Bytes_Unsafe()) {
+		t.Fail()
+	}
+}
+
+func TestScalarMixedMult_Unsafe(t *testing.T) {
+	var gScalar = make([]byte, 32)
+	var scalar = make([]byte, 32)
+
+	for i:=0; i< 1000; i++ {
+		rand.Read(gScalar)
+		rand.Read(scalar)
+
+		res1, _ := ScalarMixedMult_Unsafe(&gScalar, NewSM2Generator(), &scalar)
+		res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &gScalar)
+		res3, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &scalar)
+		res3.Add(res2, res3)
+		if !reflect.DeepEqual(res1.Bytes_Unsafe(), res3.Bytes_Unsafe()) {
+			t.Fail()
+		}
+	}
+
+}
+
+func BenchmarkScalarMixedMult_Unsafe(b *testing.B) {
+	var gScalar = make([]byte, 32)
+	var scalar = make([]byte, 32)
+
+	for i:=0; i<b.N; i++ {
+		rand.Read(gScalar)
+		//rand.Read(scalar)
+		scalar[0] = 0xf2
+
+		ScalarMixedMult_Unsafe(&gScalar, NewSM2Generator(), &scalar)
+	}
+}
+
 // Tests if the result wraps around infinity how the program handles
 func BenchmarkSM2Point_ScalarMult_Unsafe_DaA(b *testing.B) {
 	bytes := make([]byte, 32)

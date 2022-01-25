@@ -49,6 +49,14 @@ func NewSM2Point() *SM2Point {
 	}
 }
 
+func NewFromXY(xx, yy *[4]uint64) *SM2Point {
+	return &SM2Point{
+		x: new(fiat.SM2Element).SetRaw(*xx),
+		y: new(fiat.SM2Element).SetRaw(*yy),
+		z: new(fiat.SM2Element).One(),
+	}
+}
+
 // NewSM2Generator returns a new SM2Point set to the canonical generator.
 func NewSM2Generator() *SM2Point {
 	return (&SM2Point{
@@ -183,6 +191,13 @@ func (p *SM2Point) bytes(out *[SM2BytesLengthUncompressed]byte, safe bool) []byt
 		buf = append(buf, yyBytes...)
 		return buf
 	}
+}
+
+func (q *SM2Point) Negate(p *SM2Point) *SM2Point {
+	q.x.Set(p.x)
+	q.y.Opp(p.y)
+	q.z.Set(p.z)
+	return q
 }
 
 // GetAffineX return X in Affine as big integer. It saves some costs by

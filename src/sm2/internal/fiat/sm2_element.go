@@ -122,6 +122,11 @@ func (e *SM2Element) Sub(t1, t2 *SM2Element) *SM2Element {
 	return e
 }
 
+func (e *SM2Element) Opp(t *SM2Element) *SM2Element {
+	sm2Opp(&e.x, &t.x)
+	return e
+}
+
 // Mul sets e = t1 * t2, and returns e.
 func (e *SM2Element) Mul(t1, t2 *SM2Element) *SM2Element {
 	sm2Mul(&e.x, &t1.x, &t2.x)
