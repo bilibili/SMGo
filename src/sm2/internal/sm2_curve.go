@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"smgo/sm2/internal/utils"
+	"smgo/utils"
 )
 
 type sm2Curve struct {

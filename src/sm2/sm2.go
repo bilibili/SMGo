@@ -10,7 +10,7 @@ import (
 	"math/big"
 	"smgo/sm2/internal"
 	"smgo/sm2/internal/fiat"
-	"smgo/sm2/internal/utils"
+	"smgo/utils"
 )
 
 // GenerateKey generate private key with provided random source
@@ -77,7 +77,7 @@ var nMinus1Bytes = nMinus1.Bytes()
 // Returns the length difference if longer than 32, or -1 if not in the range,
 // or 0 if everything checks out
 //
-// TestPrivateKey is made public purposefully.
+// TestPrivateKey runs in constant time.
 func TestPrivateKey(priv *[]byte) int {
 	l := len(*priv) - 32
 	if l > 0 {

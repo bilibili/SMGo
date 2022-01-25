@@ -18,7 +18,7 @@ func BenchmarkSignHashed(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		SignHashed(rand.Reader, &priv, &e)
+		SignHashed(myRandVar, &priv, &e)
 	}
 }
 
@@ -27,7 +27,7 @@ func BenchmarkVerifyHashed(b *testing.B) {
 
 	e := make([]byte, 32)
 	rand.Read(e)
-	rand.Read(e)
+
 	r, s, err := SignHashed(rand.Reader, &priv, &e)
 	if err != nil {
 		b.Fail()
@@ -50,9 +50,7 @@ type myRand struct{}
 var myRandVar myRand
 func (myRand) Read(b []byte) (n int, err error) {
 	k, _ := hex.DecodeString("59276E27D506861A16680F3AD9C02DCCEF3CC1FA3CDBE4CE6D54B80DEAC1BC21")
-	for i, _ := range k {
-		b[i] = k[i]
-	}
+	copy(b, k)
 
 	return 32, nil
 }
