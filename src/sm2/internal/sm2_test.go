@@ -280,7 +280,30 @@ func TestScalarMixedMult_Unsafe(t *testing.T) {
 			t.Fail()
 		}
 	}
+}
 
+func TestScalarMult(t *testing.T) {
+	var scalar = make([]byte, 32)
+
+	for i:=0; i< 1000; i++ {
+		rand.Read(scalar)
+
+		res1, _ := ScalarMult(NewSM2Generator(), &scalar)
+		res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &scalar)
+		if !reflect.DeepEqual(res1.Bytes_Unsafe(), res2.Bytes_Unsafe()) {
+			t.Fail()
+		}
+	}
+}
+
+func BenchmarkScalarNult(b *testing.B) {
+	var scalar = make([]byte, 32)
+	rand.Read(scalar)
+	p := NewSM2Generator()
+
+	for i:=0; i<b.N; i++ {
+		ScalarMult(p, &scalar)
+	}
 }
 
 func BenchmarkScalarMixedMult_Unsafe(b *testing.B) {

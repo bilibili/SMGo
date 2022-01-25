@@ -51,7 +51,50 @@ func (curve sm2Curve) Params() *elliptic.CurveParams {
 // scalar is big endian and its integer value should lie in range of [1, n-1]
 // ***secure implementation***, this could be used for ECDH
 func ScalarMult(P *SM2Point, scalar *[]byte) (*SM2Point, error) {
-	return scalarMult_Unsafe_DaA(P, scalar)
+	const nafWindowWidth = 4
+	const nafPrecomputes = 1 << (nafWindowWidth -1) // 8
+
+	// P, 3P, 5P, ... [2i+1]P, ... 15P
+	var pPrecomputes [nafPrecomputes]*SM2Point
+	pPrecomputes[0] = P
+	var p2 = NewSM2Point().Double(P)
+	for i:=1; i<len(pPrecomputes); i++ {
+		pPrecomputes[i] = NewSM2Point().Add(pPrecomputes[i-1], p2)
+	}
+
+	var singed4Naf [257]int
+	utils.DecomposeNAF(singed4Naf[:], scalar, 257, nafWindowWidth)
+	skip := true
+	ret := NewSM2Point()
+
+	for i:=256; i>=0; i-- {
+		if !skip {
+			ret.Double(ret)
+		}
+
+		naf := singed4Naf[i]
+		if naf == 0 {
+			continue
+		}
+
+		tmpPoint := NewSM2Point()
+		if naf > 0 {
+			idx := (naf - 1) >> 1
+			tmpPoint = pPrecomputes[idx]
+		} else if naf < 0 {
+			idx := (-naf - 1) >> 1
+			tmpPoint.Negate(pPrecomputes[idx])
+		}
+
+		if skip {
+			ret.Set(tmpPoint)
+			skip = false
+		} else {
+			ret.Add(ret, tmpPoint)
+		}
+	}
+
+	return ret, nil
 }
 
 // ScalarBaseMult scalar base multiplication, return [k]G when no error
@@ -123,8 +166,12 @@ func ScalarMixedMult_Unsafe(gScalar *[]byte, P *SM2Point, scalar *[]byte) (*SM2P
 			tmpPoint.Negate(pPrecomputes[idx])
 		}
 
-		ret.Add(ret, tmpPoint)
-		skip = false
+		if skip {
+			ret.Set(tmpPoint)
+			skip = false
+		} else {
+			ret.Add(ret, tmpPoint)
+		}
 	}
 
 	bits := extractLowerBits(gScalar, remainder)
