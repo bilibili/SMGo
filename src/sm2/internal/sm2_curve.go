@@ -5,6 +5,7 @@ package internal
 
 import (
 	"crypto/elliptic"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"math"
@@ -49,49 +50,52 @@ func (curve sm2Curve) Params() *elliptic.CurveParams {
 
 // ScalarMult Scalar multiplication, returns [scalar]P when no error.
 // scalar is big endian and its integer value should lie in range of [1, n-1]
-// ***secure implementation***, this could be used for ECDH
+// ***secure implementation***, this could be used for ECDH with unsigned 4-NAF
 func ScalarMult(P *SM2Point, scalar *[]byte) (*SM2Point, error) {
 	const nafWindowWidth = 4
-	const nafPrecomputes = 1 << (nafWindowWidth -1) // 8
+	const nafPrecomputes = 1 << nafWindowWidth
 
-	// P, 3P, 5P, ... [2i+1]P, ... 15P
+	// Inf, P, 2P, ..., 15P
 	var pPrecomputes [nafPrecomputes]*SM2Point
-	pPrecomputes[0] = P
-	var p2 = NewSM2Point().Double(P)
-	for i:=1; i<len(pPrecomputes); i++ {
-		pPrecomputes[i] = NewSM2Point().Add(pPrecomputes[i-1], p2)
+	pPrecomputes[0] = NewSM2Point()
+	pPrecomputes[1] = P
+	for i:=2; i<len(pPrecomputes); i++ {
+		pPrecomputes[i] = NewSM2Point().Add(pPrecomputes[i-1], P)
 	}
 
-	var singed4Naf [257]int
-	utils.DecomposeNAF(singed4Naf[:], scalar, 257, nafWindowWidth)
 	skip := true
 	ret := NewSM2Point()
 
-	for i:=256; i>=0; i-- {
+	for _, b := range *scalar {
 		if !skip {
+			ret.Double(ret)
+			ret.Double(ret)
+			ret.Double(ret)
 			ret.Double(ret)
 		}
 
-		naf := singed4Naf[i]
-		if naf == 0 {
-			continue
-		}
-
 		tmpPoint := NewSM2Point()
-		if naf > 0 {
-			idx := (naf - 1) >> 1
-			tmpPoint = pPrecomputes[idx]
-		} else if naf < 0 {
-			idx := (-naf - 1) >> 1
-			tmpPoint.Negate(pPrecomputes[idx])
-		}
 
-		if skip {
-			ret.Set(tmpPoint)
-			skip = false
-		} else {
-			ret.Add(ret, tmpPoint)
+		// TODO multi select later (with negation)
+		for j:=0; j<nafPrecomputes; j++ {
+			mask := subtle.ConstantTimeByteEq(b>>4, byte(j))
+			tmpPoint.Select(pPrecomputes[b>>4], tmpPoint, mask)
 		}
+		ret.Add(ret, tmpPoint)
+		skip = false
+		tmpPoint = NewSM2Point() // refresh it
+
+		ret.Double(ret)
+		ret.Double(ret)
+		ret.Double(ret)
+		ret.Double(ret)
+
+		// TODO multi select later (with negation)
+		for j:=0; j<nafPrecomputes; j++ {
+			mask := subtle.ConstantTimeByteEq(b&0x0f, byte(j))
+			tmpPoint.Select(pPrecomputes[b&0x0f], tmpPoint, mask)
+		}
+		ret.Add(ret, tmpPoint)
 	}
 
 	return ret, nil
@@ -111,8 +115,9 @@ func ScalarBaseMult(k *[]byte) (*SM2Point, error) {
 // ScalarMixedMult_Unsafe mixed scalar multiplication, returns [gScalar]G + [scalar]P when no error
 // gScalar and scalar are big endian and their integer values should lie in range of [1, n-1]
 // usually used for signature verification and not sensitive
-// This is an internal function. Do NOT use it out of this library. Use sm. functions.
+// This is an internal function. Do NOT use it out of this library. Use sm2.* functions instead.
 func ScalarMixedMult_Unsafe(gScalar *[]byte, P *SM2Point, scalar *[]byte) (*SM2Point, error) {
+	// signed 4-NAF
 	const nafWindowWidth = 4
 	const nafPrecomputes = 1 << (nafWindowWidth -1) // 8
 
@@ -160,7 +165,7 @@ func ScalarMixedMult_Unsafe(gScalar *[]byte, P *SM2Point, scalar *[]byte) (*SM2P
 		tmpPoint := NewSM2Point()
 		if naf > 0 {
 			idx := (naf - 1) >> 1
-			tmpPoint = pPrecomputes[idx]
+			tmpPoint.Set(pPrecomputes[idx])
 		} else if naf < 0 {
 			idx := (-naf - 1) >> 1
 			tmpPoint.Negate(pPrecomputes[idx])
