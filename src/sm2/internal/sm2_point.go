@@ -347,6 +347,16 @@ var sm2ElementOne = new(fiat.SM2Element).One()
 // MultiSelectXY select from multiple options based on the bits. We should be
 // able to cut roughly half of selection cost compared to if we select the point one-by-one in a loop.
 func (q *SM2Point) MultiSelectXY(precomputed *[][]*[4]uint64, width int, bits byte) *SM2Point {
+	return q.multiSelectConditioned(precomputed, false, width, bits)
+}
+
+// MultiSelectXYZ select from multiple options based on the bits. We should be
+// able to cut roughly half of selection cost compared to if we select the point one-by-one in a loop.
+func (q *SM2Point) MultiSelectXYZ(precomputed *[][]*[4]uint64, width int, bits byte) *SM2Point {
+	return q.multiSelectConditioned(precomputed, true, width, bits)
+}
+
+func (q *SM2Point) multiSelectConditioned(precomputed *[][]*[4]uint64, hasZ bool, width int, bits byte) *SM2Point {
 	if precomputed == nil || len((*precomputed)[0]) != width {
 		panic("invalid inputs")
 	}
@@ -355,23 +365,12 @@ func (q *SM2Point) MultiSelectXY(precomputed *[][]*[4]uint64, width int, bits by
 
 	q.x.MultiSelect(&(*precomputed)[0], width, bits, q.x, fallbackMask)
 	q.y.MultiSelect(&(*precomputed)[1], width, bits, q.y, fallbackMask)
-
-	q.z.Select(sm2ElementOne, q.z, fallbackMask)
-	return q
-}
-
-// MultiSelectXYZ select from multiple options based on the bits. We should be
-// able to cut roughly half of selection cost compared to if we select the point one-by-one in a loop.
-func (q *SM2Point) MultiSelectXYZ(precomputed *[][]*[4]uint64, width int, bits byte) *SM2Point {
-	if precomputed == nil || len((*precomputed)[0]) != width {
-		panic("invalid inputs")
+	if hasZ {
+		q.z.MultiSelect(&(*precomputed)[2], width, bits, q.z, fallbackMask)
+	} else {
+		q.z.Select(sm2ElementOne, q.z, fallbackMask)
 	}
 
-	fallbackMask := 1 - subtle.ConstantTimeByteEq(bits, 0)
-
-	q.x.MultiSelect(&((*precomputed)[0]), width, bits, q.x, fallbackMask)
-	q.y.MultiSelect(&((*precomputed)[1]), width, bits, q.y, fallbackMask)
-	q.z.MultiSelect(&((*precomputed)[2]), width, bits, q.z, fallbackMask)
 	return q
 }
 
