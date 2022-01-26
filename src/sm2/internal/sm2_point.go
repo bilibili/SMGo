@@ -344,52 +344,48 @@ func (q *SM2Point) Select(p1, p2 *SM2Point, cond int) *SM2Point {
 // this is in the Montgomery domain
 var sm2ElementOne = new(fiat.SM2Element).One()
 
-// MultiSelect select from multiple options based on the masks. With MultiSelect we should be
+// MultiSelectXY select from multiple options based on the bits. We should be
 // able to cut roughly half of selection cost compared to if we select the point one-by-one in a loop.
-//
-// xyMasks indicates for which element in the precomputed should the X and Y be selected from.
-// It should contain at most one value 1, the rest should all be value 0, otherwise behavior undefined.
-// If all of xyMasks are value 0, then q.x and q.y will remain as-is.
-//
-// zMask indicates if q.z should be selected from precomputed or not
-func (q *SM2Point) MultiSelect(precomputed *[][]*[4]uint64, width int, bits byte) *SM2Point {
+func (q *SM2Point) MultiSelectXY(precomputed *[][]*[4]uint64, width int, bits byte) *SM2Point {
 	if precomputed == nil || len((*precomputed)[0]) != width {
 		panic("invalid inputs")
 	}
 
-	zmask := 1 - subtle.ConstantTimeByteEq(bits, 0)
+	fallbackMask := 1 - subtle.ConstantTimeByteEq(bits, 0)
 
-	q.x.MultiSelect(&(*precomputed)[0], width, bits, q.x, zmask)
-	q.y.MultiSelect(&(*precomputed)[1], width, bits, q.y, zmask)
+	q.x.MultiSelect(&(*precomputed)[0], width, bits, q.x, fallbackMask)
+	q.y.MultiSelect(&(*precomputed)[1], width, bits, q.y, fallbackMask)
 
-	q.z.Select(sm2ElementOne, q.z, zmask)
+	q.z.Select(sm2ElementOne, q.z, fallbackMask)
 	return q
 }
 
-// MultiSelect2
-// precondition: caller must ensure that exactly one of the candidates must be selected
-func (q *SM2Point) MultiSelect2(precomputed *[][]*fiat.SM2Element, width int, bits byte) *SM2Point {
+// MultiSelectXYZ select from multiple options based on the bits. We should be
+// able to cut roughly half of selection cost compared to if we select the point one-by-one in a loop.
+func (q *SM2Point) MultiSelectXYZ(precomputed *[][]*[4]uint64, width int, bits byte) *SM2Point {
 	if precomputed == nil || len((*precomputed)[0]) != width {
 		panic("invalid inputs")
 	}
 
-	q.x.MultiSelect2(&((*precomputed)[0]), width, bits)
-	q.y.MultiSelect2(&((*precomputed)[1]), width, bits)
-	q.z.MultiSelect2(&((*precomputed)[2]), width, bits)
+	fallbackMask := 1 - subtle.ConstantTimeByteEq(bits, 0)
+
+	q.x.MultiSelect(&((*precomputed)[0]), width, bits, q.x, fallbackMask)
+	q.y.MultiSelect(&((*precomputed)[1]), width, bits, q.y, fallbackMask)
+	q.z.MultiSelect(&((*precomputed)[2]), width, bits, q.z, fallbackMask)
 	return q
 }
 
-func TransformPrecomputed(precomputed *[]*SM2Point, width int) [][]*fiat.SM2Element {
-	var precomputedElements [][]*fiat.SM2Element
-	precomputedElements = make([][]*fiat.SM2Element, 3)
-	precomputedElements[0] = make([]*fiat.SM2Element, width)
-	precomputedElements[1] = make([]*fiat.SM2Element, width)
-	precomputedElements[2] = make([]*fiat.SM2Element, width)
+func TransformPrecomputed(precomputed *[]*SM2Point, width int) [][]*[4]uint64 {
+	var precomputedElements [][]*[4]uint64
+	precomputedElements = make([][]*[4]uint64, 3)
+	precomputedElements[0] = make([]*[4]uint64, width)
+	precomputedElements[1] = make([]*[4]uint64, width)
+	precomputedElements[2] = make([]*[4]uint64, width)
 
 	for i := 0; i < width; i++ {
-		precomputedElements[0][i] = (*precomputed)[i].x
-		precomputedElements[1][i] = (*precomputed)[i].y
-		precomputedElements[2][i] = (*precomputed)[i].z
+		precomputedElements[0][i] = (*precomputed)[i].x.GetRaw()
+		precomputedElements[1][i] = (*precomputed)[i].y.GetRaw()
+		precomputedElements[2][i] = (*precomputed)[i].z.GetRaw()
 	}
 	return precomputedElements
 }

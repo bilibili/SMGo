@@ -37,6 +37,12 @@ func (e *SM2Element) SetRaw(raw [4]uint64) *SM2Element {
 	return e
 }
 
+// GetRaw returns reference to internal state so that data could be manipulated.
+// Use with caution as this violates encapsulation.
+func (e *SM2Element) GetRaw() *[4]uint64 {
+	return (*[4]uint64)(&(e.x))
+}
+
 // One sets e = 1, and returns e.
 func (e *SM2Element) One() *SM2Element {
 	sm2SetOne(&e.x)

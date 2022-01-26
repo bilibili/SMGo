@@ -52,12 +52,12 @@ func (curve sm2Curve) Params() *elliptic.CurveParams {
 // ***secure implementation***, this could be used for ECDH with unsigned 4-NAF
 func ScalarMult(P *SM2Point, scalar *[]byte) (*SM2Point, error) {
 	const nafWindowWidth = 4
-	const nafPrecomputes = 1 << nafWindowWidth
+	const nafPrecomputes = 1 << nafWindowWidth - 1
 
-	// Inf, P, 2P, ..., 15P
+	// P, 2P, ..., 15P
 	var pPrecomputes [nafPrecomputes]*SM2Point
-	pPrecomputes[0] = NewSM2Point()
-	pPrecomputes[1] = P
+	pPrecomputes[0] = P
+	pPrecomputes[1] = NewSM2Point().Double(P) //Add is "complete" but let's not rely on it
 	for i:=2; i<len(pPrecomputes); i++ {
 		pPrecomputes[i] = NewSM2Point().Add(pPrecomputes[i-1], P)
 	}
@@ -65,10 +65,8 @@ func ScalarMult(P *SM2Point, scalar *[]byte) (*SM2Point, error) {
 	pre := pPrecomputes[:]
 	precomputedElements := TransformPrecomputed(&pre, nafPrecomputes)
 
-
 	skip := true
 	ret := NewSM2Point()
-
 	for _, b := range *scalar {
 		if !skip {
 			ret.Double(ret)
@@ -78,8 +76,7 @@ func ScalarMult(P *SM2Point, scalar *[]byte) (*SM2Point, error) {
 		}
 
 		tmpPoint := NewSM2Point()
-
-		tmpPoint.MultiSelect2(&precomputedElements, nafPrecomputes, b>>4)
+		tmpPoint.MultiSelectXYZ(&precomputedElements, nafPrecomputes, b>>4)
 		ret.Add(ret, tmpPoint)
 		skip = false
 
@@ -88,7 +85,8 @@ func ScalarMult(P *SM2Point, scalar *[]byte) (*SM2Point, error) {
 		ret.Double(ret)
 		ret.Double(ret)
 
-		tmpPoint.MultiSelect2(&precomputedElements, nafPrecomputes, b&0x0f)
+		tmpPoint = NewSM2Point()
+		tmpPoint.MultiSelectXYZ(&precomputedElements, nafPrecomputes, b&0x0f)
 		ret.Add(ret, tmpPoint)
 	}
 
@@ -318,7 +316,7 @@ func selectPoints(out *SM2Point, precomputed *[][]*[4]uint64, width int, bits by
 	//
 	//zmask := 1 - subtle.ConstantTimeByteEq(bits, 0)
 
-	out.MultiSelect(precomputed, width, bits)
+	out.MultiSelectXY(precomputed, width, bits)
 	return out
 }
 
