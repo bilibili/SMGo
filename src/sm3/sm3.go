@@ -6,7 +6,7 @@ package sm3
 import (
 	"encoding/binary"
 	"hash"
-	"math/bits"
+	"smgo/utils"
 )
 
 type SM3 struct {
@@ -101,10 +101,6 @@ func (sm3 *SM3) BlockSize() int {return blockSize}
 // let's do this branching free
 func reduce(j int) uint32 {return 1- uint32(j-16)>>31}
 
-// rotate returns x left rotated in k (mod 32).
-// if k is negative, rotates right but this will not happen here
-func rotate(x uint32, k int) uint32 {return bits.RotateLeft32(x, k)}
-
 func ff0(x, y, z uint32) uint32 {return x ^ y ^ z}
 func ff1(x, y, z uint32) uint32 {return (x&y) | (x&z) | (y&z)}
 var ffs = []func (x, y, z uint32) uint32 {ff0, ff1}
@@ -115,8 +111,8 @@ func gg1(x, y, z uint32) uint32 {return (x&y) | (^x & z)}
 var ggs = []func (x, y, z uint32) uint32 {gg0, gg1}
 func gg(j int) func (x, y, z uint32) uint32 {return ggs[reduce(j)]}
 
-func p0(x uint32) uint32 {return x ^ rotate(x, 9) ^ rotate(x, 17)}
-func p1(x uint32) uint32 {return x ^ rotate(x, 15) ^ rotate(x, 23)}
+func p0(x uint32) uint32 {return x ^ utils.RotateLeft(x, 9) ^ utils.RotateLeft(x, 17)}
+func p1(x uint32) uint32 {return x ^ utils.RotateLeft(x, 15) ^ utils.RotateLeft(x, 23)}
 
 var tts = []uint32 {t0, t1}
 func tt(j int) uint32 {return tts[reduce(j)]}
@@ -128,7 +124,7 @@ func expand(msg []byte, w *[68]uint32, wPrime *[64]uint32) {
 		//fmt.Printf("w[%d]: 0x%x\n", i, w[i])
 	}
 	for j:=16; j<=67; j++ {
-		w[j] = p1(w[j-16] ^ w[j-9] ^ rotate(w[j-3], 15)) ^ rotate(w[j-13], 7) ^ w[j-6]
+		w[j] = p1(w[j-16] ^ w[j-9] ^ utils.RotateLeft(w[j-3], 15)) ^ utils.RotateLeft(w[j-13], 7) ^ w[j-6]
 		//fmt.Printf("w[%d]: 0x%x\n", j, w[j])
 	}
 	for j:=0; j<=63; j++ {
@@ -146,17 +142,17 @@ func (sm3 *SM3) cf(msg []byte) {
 	expand(msg[:], &w, &wPrime)
 
 	for j:=0; j<=63; j++ {
-		alr12 := rotate(a, 12)
-		ss1 := rotate(alr12 + e + rotate(tt(j), j), 7)
+		alr12 := utils.RotateLeft(a, 12)
+		ss1 := utils.RotateLeft(alr12 + e + utils.RotateLeft(tt(j), j), 7)
 		ss2 := ss1 ^ alr12
 		tt1 := ff(j)(a, b, c) + d + ss2 + wPrime[j]
 		tt2 := gg(j)(e, f, g) + h + ss1 + w[j]
 		d = c
-		c = rotate(b, 9)
+		c = utils.RotateLeft(b, 9)
 		b = a
 		a = tt1
 		h = g
-		g = rotate(f, 19)
+		g = utils.RotateLeft(f, 19)
 		f = e
 		e = p0(tt2)
 
