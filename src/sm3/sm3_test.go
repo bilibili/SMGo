@@ -48,19 +48,33 @@ func Test_SpecExample2(t *testing.T) {
 }
 
 func BenchmarkSum_16(b *testing.B) {
-	sm3 := New()
-	data, _ := hex.DecodeString("0123456789abcdef0123456789abcdef") //16bytes
-	b.ResetTimer()
-	b.ReportAllocs()
-	for i:=0; i<b.N; i++ {
-		sm3.Write(data[:])
-		sm3.Sum(nil)
-	}
+	bench(b, 16)
 }
 
 func BenchmarkSum_64(b *testing.B) {
+	bench(b, 64)
+}
+
+func BenchmarkSum_256(b *testing.B) {
+	bench(b, 256)
+}
+
+func BenchmarkSum_1024(b *testing.B) {
+	bench(b, 1024)
+}
+
+func BenchmarkSum_8192(b *testing.B) {
+	bench(b, 8192)
+}
+
+func BenchmarkSum_16384(b *testing.B) {
+	bench(b, 16384)
+}
+
+func bench(b *testing.B, n int) {
 	sm3 := New()
-	data, _ := hex.DecodeString("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef") //64bytes
+	data := make([]byte, n)
+	b.SetBytes(int64(n))
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i:=0; i<b.N; i++ {

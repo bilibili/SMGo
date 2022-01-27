@@ -4,6 +4,7 @@
 package sm4
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	"reflect"
@@ -52,24 +53,32 @@ func Test_sample1(t *testing.T) {
 }
 
 func BenchmarkSm4Cipher_Encrypt_16(b *testing.B) {
-	plain, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
-	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
-
-	sm4, err := NewCipher(key)
-	if err != nil {
-		b.Fail()
-	}
-
-	cipher := make([]byte, 16)
-	b.ResetTimer()
-	b.ReportAllocs()
-	for i:=0; i<b.N; i++ {
-		sm4.Encrypt(cipher, plain)
-	}
+	bench(b, 16)
 }
 
 func BenchmarkSm4Cipher_Encrypt_64(b *testing.B) {
-	plain, _ := hex.DecodeString("0123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210")
+	bench(b, 64)
+}
+
+func BenchmarkSm4Cipher_Encrypt_256(b *testing.B) {
+	bench(b, 256)
+}
+
+func BenchmarkSm4Cipher_Encrypt_1024(b *testing.B) {
+	bench(b, 1024)
+}
+
+func BenchmarkSm4Cipher_Encrypt_8192(b *testing.B) {
+	bench(b, 8192)
+}
+
+func BenchmarkSm4Cipher_Encrypt_16384(b *testing.B) {
+	bench(b, 16384)
+}
+
+func bench(b *testing.B, n int) {
+	plain := make([]byte, n)
+	rand.Read(plain)
 	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 
 	sm4, err := NewCipher(key)
@@ -77,10 +86,14 @@ func BenchmarkSm4Cipher_Encrypt_64(b *testing.B) {
 		b.Fail()
 	}
 
-	cipher := make([]byte, 16)
+	cipher := make([]byte, n)
+	b.SetBytes(int64(n))
+	inner := n / 16
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i:=0; i<b.N; i++ {
-		sm4.Encrypt(cipher, plain)
+		for j:=0; j<inner; j++ {
+			sm4.Encrypt(cipher[16*j:], plain[16*j:])
+		}
 	}
 }

@@ -15,6 +15,7 @@ func BenchmarkSignHashed(b *testing.B) {
 	e := make([]byte, 32)
 	rand.Read(e)
 
+	b.SetBytes(1000*1000) // hacking to report ops/s, it will be the number leading MS/s
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -33,6 +34,7 @@ func BenchmarkVerifyHashed(b *testing.B) {
 		b.Fail()
 	}
 
+	b.SetBytes(1000*1000) // hacking to report ops/s, it will be the number leading MS/s
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
