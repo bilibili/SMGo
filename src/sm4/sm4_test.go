@@ -61,6 +61,8 @@ func BenchmarkSm4Cipher_Encrypt_16(b *testing.B) {
 	}
 
 	cipher := make([]byte, 16)
+	b.ResetTimer()
+	b.ReportAllocs()
 	for i:=0; i<b.N; i++ {
 		sm4.Encrypt(cipher, plain)
 	}
@@ -76,6 +78,8 @@ func BenchmarkSm4Cipher_Encrypt_64(b *testing.B) {
 	}
 
 	cipher := make([]byte, 16)
+	b.ResetTimer()
+	b.ReportAllocs()
 	for i:=0; i<b.N; i++ {
 		sm4.Encrypt(cipher, plain)
 	}
