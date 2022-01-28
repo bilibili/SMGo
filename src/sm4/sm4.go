@@ -20,6 +20,11 @@ func (k KeySizeError) Error() string {
 
 func (sm4 *sm4Cipher) BlockSize() int {return blockSize}
 
+// NewCipher security warning: this function is provided as part of cipher.Block spec.
+// The expanded key could be left in heap memory after use, or copied around by GC or OS.
+// Unfortunately *automatic* destroying the expanded key is rather complicated in Go.
+// See https://github.com/golang/go/issues/18645
+// Also see https://github.com/awnumar/memguard
 func NewCipher(key []byte) (cipher.Block, error) {
 	k := len(key)
 	if k != blockSize {

@@ -52,4 +52,6 @@ Caller needs to provide reference so that this implementation can output the ret
 <h3>SM3</h3>
 
 <h3>SM4</h3>
+为了支持Golang标准库的范例，我们实现了sm4.NewCipher函数。使用该函数有一定的可能性将导致扩展密钥数据被Golang的垃圾回收器或者操作系统拷贝到其它内存地址或者磁盘。用户需要限制所创建对象的使用范围。
 
+To follow the convention of Golang standard library, we implement the sm4.NewCipher function. There is possibility that the expanded key be copied around by GC or OS. User should limit the scope of the created object.
