@@ -37,21 +37,19 @@ func NewCipher(key []byte) (cipher.Block, error) {
 }
 
 func (sm4 *sm4Cipher) Encrypt(dst, src []byte) {
-	crytoBlock(src, dst, &sm4.expandedKey, 1)
+	crytoBlock(src[:blockSize], dst[:blockSize], &sm4.expandedKey, 1)
 }
 
 func (sm4 *sm4Cipher) Decrypt(dst, src []byte) {
-	crytoBlock(src, dst, &sm4.expandedKey, 0)
+	crytoBlock(src[:blockSize], dst[:blockSize], &sm4.expandedKey, 0)
 }
 
-func transT(a uint32) uint32 {
-	b := tau(a)
-	//return b ^ utils.RotateLeft(b, 2) ^utils.RotateLeft(b, 10) ^ utils.RotateLeft(b, 18) ^ utils.RotateLeft(b, 24)
-	return b ^ (b<<2 | b >>30) ^ (b<<10 | b>>22) ^ (b<<18 | b>>14) ^ (b<<24 | b>>8)
-}
+//func transT(a uint32) uint32 {
+//	b := tau(a)
+//	return b ^ (b<<2 | b >>30) ^ (b<<10 | b>>22) ^ (b<<18 | b>>14) ^ (b<<24 | b>>8)
+//}
 func transTPrime(a uint32) uint32 {
 	b := tau(a)
-	//return b ^ utils.RotateLeft(b, 13) ^ utils.RotateLeft(b, 23)
 	return b ^ (b<<13 | b>>19) ^ (b<<23 | b>>9)
 }
 
@@ -62,18 +60,14 @@ func tau(a uint32) uint32 {
 }
 
 func crytoBlock(x, y []byte, rk *[32]uint32, encryption int) {
-	if len(x) < blockSize {
-		panic("crypto/sm4: input not full block")
-	}
-	if len(y) < blockSize {
-		panic("crypto/sm4: output not full block")
-	}
-
 	rkIdx := 31 * (1 - encryption) // branching free trick
 	rkInc := encryption<<1 - 1
 	var t uint32
 	var xx [4]uint32
-	byte16ToUint32(x, xx[0:4])
+	xx[0] = binary.BigEndian.Uint32(x[0:4])
+	xx[1] = binary.BigEndian.Uint32(x[4:8])
+	xx[2] = binary.BigEndian.Uint32(x[8:12])
+	xx[3] = binary.BigEndian.Uint32(x[12:16])
 
 	// using notation of GMT 0002-2012, in each round we need to compute
 	// L(b0 || b1 || b2 || b3)
@@ -117,6 +111,6 @@ func keyExpansion(mk []byte, rk *[32]uint32) {
 }
 func byte16ToUint32(bytes []byte, uints []uint32) {
 	for i := 0; i < 4; i++ {
-		uints[i] = binary.BigEndian.Uint32(bytes[i*4 : i*4+4])
+		uints[i] = binary.BigEndian.Uint32(bytes[i<<2 : i<<2+4])
 	}
 }
