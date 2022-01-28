@@ -7,21 +7,6 @@ import (
 	"testing"
 )
 
-func Test_reduce(t *testing.T) {
-	for j:=0; j <=15; j++ {
-		r := reduce(j)
-		if r != 0 {
-			t.Fail()
-		}
-	}
-	for j:=16; j<=63; j++ {
-		r := reduce(j)
-		if r != 1 {
-			t.Fail()
-		}
-	}
-}
-
 func Test_SpecExample1(t *testing.T) {
 	sm3 := New()
 	out := make([]byte, 32)

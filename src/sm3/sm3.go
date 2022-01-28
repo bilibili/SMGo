@@ -96,11 +96,6 @@ func SumSM3(data []byte) [hashSize]byte {
 func (sm3 *SM3) Size() int {return hashSize}
 func (sm3 *SM3) BlockSize() int {return blockSize}
 
-// reduce turns j into 0 or 1 based on its range according to the SM3 standard spec
-// caller must ensure j >=0 && j <= 63, otherwise return value is undefined
-// let's do this branching free
-func reduce(j int) uint32 {return 1- uint32(j-16)>>31}
-
 func ff0(x, y, z uint32) uint32 {return x ^ y ^ z}
 func ff1(x, y, z uint32) uint32 {return (x&y) | (x&z) | (y&z)}
 
@@ -110,15 +105,12 @@ func p0(x uint32) uint32 {return x ^ utils.RotateLeft(x, 9) ^ utils.RotateLeft(x
 func p1(x uint32) uint32 {return x ^ utils.RotateLeft(x, 15) ^ utils.RotateLeft(x, 23)}
 
 // msg must be in 64 bytes
-func expand(msg []byte, w *[68]uint32, wPrime *[64]uint32) {
+func expand(msg []byte, w *[68]uint32) {
 	for i:=0; i<=15; i++ {
 		w[i] = binary.BigEndian.Uint32(msg[i<<2 : i<<2 + 4])
 	}
 	for j:=16; j<=67; j++ {
 		w[j] = p1(w[j-16] ^ w[j-9] ^ utils.RotateLeft(w[j-3], 15)) ^ utils.RotateLeft(w[j-13], 7) ^ w[j-6]
-	}
-	for j:=0; j<=63; j++ {
-		wPrime[j] = w[j] ^ w[j+4]
 	}
 }
 
@@ -127,36 +119,27 @@ func (sm3 *SM3) cf(msg []byte) {
 	a, b, c, d, e, f, g, h := sm3.h[0], sm3.h[1], sm3.h[2], sm3.h[3], sm3.h[4],sm3.h[5], sm3.h[6], sm3.h[7]
 
 	var w [68]uint32
-	var wPrime [64]uint32
-	expand(msg[:], &w, &wPrime)
+	expand(msg[0:64], &w)
 
 	for j:=0; j<=15; j++ {
 		alr12 := utils.RotateLeft(a, 12)
 		ss1 := utils.RotateLeft(alr12 + e + utils.RotateLeft(t0, j), 7)
 		tt2 := ff0(e, f, g) + h + ss1 + w[j]
 		ss2 := ss1 ^ alr12
-		tt1 := ff0(a, b, c) + d + ss2 + wPrime[j]
+		tt1 := ff0(a, b, c) + d + ss2 + (w[j]^w[j+4])
 		d, c = c, utils.RotateLeft(b, 9)
-		b = a
-		a = tt1
-		h = g
-		g = utils.RotateLeft(f, 19)
-		f = e
-		e = p0(tt2)
+		b, a, h = a, tt1, g
+		g, f, e = utils.RotateLeft(f, 19), e, p0(tt2)
 	}
 	for j:=16; j<=63; j++ {
 		alr12 := utils.RotateLeft(a, 12)
 		ss1 := utils.RotateLeft(alr12 + e + utils.RotateLeft(t1, j), 7)
 		tt2 := gg1(e, f, g) + h + ss1 + w[j]
 		ss2 := ss1 ^ alr12
-		tt1 := ff1(a, b, c) + d + ss2 + wPrime[j]
+		tt1 := ff1(a, b, c) + d + ss2 + (w[j]^w[j+4])
 		d, c = c, utils.RotateLeft(b, 9)
-		b = a
-		a = tt1
-		h = g
-		g = utils.RotateLeft(f, 19)
-		f = e
-		e = p0(tt2)
+		b, a, h = a, tt1, g
+		g, f, e = utils.RotateLeft(f, 19), e, p0(tt2)
 	}
 
 	sm3.h[0] ^= a
