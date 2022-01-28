@@ -109,7 +109,7 @@ func expand(msg []byte, w *[68]uint32) {
 	for i:=0; i<=15; i++ {
 		w[i] = binary.BigEndian.Uint32(msg[i<<2 : i<<2 + 4])
 	}
-	for j:=16; j<=67; j++ {
+	for j:=16; j<=20; j++ {
 		w[j] = p1(w[j-16] ^ w[j-9] ^ utils.RotateLeft(w[j-3], 15)) ^ utils.RotateLeft(w[j-13], 7) ^ w[j-6]
 	}
 }
@@ -136,6 +136,7 @@ func (sm3 *SM3) cf(msg []byte) {
 		ss1 := utils.RotateLeft(alr12 + e + utils.RotateLeft(t1, j), 7)
 		tt2 := gg1(e, f, g) + h + ss1 + w[j]
 		ss2 := ss1 ^ alr12
+		w[j+4] = p1(w[j+4-16] ^ w[j+4-9] ^ utils.RotateLeft(w[j+4-3], 15)) ^ utils.RotateLeft(w[j+4-13], 7) ^ w[j+4-6]
 		tt1 := ff1(a, b, c) + d + ss2 + (w[j]^w[j+4])
 		d, c = c, utils.RotateLeft(b, 9)
 		b, a, h = a, tt1, g
