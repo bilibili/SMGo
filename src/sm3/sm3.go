@@ -103,33 +103,22 @@ func reduce(j int) uint32 {return 1- uint32(j-16)>>31}
 
 func ff0(x, y, z uint32) uint32 {return x ^ y ^ z}
 func ff1(x, y, z uint32) uint32 {return (x&y) | (x&z) | (y&z)}
-var ffs = []func (x, y, z uint32) uint32 {ff0, ff1}
-func ff(j int) func (x, y, z uint32) uint32 {return ffs[reduce(j)]}
 
-var gg0 = ff0
 func gg1(x, y, z uint32) uint32 {return (x&y) | (^x & z)}
-var ggs = []func (x, y, z uint32) uint32 {gg0, gg1}
-func gg(j int) func (x, y, z uint32) uint32 {return ggs[reduce(j)]}
 
 func p0(x uint32) uint32 {return x ^ utils.RotateLeft(x, 9) ^ utils.RotateLeft(x, 17)}
 func p1(x uint32) uint32 {return x ^ utils.RotateLeft(x, 15) ^ utils.RotateLeft(x, 23)}
 
-var tts = []uint32 {t0, t1}
-func tt(j int) uint32 {return tts[reduce(j)]}
-
 // msg must be in 64 bytes
 func expand(msg []byte, w *[68]uint32, wPrime *[64]uint32) {
 	for i:=0; i<=15; i++ {
-		w[i] = binary.BigEndian.Uint32(msg[4*i : 4*i + 4])
-		//fmt.Printf("w[%d]: 0x%x\n", i, w[i])
+		w[i] = binary.BigEndian.Uint32(msg[i<<2 : i<<2 + 4])
 	}
 	for j:=16; j<=67; j++ {
 		w[j] = p1(w[j-16] ^ w[j-9] ^ utils.RotateLeft(w[j-3], 15)) ^ utils.RotateLeft(w[j-13], 7) ^ w[j-6]
-		//fmt.Printf("w[%d]: 0x%x\n", j, w[j])
 	}
 	for j:=0; j<=63; j++ {
 		wPrime[j] = w[j] ^ w[j+4]
-		//fmt.Printf("w'[%d]: 0x%x\n", j, wPrime[j])
 	}
 }
 
@@ -141,12 +130,12 @@ func (sm3 *SM3) cf(msg []byte) {
 	var wPrime [64]uint32
 	expand(msg[:], &w, &wPrime)
 
-	for j:=0; j<=63; j++ {
+	for j:=0; j<=15; j++ {
 		alr12 := utils.RotateLeft(a, 12)
-		ss1 := utils.RotateLeft(alr12 + e + utils.RotateLeft(tt(j), j), 7)
+		ss1 := utils.RotateLeft(alr12 + e + utils.RotateLeft(t0, j), 7)
 		ss2 := ss1 ^ alr12
-		tt1 := ff(j)(a, b, c) + d + ss2 + wPrime[j]
-		tt2 := gg(j)(e, f, g) + h + ss1 + w[j]
+		tt1 := ff0(a, b, c) + d + ss2 + wPrime[j]
+		tt2 := ff0(e, f, g) + h + ss1 + w[j]
 		d = c
 		c = utils.RotateLeft(b, 9)
 		b = a
@@ -155,8 +144,21 @@ func (sm3 *SM3) cf(msg []byte) {
 		g = utils.RotateLeft(f, 19)
 		f = e
 		e = p0(tt2)
-
-		//fmt.Printf("j=%d\t\t%x %x %x %x %x %x %x %x \n", j, a, b, c, d, e, f, g, h)
+	}
+	for j:=16; j<=63; j++ {
+		alr12 := utils.RotateLeft(a, 12)
+		ss1 := utils.RotateLeft(alr12 + e + utils.RotateLeft(t1, j), 7)
+		ss2 := ss1 ^ alr12
+		tt1 := ff1(a, b, c) + d + ss2 + wPrime[j]
+		tt2 := gg1(e, f, g) + h + ss1 + w[j]
+		d = c
+		c = utils.RotateLeft(b, 9)
+		b = a
+		a = tt1
+		h = g
+		g = utils.RotateLeft(f, 19)
+		f = e
+		e = p0(tt2)
 	}
 
 	sm3.h[0] ^= a
