@@ -133,11 +133,10 @@ func (sm3 *SM3) cf(msg []byte) {
 	for j:=0; j<=15; j++ {
 		alr12 := utils.RotateLeft(a, 12)
 		ss1 := utils.RotateLeft(alr12 + e + utils.RotateLeft(t0, j), 7)
+		tt2 := ff0(e, f, g) + h + ss1 + w[j]
 		ss2 := ss1 ^ alr12
 		tt1 := ff0(a, b, c) + d + ss2 + wPrime[j]
-		tt2 := ff0(e, f, g) + h + ss1 + w[j]
-		d = c
-		c = utils.RotateLeft(b, 9)
+		d, c = c, utils.RotateLeft(b, 9)
 		b = a
 		a = tt1
 		h = g
@@ -148,11 +147,10 @@ func (sm3 *SM3) cf(msg []byte) {
 	for j:=16; j<=63; j++ {
 		alr12 := utils.RotateLeft(a, 12)
 		ss1 := utils.RotateLeft(alr12 + e + utils.RotateLeft(t1, j), 7)
+		tt2 := gg1(e, f, g) + h + ss1 + w[j]
 		ss2 := ss1 ^ alr12
 		tt1 := ff1(a, b, c) + d + ss2 + wPrime[j]
-		tt2 := gg1(e, f, g) + h + ss1 + w[j]
-		d = c
-		c = utils.RotateLeft(b, 9)
+		d, c = c, utils.RotateLeft(b, 9)
 		b = a
 		a = tt1
 		h = g
