@@ -76,8 +76,9 @@ func crytoBlock(x, y []byte, rk *[32]uint32, encryption int) {
 	// = L(sbox[a0]<<24) ^ L(sbox[a1]<<16) ^ L(sbox[a2]<<8) ^ L(sbox[a3])
 	// we then put L(.<<24) into sbox0, L(.<<16) into sbox1, and so on.
 	// Generators are put into test function Test_DeriveSboxes
+
 	//for i:=0; i<8; i++ {
-	// loop is unrolled for performance reasons (10+%). To recover the looping, simply keep the top most 4 lines with the loop of 8 iterations.
+	// loop is unrolled for performance reasons (10+%). To recover the looping, simply keep the top most 4 lines within the loop of 8 iterations.
 	t = xx[1] ^ xx[2] ^ xx[3] ^ rk[rkIdx]; xx[0] ^= sbox0[0xff&(t>>24)] ^ sbox1[0xff&(t>>16)] ^ sbox2[0xff&(t>>8)] ^ sbox3[0xff&(t)]; rkIdx += rkInc
 	t = xx[2] ^ xx[3] ^ rk[rkIdx] ^ xx[0]; xx[1] ^= sbox0[0xff&(t>>24)] ^ sbox1[0xff&(t>>16)] ^ sbox2[0xff&(t>>8)] ^ sbox3[0xff&(t)]; rkIdx += rkInc
 	t = xx[3] ^ rk[rkIdx] ^ xx[0] ^ xx[1]; xx[2] ^= sbox0[0xff&(t>>24)] ^ sbox1[0xff&(t>>16)] ^ sbox2[0xff&(t>>8)] ^ sbox3[0xff&(t)]; rkIdx += rkInc
@@ -118,6 +119,7 @@ func crytoBlock(x, y []byte, rk *[32]uint32, encryption int) {
 	t = xx[3] ^ rk[rkIdx] ^ xx[0] ^ xx[1]; xx[2] ^= sbox0[0xff&(t>>24)] ^ sbox1[0xff&(t>>16)] ^ sbox2[0xff&(t>>8)] ^ sbox3[0xff&(t)]; rkIdx += rkInc
 	t = rk[rkIdx] ^ xx[0] ^ xx[1] ^ xx[2]; xx[3] ^= sbox0[0xff&(t>>24)] ^ sbox1[0xff&(t>>16)] ^ sbox2[0xff&(t>>8)] ^ sbox3[0xff&(t)]; rkIdx += rkInc
 	//}
+
 	binary.BigEndian.PutUint32(y[0:4], xx[3])
 	binary.BigEndian.PutUint32(y[4:8], xx[2])
 	binary.BigEndian.PutUint32(y[8:12], xx[1])
