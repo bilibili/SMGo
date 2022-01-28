@@ -52,6 +52,37 @@ func Test_sample1(t *testing.T) {
 	}
 }
 
+func Test_DeriveSboxes(t *testing.T) {
+	var out0, out1, out2, out3 [256]uint32
+	for i:=0; i<256; i++ {
+		x := uint32(sbox[i])
+		out0[i] = l(x<<24)
+		out1[i] = l(x<<16)
+		out2[i] = l(x<<8)
+		out3[i] = l(x)
+	}
+
+	printsbox(0, out0)
+	printsbox(1, out1)
+	printsbox(2, out2)
+	printsbox(3, out3)
+}
+
+func l(b uint32) uint32 {
+	return b ^ (b<<2 | b >>30) ^ (b<<10 | b>>22) ^ (b<<18 | b>>14) ^ (b<<24 | b>>8)
+}
+
+func printsbox(idx int, out [256]uint32) {
+	fmt.Printf("var sbox%d = [256]uint32 {\n", idx)
+	for i := 0; i < 256; i++ {
+		fmt.Printf("\t0x%08x,", out[i])
+		if (i+1)&15 == 0 {
+			fmt.Println()
+		}
+	}
+	fmt.Println("}")
+}
+
 func BenchmarkSm4Cipher_Encrypt_16(b *testing.B) {
 	bench(b, 16)
 }

@@ -51,7 +51,7 @@ func transTPrime(a uint32) uint32 {
 }
 
 func tau(a uint32) uint32 {
-	a0, a1, a2, a3 := byte(a>>24), byte(a>>16), byte(a>>8), byte(a)
+	a0, a1, a2, a3 := 0xff&(a>>24), 0xff&(a>>16), 0xff&(a>>8), 0xff&(a)
 	b0, b1, b2, b3 := sbox[a0], sbox[a1], sbox[a2], sbox[a3]
 	return uint32(b0)<<24 | uint32(b1)<<16 | uint32(b2)<<8 | uint32(b3)
 }
@@ -70,18 +70,28 @@ func crytoBlock(x, y []byte, rk *[32]uint32, encryption int) {
 	var xx [4]uint32
 	byte16ToUint32(x, xx[0:4])
 
+	// using notation of GMT 0002-2012, in each round we need to compute
+	// L(b0 || b1 || b2 || b3)
+	// = L(sbox[a0] || sbox[a1] || sbox[a2] || sbox[a3])
+	// = L(sbox[a0]<<24 ^ sbox[a1]<<16 ^ sbox[a2]<<8 ^ sbox[a3]) (assuming type width is expanded automatically)
+	// = L(sbox[a0]<<24) ^ L(sbox[a1]<<16) ^ L(sbox[a2]<<8) ^ L(sbox[a3])
+	// we then put L(.<<24) into sbox0, L(.<<16) into sbox1, and so on.
+	// Generators are put into test function Test_DeriveSboxes
 	for i:=0; i<8; i++ {
 		t = xx[1] ^ xx[2] ^ xx[3] ^ rk[rkIdx]
-		xx[0] ^= transT(t)
+		xx[0] ^= sbox0[0xff&(t>>24)] ^ sbox1[0xff&(t>>16)] ^ sbox2[0xff&(t>>8)] ^ sbox3[0xff&(t)]
 		rkIdx += rkInc
+
 		t = xx[2] ^ xx[3] ^ rk[rkIdx] ^ xx[0]
-		xx[1] ^= transT(t)
+		xx[1] ^= sbox0[0xff&(t>>24)] ^ sbox1[0xff&(t>>16)] ^ sbox2[0xff&(t>>8)] ^ sbox3[0xff&(t)]
 		rkIdx += rkInc
+
 		t = xx[3] ^ rk[rkIdx] ^ xx[0] ^ xx[1]
-		xx[2] ^= transT(t)
+		xx[2] ^= sbox0[0xff&(t>>24)] ^ sbox1[0xff&(t>>16)] ^ sbox2[0xff&(t>>8)] ^ sbox3[0xff&(t)]
 		rkIdx += rkInc
+
 		t = rk[rkIdx] ^ xx[0] ^ xx[1] ^ xx[2]
-		xx[3] ^= transT(t)
+		xx[3] ^= sbox0[0xff&(t>>24)] ^ sbox1[0xff&(t>>16)] ^ sbox2[0xff&(t>>8)] ^ sbox3[0xff&(t)]
 		rkIdx += rkInc
 	}
 	binary.BigEndian.PutUint32(y[0:], xx[3])

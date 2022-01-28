@@ -4,6 +4,11 @@
 
 The Golang implementation of the SM2/3/4 ciphers, suitable for platforms with 64-bit multiplier.
 
+<h3>完全公开 Totally Open</h3>
+本实现使用了预计算数据提升性能。所有的预计算程序均已在源程序中提供。
+
+This implementation is totally and completely open in that we provide all the codes to derive the precalculated data. We use these data to enhance the performance.
+
 <h3>SM2</h3>
 <h4>侧信道保护 SCA Protection</h4>
 本实现使用常数时间算法，通过牺牲一部分性能获得更好的安全性，不会在签名时或执行DH协议时通过运行时间泄漏私钥或者签名随机数信息。这主要包含三部分的安全设计和实现：
@@ -36,9 +41,9 @@ This implementation uses generated codes from [Fiat-Crypto](https://github.com/m
 Based on the standard Golang library, this implementation uses the algorithm from [Complete addition formulas for prime order elliptic curves](https://eprint.iacr.org/2015/1060) §A.2 to calculate Point-Add and Point-Double in the Jacobian coordinates. Please note that the curve definition of SM2 meets the prerequisite of "a = -3".
 
 <h4>API设计原则 Principles of API Design</h4>
-本实现（将）无运行时内存分配。
+本实现（将）无运行时内存分配。TODO
 
-This implementation (will) contains no runtime heap allocation.
+This implementation (will) contains no runtime heap allocation. TODO
 
 所需返回值需要调用方提供相应的对象引用，本实现内部不复制私钥等敏感信息。建议调用方在使用后，安全销毁敏感数据。
 
