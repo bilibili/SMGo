@@ -157,11 +157,12 @@ func BenchmarkSum_16384(b *testing.B) {
 func bench(b *testing.B, n int) {
 	sm3 := New()
 	data := make([]byte, n)
+	var out [hashSize]byte
 	b.SetBytes(int64(n))
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i:=0; i<b.N; i++ {
 		sm3.Write(data[:])
-		sm3.Sum(nil)
+		sm3.Sum(out[:0])
 	}
 }

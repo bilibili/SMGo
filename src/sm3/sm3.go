@@ -94,7 +94,7 @@ func (sm3 *SM3) Write(data []byte) (n int, err error) {
 	return
 }
 
-func (sm3 *SM3) checkSum() [hashSize]byte {
+func (sm3 *SM3) checkSum(out []byte) {
 	lenAtSum := sm3.len
 	sm3.x[sm3.nx] = 1 << 7
 	sm3.nx++
@@ -106,27 +106,29 @@ func (sm3 *SM3) checkSum() [hashSize]byte {
 	binary.BigEndian.PutUint64(sm3.x[maxTail:], lenAtSum<<3)
 	sm3.cf(sm3.x[:])
 
-	var out [hashSize]byte
+	//var out [hashSize]byte
 	for i:=0; i<8; i++ {
-		binary.BigEndian.PutUint32(out[4*i:], sm3.h[i])
+		binary.BigEndian.PutUint32(out[i<<2:], sm3.h[i])
 	}
-
-	return out
 }
 
 // Sum just follows the GoLand standard library convention
 func (sm3 *SM3) Sum(in []byte) []byte {
 	ret := *sm3 // copy deep enough so that writer can keep writing and summing
-	hash := ret.checkSum()
+	var hash [hashSize]byte
+	ret.checkSum(hash[:])
 	return append(in, hash[:]...)
 }
 
 // SumSM3 is a convenience function
+// caller must ensure out has sufficient capacity
 func SumSM3(data []byte) [hashSize]byte {
 	var sm3 SM3
 	sm3.Reset()
 	sm3.Write(data)
-	return sm3.checkSum()
+	var out [hashSize]byte
+	sm3.checkSum(out[:])
+	return out
 }
 
 func (sm3 *SM3) Size() int {return hashSize}
