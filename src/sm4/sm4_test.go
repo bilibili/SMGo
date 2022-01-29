@@ -52,6 +52,31 @@ func Test_sample1(t *testing.T) {
 	}
 }
 
+func TestSm4Cipher_BlockSize(t *testing.T) {
+	key := make([]byte, 12)
+	sm4, err := NewCipher(key)
+	if err == nil {
+		t.Fail()
+	}
+	fmt.Println(err.Error())
+
+	key = make([]byte, 18)
+	sm4, err = NewCipher(key)
+	if err == nil {
+		t.Fail()
+	}
+	fmt.Println(err.Error())
+
+	key = make([]byte, 16)
+	sm4, err = NewCipher(key)
+	if err != nil {
+		t.Fail()
+	}
+	if sm4.BlockSize() != 16 {
+		t.Fail()
+	}
+}
+
 func Test_DeriveSboxes(t *testing.T) {
 	var out0, out1, out2, out3 [256]uint32
 	for i:=0; i<256; i++ {
