@@ -120,7 +120,6 @@ func (sm3 *SM3) Sum(in []byte) []byte {
 }
 
 // SumSM3 is a convenience function
-// caller must ensure out has sufficient capacity
 func SumSM3(data []byte) [hashSize]byte {
 	var sm3 SM3
 	sm3.Reset()
@@ -141,8 +140,7 @@ func gg1(x, y, z uint32) uint32 {return (x&y) | (^x & z)}
 func p0(x uint32) uint32 {return x ^ utils.RotateLeft(x, 9) ^ utils.RotateLeft(x, 17)}
 func p1(x uint32) uint32 {return x ^ utils.RotateLeft(x, 15) ^ utils.RotateLeft(x, 23)}
 
-// msg must be in 64 bytes
-func expand(msg []byte, w *[68]uint32) {
+func partiallyExpand(msg []byte, w *[68]uint32) {
 	for i:=0; i<=15; i++ {
 		w[i] = binary.BigEndian.Uint32(msg[i<<2 : i<<2 + 4])
 	}
@@ -151,12 +149,11 @@ func expand(msg []byte, w *[68]uint32) {
 	}
 }
 
-// msg must be in 64 bytes
 func (sm3 *SM3) cf(msg []byte) {
 	a, b, c, d, e, f, g, h := sm3.h[0], sm3.h[1], sm3.h[2], sm3.h[3], sm3.h[4],sm3.h[5], sm3.h[6], sm3.h[7]
 
 	var w [68]uint32
-	expand(msg[0:64], &w)
+	partiallyExpand(msg[0:64], &w)
 
 	for j:=0; j<=15; j++ {
 		alr12 := utils.RotateLeft(a, 12)
