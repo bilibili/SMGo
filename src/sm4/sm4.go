@@ -79,58 +79,63 @@ func crytoBlock(x, y []byte, rk *[32]uint32, encryption int) {
 
 	//for i:=0; i<8; i++ {
 	// loop is unrolled for performance reasons (10+%). To recover the looping, simply keep the top most 4 lines within the loop of 8 iterations.
-	//	t = xx[1] ^ xx[2] ^ xx[3] ^ rk[rkIdx]; xx[0] ^= sbox0[0xff&(t>>24)] ^ sbox1[0xff&(t>>16)] ^ sbox2[0xff&(t>>8)] ^ sbox3[0xff&(t)]; rkIdx += rkInc
-	//	t = xx[2] ^ xx[3] ^ rk[rkIdx] ^ xx[0]; xx[1] ^= sbox0[0xff&(t>>24)] ^ sbox1[0xff&(t>>16)] ^ sbox2[0xff&(t>>8)] ^ sbox3[0xff&(t)]; rkIdx += rkInc
-	//	t = xx[3] ^ rk[rkIdx] ^ xx[0] ^ xx[1]; xx[2] ^= sbox0[0xff&(t>>24)] ^ sbox1[0xff&(t>>16)] ^ sbox2[0xff&(t>>8)] ^ sbox3[0xff&(t)]; rkIdx += rkInc
-	//	t = rk[rkIdx] ^ xx[0] ^ xx[1] ^ xx[2]; xx[3] ^= sbox0[0xff&(t>>24)] ^ sbox1[0xff&(t>>16)] ^ sbox2[0xff&(t>>8)] ^ sbox3[0xff&(t)]; rkIdx += rkInc
+	//	t = z[1] ^ z[2] ^ z[3] ^ rk[rkIdx]; z[0] ^= ss(t); rkIdx += rkInc
+	//	t = z[2] ^ z[3] ^ rk[rkIdx] ^ z[0]; z[1] ^= ss(t); rkIdx += rkInc
+	//	t = z[3] ^ rk[rkIdx] ^ z[0] ^ z[1]; z[2] ^= ss(t); rkIdx += rkInc
+	//	t = rk[rkIdx] ^ z[0] ^ z[1] ^ z[2]; z[3] ^= ss(t); rkIdx += rkInc
 	//}
 	// 8 identical blocks of 4-liners below
-	t = z[1] ^ z[2] ^ z[3] ^ rk[rkIdx]; z[0] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = z[2] ^ z[3] ^ rk[rkIdx] ^ z[0]; z[1] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = z[3] ^ rk[rkIdx] ^ z[0] ^ z[1]; z[2] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = rk[rkIdx] ^ z[0] ^ z[1] ^ z[2]; z[3] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
+	t = z[1] ^ z[2] ^ z[3] ^ rk[rkIdx]; z[0] ^= ss(t); rkIdx += rkInc
+	t = z[2] ^ z[3] ^ rk[rkIdx] ^ z[0]; z[1] ^= ss(t); rkIdx += rkInc
+	t = z[3] ^ rk[rkIdx] ^ z[0] ^ z[1]; z[2] ^= ss(t); rkIdx += rkInc
+	t = rk[rkIdx] ^ z[0] ^ z[1] ^ z[2]; z[3] ^= ss(t); rkIdx += rkInc
 
-	t = z[1] ^ z[2] ^ z[3] ^ rk[rkIdx]; z[0] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = z[2] ^ z[3] ^ rk[rkIdx] ^ z[0]; z[1] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = z[3] ^ rk[rkIdx] ^ z[0] ^ z[1]; z[2] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = rk[rkIdx] ^ z[0] ^ z[1] ^ z[2]; z[3] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
+	t = z[1] ^ z[2] ^ z[3] ^ rk[rkIdx]; z[0] ^= ss(t); rkIdx += rkInc
+	t = z[2] ^ z[3] ^ rk[rkIdx] ^ z[0]; z[1] ^= ss(t); rkIdx += rkInc
+	t = z[3] ^ rk[rkIdx] ^ z[0] ^ z[1]; z[2] ^= ss(t); rkIdx += rkInc
+	t = rk[rkIdx] ^ z[0] ^ z[1] ^ z[2]; z[3] ^= ss(t); rkIdx += rkInc
 
-	t = z[1] ^ z[2] ^ z[3] ^ rk[rkIdx]; z[0] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = z[2] ^ z[3] ^ rk[rkIdx] ^ z[0]; z[1] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = z[3] ^ rk[rkIdx] ^ z[0] ^ z[1]; z[2] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = rk[rkIdx] ^ z[0] ^ z[1] ^ z[2]; z[3] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
+	t = z[1] ^ z[2] ^ z[3] ^ rk[rkIdx]; z[0] ^= ss(t); rkIdx += rkInc
+	t = z[2] ^ z[3] ^ rk[rkIdx] ^ z[0]; z[1] ^= ss(t); rkIdx += rkInc
+	t = z[3] ^ rk[rkIdx] ^ z[0] ^ z[1]; z[2] ^= ss(t); rkIdx += rkInc
+	t = rk[rkIdx] ^ z[0] ^ z[1] ^ z[2]; z[3] ^= ss(t); rkIdx += rkInc
 
-	t = z[1] ^ z[2] ^ z[3] ^ rk[rkIdx]; z[0] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = z[2] ^ z[3] ^ rk[rkIdx] ^ z[0]; z[1] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = z[3] ^ rk[rkIdx] ^ z[0] ^ z[1]; z[2] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = rk[rkIdx] ^ z[0] ^ z[1] ^ z[2]; z[3] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
+	t = z[1] ^ z[2] ^ z[3] ^ rk[rkIdx]; z[0] ^= ss(t); rkIdx += rkInc
+	t = z[2] ^ z[3] ^ rk[rkIdx] ^ z[0]; z[1] ^= ss(t); rkIdx += rkInc
+	t = z[3] ^ rk[rkIdx] ^ z[0] ^ z[1]; z[2] ^= ss(t); rkIdx += rkInc
+	t = rk[rkIdx] ^ z[0] ^ z[1] ^ z[2]; z[3] ^= ss(t); rkIdx += rkInc
 
-	t = z[1] ^ z[2] ^ z[3] ^ rk[rkIdx]; z[0] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = z[2] ^ z[3] ^ rk[rkIdx] ^ z[0]; z[1] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = z[3] ^ rk[rkIdx] ^ z[0] ^ z[1]; z[2] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = rk[rkIdx] ^ z[0] ^ z[1] ^ z[2]; z[3] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
+	t = z[1] ^ z[2] ^ z[3] ^ rk[rkIdx]; z[0] ^= ss(t); rkIdx += rkInc
+	t = z[2] ^ z[3] ^ rk[rkIdx] ^ z[0]; z[1] ^= ss(t); rkIdx += rkInc
+	t = z[3] ^ rk[rkIdx] ^ z[0] ^ z[1]; z[2] ^= ss(t); rkIdx += rkInc
+	t = rk[rkIdx] ^ z[0] ^ z[1] ^ z[2]; z[3] ^= ss(t); rkIdx += rkInc
 
-	t = z[1] ^ z[2] ^ z[3] ^ rk[rkIdx]; z[0] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = z[2] ^ z[3] ^ rk[rkIdx] ^ z[0]; z[1] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = z[3] ^ rk[rkIdx] ^ z[0] ^ z[1]; z[2] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = rk[rkIdx] ^ z[0] ^ z[1] ^ z[2]; z[3] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
+	t = z[1] ^ z[2] ^ z[3] ^ rk[rkIdx]; z[0] ^= ss(t); rkIdx += rkInc
+	t = z[2] ^ z[3] ^ rk[rkIdx] ^ z[0]; z[1] ^= ss(t); rkIdx += rkInc
+	t = z[3] ^ rk[rkIdx] ^ z[0] ^ z[1]; z[2] ^= ss(t); rkIdx += rkInc
+	t = rk[rkIdx] ^ z[0] ^ z[1] ^ z[2]; z[3] ^= ss(t); rkIdx += rkInc
 
-	t = z[1] ^ z[2] ^ z[3] ^ rk[rkIdx]; z[0] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = z[2] ^ z[3] ^ rk[rkIdx] ^ z[0]; z[1] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = z[3] ^ rk[rkIdx] ^ z[0] ^ z[1]; z[2] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = rk[rkIdx] ^ z[0] ^ z[1] ^ z[2]; z[3] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
+	t = z[1] ^ z[2] ^ z[3] ^ rk[rkIdx]; z[0] ^= ss(t); rkIdx += rkInc
+	t = z[2] ^ z[3] ^ rk[rkIdx] ^ z[0]; z[1] ^= ss(t); rkIdx += rkInc
+	t = z[3] ^ rk[rkIdx] ^ z[0] ^ z[1]; z[2] ^= ss(t); rkIdx += rkInc
+	t = rk[rkIdx] ^ z[0] ^ z[1] ^ z[2]; z[3] ^= ss(t); rkIdx += rkInc
 
-	t = z[1] ^ z[2] ^ z[3] ^ rk[rkIdx]; z[0] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = z[2] ^ z[3] ^ rk[rkIdx] ^ z[0]; z[1] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = z[3] ^ rk[rkIdx] ^ z[0] ^ z[1]; z[2] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	t = rk[rkIdx] ^ z[0] ^ z[1] ^ z[2]; z[3] ^= s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]; rkIdx += rkInc
-	//}
+	t = z[1] ^ z[2] ^ z[3] ^ rk[rkIdx]; z[0] ^= ss(t); rkIdx += rkInc
+	t = z[2] ^ z[3] ^ rk[rkIdx] ^ z[0]; z[1] ^= ss(t); rkIdx += rkInc
+	t = z[3] ^ rk[rkIdx] ^ z[0] ^ z[1]; z[2] ^= ss(t); rkIdx += rkInc
+	t = rk[rkIdx] ^ z[0] ^ z[1] ^ z[2]; z[3] ^= ss(t); rkIdx += rkInc
 
 	binary.BigEndian.PutUint32(y[0:4], z[3])
 	binary.BigEndian.PutUint32(y[4:8], z[2])
 	binary.BigEndian.PutUint32(y[8:12], z[1])
 	binary.BigEndian.PutUint32(y[12:16], z[0])
 }
+
+func ss(t uint32) uint32 {
+	// FIXME constant time implementation for the table lookup
+	return s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]
+}
+
 func keyExpansion(mk []byte, rk *[32]uint32) {
 	var k [36]uint32
 	var mks [4] uint32
