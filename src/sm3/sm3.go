@@ -44,8 +44,6 @@ var tt = [64]uint32 {
 	0x8a7a879d,	0x14f50f3b,	0x29ea1e76,	0x53d43cec,	0xa7a879d8,	0x4f50f3b1,	0x9ea1e762,	0x3d43cec5,
 }
 
-var empty  [blockSize]byte
-
 func New() hash.Hash {
 	sm3 := new(SM3)
 	sm3.Reset()
@@ -99,14 +97,15 @@ func (sm3 *SM3) checkSum(out []byte) {
 	sm3.x[sm3.nx] = 1 << 7
 	sm3.nx++
 
+	var empty  [blockSize]byte
 	if sm3.nx >= maxTail {
-		sm3.Write(empty[sm3.nx:blockSize])
+		sm3.Write(empty[ : blockSize + maxTail - sm3.nx])
+	} else {
+		sm3.Write(empty[sm3.nx:maxTail])
 	}
-	sm3.Write(empty[sm3.nx:maxTail])
 	binary.BigEndian.PutUint64(sm3.x[maxTail:], lenAtSum<<3)
 	sm3.cf(sm3.x[:])
 
-	//var out [hashSize]byte
 	for i:=0; i<8; i++ {
 		binary.BigEndian.PutUint32(out[i<<2:], sm3.h[i])
 	}
