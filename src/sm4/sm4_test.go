@@ -98,7 +98,7 @@ func l(b uint32) uint32 {
 }
 
 func printsbox(idx int, out [256]uint32) {
-	fmt.Printf("var sbox%d = [256]uint32 {\n", idx)
+	fmt.Printf("var s%d = [256]uint32 {\n", idx)
 	for i := 0; i < 256; i++ {
 		fmt.Printf("\t0x%08x,", out[i])
 		if (i+1)&15 == 0 {
