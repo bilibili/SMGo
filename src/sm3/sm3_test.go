@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"reflect"
+	"smgo/utils"
 	"testing"
 )
 
@@ -29,6 +30,21 @@ func Test_SpecExample2(t *testing.T) {
 	expected, _ := hex.DecodeString("debe9ff92275b8a138604889c18e5a4d6fdb70e5387e5765293dcba39c0c5732")
 	if !reflect.DeepEqual(out[:], expected) {
 		t.Fail()
+	}
+}
+
+func Test_DeriveTTs(t *testing.T) {
+	for i:=0; i<16; i++ {
+		fmt.Printf("0x%08x,\t", utils.RotateLeft(t0, i))
+		if (i+1)&0x07 == 0 {
+			fmt.Println()
+		}
+	}
+	for i:=16; i<64; i++ {
+		fmt.Printf("0x%08x,\t", utils.RotateLeft(t1, i%32))
+		if (i+1)&0x07 == 0 {
+			fmt.Println()
+		}
 	}
 }
 
