@@ -11,7 +11,7 @@ import (
 
 type SM3 struct {
 	h     [8]uint32
-	x     [64]byte
+	x     [blockSize]byte
 	nx    int
 	len   uint64
 }
@@ -44,6 +44,8 @@ var tt = [64]uint32 {
 	0x8a7a879d,	0x14f50f3b,	0x29ea1e76,	0x53d43cec,	0xa7a879d8,	0x4f50f3b1,	0x9ea1e762,	0x3d43cec5,
 }
 
+var empty  [blockSize]byte
+
 func New() hash.Hash {
 	sm3 := new(SM3)
 	sm3.Reset()
@@ -66,33 +68,55 @@ func (sm3 *SM3) Reset() {
 
 // Write just follows the GoLand standard library convention
 func (sm3 *SM3) Write(data []byte) (n int, err error) {
-	n = len(data)
-	sm3.len += uint64(n)
+	sm3.len += uint64(len(data))
 
 	if sm3.nx > 0 {
 		count := copy(sm3.x[sm3.nx:], data)
 		sm3.nx += count
 		data = data[count:]
 
-		if sm3.nx + 1 == blockSize {
+		if sm3.nx == blockSize {
 			sm3.cf(sm3.x[:])
 			sm3.nx = 0
 		}
 	}
 
-	for len(data) >= 64 {
-		sm3.cf(data[:64])
-		data = data[64:]
+	if sm3.nx == 0 {
+		for len(data) >= blockSize {
+			sm3.cf(data[:blockSize])
+			data = data[blockSize:]
+		}
+		if len(data) > 0 {
+			sm3.nx = copy(sm3.x[0:], data)
+		}
 	}
-
-	sm3.nx = copy(sm3.x[sm3.nx:], data)
 
 	return
 }
 
+func (sm3 *SM3) checkSum() [hashSize]byte {
+	lenAtSum := sm3.len
+	sm3.x[sm3.nx] = 1 << 7
+	sm3.nx++
+
+	if sm3.nx >= maxTail {
+		sm3.Write(empty[sm3.nx:blockSize])
+	}
+	sm3.Write(empty[sm3.nx:maxTail])
+	binary.BigEndian.PutUint64(sm3.x[maxTail:], lenAtSum<<3)
+	sm3.cf(sm3.x[:])
+
+	var out [hashSize]byte
+	for i:=0; i<8; i++ {
+		binary.BigEndian.PutUint32(out[4*i:], sm3.h[i])
+	}
+
+	return out
+}
+
 // Sum just follows the GoLand standard library convention
 func (sm3 *SM3) Sum(in []byte) []byte {
-	ret := *sm3 // copy so that writer can keep writing and summing, however, be wary of the data slice TODO
+	ret := *sm3 // copy deep enough so that writer can keep writing and summing
 	hash := ret.checkSum()
 	return append(in, hash[:]...)
 }
@@ -163,33 +187,4 @@ func (sm3 *SM3) cf(msg []byte) {
 	sm3.h[5] ^= f
 	sm3.h[6] ^= g
 	sm3.h[7] ^= h
-}
-
-func (sm3 *SM3) checkSum() [hashSize]byte {
-	var tmp [blockSize]byte
-	pos := sm3.nx
-
-	copy(tmp[:], sm3.x[0 : pos])
-	tmp[pos] = 1 << 7
-	pos++
-
-	if pos + 1 > maxTail {
-		for i:=pos; i<blockSize; i++ {
-			tmp[i] = 0
-		}
-		sm3.cf(tmp[:])
-		pos = 0
-	}
-	for i:=pos; i<maxTail; i++ {
-		tmp[i] = 0
-	}
-	binary.BigEndian.PutUint64(tmp[maxTail:], sm3.len<<3)
-	sm3.cf(tmp[:])
-
-	var out [hashSize]byte
-	for i:=0; i<8; i++ {
-		binary.BigEndian.PutUint32(out[4*i:], sm3.h[i])
-	}
-
-	return out
 }
