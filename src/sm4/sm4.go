@@ -68,21 +68,14 @@ func crytoBlock(x, y []byte, rk *[32]uint32, encryption int) {
 	z2 := binary.BigEndian.Uint32(x[8:12])
 	z3 := binary.BigEndian.Uint32(x[12:16])
 
-	// using notation of GMT 0002-2012, in each round we need to compute
-	// L(b0 || b1 || b2 || b3)
-	// = L(sbox[a0] || sbox[a1] || sbox[a2] || sbox[a3])
-	// = L(sbox[a0]<<24 ^ sbox[a1]<<16 ^ sbox[a2]<<8 ^ sbox[a3]) (assuming type width is expanded automatically)
-	// = L(sbox[a0]<<24) ^ L(sbox[a1]<<16) ^ L(sbox[a2]<<8) ^ L(sbox[a3])
-	// we then put L(.<<24) into sbox0, L(.<<16) into sbox1, and so on.
-	// Generators are put into test function Test_DeriveSboxes
-
 	//for i:=0; i<8; i++ {
-	// loop is unrolled for performance reasons (10+%). To recover the looping, simply keep the top most 4 lines within the loop of 8 iterations.
 	//	t = z1 ^ z2 ^ z3 ^ rk[rkIdx]; z0 ^= ss(t); rkIdx += rkInc
 	//	t = z2 ^ z3 ^ rk[rkIdx] ^ z0; z1 ^= ss(t); rkIdx += rkInc
 	//	t = z3 ^ rk[rkIdx] ^ z0 ^ z1; z2 ^= ss(t); rkIdx += rkInc
 	//	t = rk[rkIdx] ^ z0 ^ z1 ^ z2; z3 ^= ss(t); rkIdx += rkInc
 	//}
+	// loop is unrolled for performance reasons (10+%).
+	// To recover the looping, simply keep the top most 4 lines within the loop of 8 iterations.
 	// 8 identical blocks of 4-liners below
 	t = z1 ^ z2 ^ z3 ^ rk[rkIdx]; z0 ^= ss(t); rkIdx += rkInc
 	t = z2 ^ z3 ^ rk[rkIdx] ^ z0; z1 ^= ss(t); rkIdx += rkInc
@@ -124,12 +117,22 @@ func crytoBlock(x, y []byte, rk *[32]uint32, encryption int) {
 	t = z3 ^ rk[rkIdx] ^ z0 ^ z1; z2 ^= ss(t); rkIdx += rkInc
 	t = rk[rkIdx] ^ z0 ^ z1 ^ z2; z3 ^= ss(t); rkIdx += rkInc
 
+	// last statement could be saved but let's not spoil the beauty of the code
+	// besides, compiler probably will do it anyway
+
 	binary.BigEndian.PutUint32(y[0:4], z3)
 	binary.BigEndian.PutUint32(y[4:8], z2)
 	binary.BigEndian.PutUint32(y[8:12], z1)
 	binary.BigEndian.PutUint32(y[12:16], z0)
 }
 
+// using notation of GMT 0002-2012, in each round we need to compute
+// L(b0 || b1 || b2 || b3)
+// = L(sbox[a0] || sbox[a1] || sbox[a2] || sbox[a3])
+// = L(sbox[a0]<<24 ^ sbox[a1]<<16 ^ sbox[a2]<<8 ^ sbox[a3]) (assuming type width is expanded automatically)
+// = L(sbox[a0]<<24) ^ L(sbox[a1]<<16) ^ L(sbox[a2]<<8) ^ L(sbox[a3])
+// we then put L(.<<24) into s0, L(.<<16) into s1, and so on.
+// Generators are put into test function Test_DeriveSboxes
 func ss(t uint32) uint32 {
 	// FIXME constant time implementation for the table lookup
 	return s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]
