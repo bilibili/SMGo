@@ -102,8 +102,3 @@ func getBits(s *[]byte, idx, w int) int {
 
 	return byteLo
 }
-
-// RotateLeft returns x left rotated in k (mod 32).
-// if k is negative, rotates right but this will not happen here
-func RotateLeft(x uint32, k int) uint32 {return bits.RotateLeft32(x, k)}
-

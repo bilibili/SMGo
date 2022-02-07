@@ -6,7 +6,6 @@ package sm3
 import (
 	"encoding/binary"
 	"hash"
-	"smgo/utils"
 )
 
 type SM3 struct {
@@ -132,20 +131,19 @@ func SumSM3(data []byte) [hashSize]byte {
 func (sm3 *SM3) Size() int {return hashSize}
 func (sm3 *SM3) BlockSize() int {return blockSize}
 
-func ff0(x, y, z uint32) uint32 {return x ^ y ^ z}
 func ff1(x, y, z uint32) uint32 {return (x&y) | (x&z) | (y&z)}
 
 func gg1(x, y, z uint32) uint32 {return (x&y) | (^x & z)}
 
-func p0(x uint32) uint32 {return x ^ utils.RotateLeft(x, 9) ^ utils.RotateLeft(x, 17)}
-func p1(x uint32) uint32 {return x ^ utils.RotateLeft(x, 15) ^ utils.RotateLeft(x, 23)}
+func p0(x uint32) uint32 {return x ^ (x<<9 | x>>23) ^ (x<<17 | x>>15)}
+func p1(x uint32) uint32 {return x ^ (x<<15 | x>>17) ^ (x<<23 | x>>9)}
 
 func partiallyExpand(msg []byte, w *[68]uint32) {
 	for i:=0; i<=15; i++ {
 		w[i] = binary.BigEndian.Uint32(msg[i<<2 : i<<2 + 4])
 	}
 	for j:=16; j<=20; j++ {
-		w[j] = p1(w[j-16] ^ w[j-9] ^ utils.RotateLeft(w[j-3], 15)) ^ utils.RotateLeft(w[j-13], 7) ^ w[j-6]
+		w[j] = p1(w[j-16] ^ w[j-9] ^ (w[j-3]<<15 | w[j-3]>>17)) ^ (w[j-13]<<7 | w[j-13]>>25) ^ w[j-6]
 	}
 }
 
@@ -156,25 +154,27 @@ func (sm3 *SM3) cf(msg []byte) {
 	partiallyExpand(msg[0:64], &w)
 
 	for j:=0; j<=15; j++ {
-		alr12 := utils.RotateLeft(a, 12)
-		ss1 := utils.RotateLeft(alr12 + e + tt[j], 7)
-		tt2 := ff0(e, f, g) + h + ss1 + w[j]
+		alr12 := a<<12 | a>>20
+		ss1 := alr12 + e + tt[j]
+		ss1 = ss1<<7 | ss1>>25
+		tt2 := (e^f^g) + h + ss1 + w[j]
 		ss2 := ss1 ^ alr12
-		tt1 := ff0(a, b, c) + d + ss2 + (w[j]^w[j+4])
-		d, c = c, utils.RotateLeft(b, 9)
+		tt1 := (a^b^c) + d + ss2 + (w[j]^w[j+4])
+		d, c = c, b<<9 | b>>23
 		b, a, h = a, tt1, g
-		g, f, e = utils.RotateLeft(f, 19), e, p0(tt2)
+		g, f, e = f<<19 | f>>13, e, p0(tt2)
 	}
 	for j:=16; j<=63; j++ {
-		alr12 := utils.RotateLeft(a, 12)
-		ss1 := utils.RotateLeft(alr12 + e + tt[j], 7)
+		alr12 := a<<12 | a>>20
+		ss1 := alr12 + e + tt[j]
+		ss1 = ss1<<7 | ss1>>25
 		tt2 := gg1(e, f, g) + h + ss1 + w[j]
 		ss2 := ss1 ^ alr12
-		w[j+4] = p1(w[j+4-16] ^ w[j+4-9] ^ utils.RotateLeft(w[j+4-3], 15)) ^ utils.RotateLeft(w[j+4-13], 7) ^ w[j+4-6]
+		w[j+4] = p1(w[j-12] ^ w[j-5] ^ (w[j+1]<<15 | w[j+1]>>17)) ^ (w[j-9]<<7 | w[j-9]>>25) ^ w[j-2]
 		tt1 := ff1(a, b, c) + d + ss2 + (w[j]^w[j+4])
-		d, c = c, utils.RotateLeft(b, 9)
+		d, c = c, b<<9 | b>>23
 		b, a, h = a, tt1, g
-		g, f, e = utils.RotateLeft(f, 19), e, p0(tt2)
+		g, f, e = f<<19 | f>>13, e, p0(tt2)
 	}
 
 	sm3.h[0] ^= a
