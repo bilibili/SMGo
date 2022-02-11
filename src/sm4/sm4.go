@@ -1,5 +1,5 @@
-// Copyright 2021 bilibili. All rights reserved. Author: Guo, Weiji guoweiji@bilibili.com
-// 哔哩哔哩版权所有 2011 ~ 2022。作者：郭伟基 guoweiji@bilibili.com
+// Copyright 2021 ~ 2022 bilibili. All rights reserved. Author: Guo, Weiji guoweiji@bilibili.com
+// 哔哩哔哩版权所有 2021 ~ 2022。作者：郭伟基 guoweiji@bilibili.com
 
 package sm4
 
@@ -31,9 +31,13 @@ func NewCipher(key []byte) (cipher.Block, error) {
 		return nil, KeySizeError(k)
 	}
 
-	sm4 := new(sm4Cipher)
-	keyExpansion(key, &sm4.expandedKey)
-	return sm4, nil
+	return newCipher(key)
+}
+
+func newCipherGeneric(key []byte) (cipher.Block, error) {
+	sm4 := sm4Cipher{}
+	expandKey(key, &sm4.expandedKey)
+	return &sm4, nil
 }
 
 func (sm4 *sm4Cipher) Encrypt(dst, src []byte) {
@@ -134,17 +138,15 @@ func crytoBlock(x, y []byte, rk *[32]uint32, encryption int) {
 // we then put L(.<<24) into s0, L(.<<16) into s1, and so on.
 // Generators are put into test function Test_DeriveSboxes
 func ss(t uint32) uint32 {
-	// FIXME constant time implementation for the table lookup
 	return s0[0xff&(t>>24)] ^ s1[0xff&(t>>16)] ^ s2[0xff&(t>>8)] ^ s3[0xff&(t)]
 }
 
-func keyExpansion(mk []byte, rk *[32]uint32) {
+func expandKey(mk []byte, rk *[32]uint32) {
 	var k [36]uint32
 	var mks [4] uint32
 	byte16ToUint32(mk[:], mks[:])
 	k[0], k[1], k[2], k[3] = mks[0]^fk0, mks[1]^fk1, mks[2]^fk2, mks[3]^fk3
 	for i := 0; i < 32; i++ {
-		// FIXME constant time implementation for the sbox lookup
 		k[i+4] = k[i] ^ transTPrime(k[i+1]^k[i+2]^k[i+3]^ck[i])
 		rk[i] = k[i+4]
 	}
