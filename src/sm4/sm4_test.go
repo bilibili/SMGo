@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-func Test_sample1(t *testing.T) {
+func Test_samples(t *testing.T) {
 	plain, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 	expected, _ := hex.DecodeString("681edf34d206965e86b3e94f536e4246")
@@ -43,6 +43,45 @@ func Test_sample1(t *testing.T) {
 	copy(inter, plain)
 	for i:=0; i<1000000; i++ {
 		sm4.Encrypt(cipher, inter)
+		copy(inter, cipher)
+	}
+
+	if !reflect.DeepEqual(expected, cipher) {
+		fmt.Printf("output: %x\n", cipher)
+		t.Fail()
+	}
+}
+
+func Test_samplesX2(t *testing.T) {
+	plain, _ := hex.DecodeString("0123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210")
+	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
+	expected, _ := hex.DecodeString("681edf34d206965e86b3e94f536e4246681edf34d206965e86b3e94f536e4246")
+
+	sm4 := sm4Cipher{}
+	expandKey(key, &sm4.expandedKey)
+
+	cipher := make([]byte, 32)
+	encryptX2(&sm4, cipher, plain)
+
+	if !reflect.DeepEqual(expected, cipher) {
+		fmt.Printf("output: %x\n", cipher)
+		t.Fail()
+	}
+
+	decrypted := make([]byte, 32)
+	decryptX2(&sm4, decrypted, cipher)
+
+	if !reflect.DeepEqual(decrypted, plain) {
+		fmt.Printf("decrypted: %x\n", decrypted)
+		t.Fail()
+	}
+
+	expected, _ = hex.DecodeString("595298c7c6fd271f0402f804c33d3f66595298c7c6fd271f0402f804c33d3f66")
+	// 示例2，加密1000000次
+	inter := make([]byte, 32)
+	copy(inter, plain)
+	for i:=0; i<1000000; i++ {
+		encryptX2(&sm4, cipher, inter)
 		copy(inter, cipher)
 	}
 
@@ -137,19 +176,23 @@ func bench(b *testing.B, n int) {
 	rand.Read(plain)
 	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 
-	sm4, err := newCipherGeneric(key)
-	if err != nil {
-		b.Fail()
-	}
+	sm4 := sm4Cipher{}
+	expandKey(key, &sm4.expandedKey)
 
 	cipher := make([]byte, n)
 	b.SetBytes(int64(n))
-	inner := n / 16
 	b.ResetTimer()
 	b.ReportAllocs()
-	for i:=0; i<b.N; i++ {
-		for j:=0; j<inner; j++ {
-			sm4.Encrypt(cipher[16*j:], plain[16*j:])
+	if n == 16 {
+		for i:=0; i<b.N; i++ {
+			sm4.Encrypt(cipher[:], plain[:])
+		}
+	} else {
+		inner := n / 32
+		for i:=0; i<b.N; i++ {
+			for j:=0; j<inner; j++ {
+				encryptX2(&sm4, cipher[32*j:], plain[32*j:])
+			}
 		}
 	}
 }
