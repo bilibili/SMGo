@@ -16,7 +16,7 @@ func Test_sample1(t *testing.T) {
 	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 	expected, _ := hex.DecodeString("681edf34d206965e86b3e94f536e4246")
 
-	sm4, err := NewCipher(key)
+	sm4, err := newCipherGeneric(key)
 	if err != nil {
 		t.Fail()
 	}
@@ -68,7 +68,7 @@ func TestSm4Cipher_BlockSize(t *testing.T) {
 	fmt.Println(err.Error())
 
 	key = make([]byte, 16)
-	sm4, err = NewCipher(key)
+	sm4, err = newCipherGeneric(key)
 	if err != nil {
 		t.Fail()
 	}
@@ -137,7 +137,7 @@ func bench(b *testing.B, n int) {
 	rand.Read(plain)
 	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 
-	sm4, err := NewCipher(key)
+	sm4, err := newCipherGeneric(key)
 	if err != nil {
 		b.Fail()
 	}

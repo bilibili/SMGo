@@ -1,24 +1,23 @@
 // Copyright 2021 ~ 2022 bilibili. All rights reserved. Author: Guo, Weiji guoweiji@bilibili.com
 // 哔哩哔哩版权所有 2021 ~ 2022。作者：郭伟基 guoweiji@bilibili.com
 
-//go:build amd64 || arm64
+//go:build arm64
 
 package sm4
 
 import (
 	"crypto/cipher"
+	. "github.com/klauspost/cpuid/v2"
 )
 
 type sm4CipherAsm struct {
 	sm4Cipher
 }
 
-//var supportsSM4 = CPU.Supports(SM4)
-//var supportsAES = CPU.Supports(AESNI) || CPU.Supports(AESARM)
-var supportsAES = false // let's worry about key expansion later FIXME
+var candoAsm = CPU.Supports(PMULL) // for ARM64 we implement with NEON and PMULL, and NEON should be available by default
 
 func newCipher(key []byte) (cipher.Block, error) {
-	if !supportsAES {
+	if !candoAsm {
 		return newCipherGeneric(key)
 	}
 
