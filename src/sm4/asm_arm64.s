@@ -41,6 +41,11 @@ DATA SBox<>+0xf0(SB)/8, $0x204ddc3aec7df018
 DATA SBox<>+0xf8(SB)/8, $0x4839cbd73e5fee79
 GLOBL SBox<>(SB), (NOPTR+RODATA), $256
 
+// Register allocation
+// V16 ~ V31: SBox
+// V15: constant for table lookup
+// V0: target and initial index for table lookup
+
 // again, optimize later
 #define     t0  R2
 #define     t1  R3
@@ -103,16 +108,18 @@ GLOBL SBox<>(SB), (NOPTR+RODATA), $256
 	EOR	R2, R0, t \
 	REVW    t, t \
 
-#define subRound(A, B, C, D, RK) \
-    getXor(B, C, D, RK) \
-    VMOVI   $0x40, V15.B16 \
+#define tableLookup() \
     VSUB    V15.B16, V0.B16, V9.B16 \
     VTBL    V0.B16, [V16.B16, V17.B16, V18.B16, V19.B16], V0.B16 \ //WORD    $0x0E006000 | 0x00<<16 | 16<<5 | 0x00
     VSUB    V15.B16, V9.B16, V10.B16 \
-    WORD    $0x0E007000 | 9<<16 | 20<<5 | 0x00 \ //VTBX1    V9.B16, [V20.B16, V21.B16, V22.B16, V23.B16], V0.B16 \
+    WORD    $0x0E007000 | 9<<16 | 20<<5 | 0x00 \ //VTBX    V9.B16, [V20.B16, V21.B16, V22.B16, V23.B16], V0.B16 \
     VSUB    V15.B16, V10.B16, V11.B16 \
     WORD    $0x0E007000 | 10<<16 | 24<<5 | 0x00 \ //VTBX    V10.B16, [V24.B16, V25.B16, V26.B16, V27.B16], V0.B16 \
     WORD    $0x0E007000 | 11<<16 | 28<<5 | 0x00 \ //VTBX    V11.B16, [V28.B16, V29.B16, V30.B16, V31.B16], V0.B16 \
+
+#define subRound(A, B, C, D, RK) \
+    getXor(B, C, D, RK) \
+    tableLookup() \
     lX1() \
     EORW    t, A, A \
 
@@ -136,6 +143,7 @@ TEXT ·encryptBlockAsm(SB),NOSPLIT,$0-24
 	MOVD	src+16(FP), R12
 
     loadInput(R12)
+    VMOVI   $0x40, V15.B16
 
     round(z0, z1, z2, z3, 0, R10)
     round(z0, z1, z2, z3, 16, R10)

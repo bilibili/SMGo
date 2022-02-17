@@ -25,7 +25,7 @@ func Test_samples(t *testing.T) {
 	sm4.Encrypt(cipher, plain)
 
 	if !reflect.DeepEqual(expected, cipher) {
-		fmt.Printf("output: %x\n", cipher)
+		fmt.Printf("encrypted: %x\n", cipher)
 		t.Fail()
 	}
 
@@ -47,7 +47,7 @@ func Test_samples(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(expected, cipher) {
-		fmt.Printf("output: %x\n", cipher)
+		fmt.Printf("encrypted 1M times: %x\n", cipher)
 		t.Fail()
 	}
 }
@@ -58,13 +58,13 @@ func Test_samplesX2(t *testing.T) {
 	expected, _ := hex.DecodeString("681edf34d206965e86b3e94f536e4246681edf34d206965e86b3e94f536e4246")
 
 	sm4 := sm4Cipher{}
-	expandKey(key, &sm4.expandedKey)
+	expandKey(key, &sm4.enc, &sm4.dec)
 
 	cipher := make([]byte, 32)
 	encryptX2(&sm4, cipher, plain)
 
 	if !reflect.DeepEqual(expected, cipher) {
-		fmt.Printf("output: %x\n", cipher)
+		fmt.Printf("encrypted: %x\n", cipher)
 		t.Fail()
 	}
 
@@ -86,7 +86,7 @@ func Test_samplesX2(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(expected, cipher) {
-		fmt.Printf("output: %x\n", cipher)
+		fmt.Printf("encrypted 1M times: %x\n", cipher)
 		t.Fail()
 	}
 }
@@ -177,7 +177,7 @@ func bench(b *testing.B, n int) {
 	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 
 	sm4 := sm4Cipher{}
-	expandKey(key, &sm4.expandedKey)
+	expandKey(key, &sm4.enc, &sm4.dec)
 
 	cipher := make([]byte, n)
 	b.SetBytes(int64(n))

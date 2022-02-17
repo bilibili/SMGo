@@ -45,9 +45,9 @@ func Test_encryptBlockAsm(t *testing.T) {
 	cipher := make([]byte, 16)
 
 	sm4 := sm4Cipher{}
-	expandKey(key, &sm4.expandedKey)
+	expandKey(key, &sm4.enc, &sm4.dec)
 
-	encryptBlockAsm(&sm4.expandedKey[0], &cipher[0], &plain[0])
+	encryptBlockAsm(&sm4.enc[0], &cipher[0], &plain[0])
 	fmt.Printf("Result: %x\nExpected: %x\n", cipher, expected)
 	if !reflect.DeepEqual(cipher, expected) {
 		t.Fail()
@@ -74,13 +74,13 @@ func Benchmark_encryptBlockAsm(b *testing.B) {
 	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 	dst := make([]byte, 16)
 	sm4 := sm4Cipher{}
-	expandKey(key, &sm4.expandedKey)
+	expandKey(key, &sm4.enc, &sm4.dec)
 
 	b.ResetTimer()
 	b.ReportAllocs()
 	b.SetBytes(16)
 	for i:=0; i<b.N; i++ {
-		encryptBlockAsm(&sm4.expandedKey[0], &dst[0], &plain[0])
+		encryptBlockAsm(&sm4.enc[0], &dst[0], &plain[0])
 	}
 }
 

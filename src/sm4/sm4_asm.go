@@ -22,7 +22,7 @@ func newCipher(key []byte) (cipher.Block, error) {
 	}
 
 	sm4 := sm4CipherAsm{}
-	expandKeyAsm(&key[0], &sm4.expandedKey[0])
+	expandKeyAsm(&key[0], &sm4.enc[0])
 	return &sm4, nil
 }
 
@@ -44,7 +44,7 @@ func (sm4 *sm4CipherAsm) Encrypt(dst, src []byte) {
 	if len(dst) < blockSize {
 		panic("sm4: output not full block")
 	}
-	encryptBlockAsm(&sm4.expandedKey[0], &dst[0], &src[0])
+	encryptBlockAsm(&sm4.enc[0], &dst[0], &src[0])
 }
 
 func (sm4 *sm4CipherAsm) Decrypt(dst, src []byte) {
@@ -54,5 +54,5 @@ func (sm4 *sm4CipherAsm) Decrypt(dst, src []byte) {
 	if len(dst) < blockSize {
 		panic("sm4: output not full block")
 	}
-	decryptBlockAsm(&sm4.expandedKey[0], &dst[0], &src[0])
+	decryptBlockAsm(&sm4.enc[0], &dst[0], &src[0])
 }
