@@ -1,7 +1,7 @@
 // Copyright 2021 ~ 2022 bilibili. All rights reserved. Author: Guo, Weiji guoweiji@bilibili.com
 // 哔哩哔哩版权所有 2021 ~ 2022。作者：郭伟基 guoweiji@bilibili.com
 
-// method credited to Ard Biesheuve from Linaro, see https://www.linaro.org/blog/accelerated-aes-for-the-arm64-linux-kernel/
+// "table lookup in NEON" method credited to Ard Biesheuve from Linaro, see https://www.linaro.org/blog/accelerated-aes-for-the-arm64-linux-kernel/
 // ARM opcode refs: https://github.com/CAS-Atlantic/AArch64-Encoding
 
 #include "textflag.h"
@@ -44,120 +44,267 @@ GLOBL SBox<>(SB), (NOPTR+RODATA), $256
 // Register allocation
 // V16 ~ V31: SBox
 // V15: constant for table lookup
-// V0: target and initial index for table lookup
+// V11~14: drafts
+// V7~10: input data and program state (for 2X)
+// V6: round key (load per round)
+// V2~5: input data and program state (for 1X)
+// V1: target and initial index for table lookup (for 2X)
+// V0: target and initial index for table lookup (for 1X)
 
-// again, optimize later
-#define     t0  R2
-#define     t1  R3
-#define     t   R4
-#define     z0  R5
-#define     z1  R6
-#define     z2  R7
-#define     z3  R8
-#define     rk0 R16
-#define     rk1 R17
-#define     rk2 R20
-#define     rk3 R21
+// R0~8: general purpose drafts
 
-#define loadSBox(T) \
-    MOVD    $SBox<>(SB), T \
-    VLD1.P  64(T), [V16.B16, V17.B16, V18.B16, V19.B16] \
-    VLD1.P  64(T), [V20.B16, V21.B16, V22.B16, V23.B16] \
-    VLD1.P  64(T), [V24.B16, V25.B16, V26.B16, V27.B16] \
-    VLD1.P  64(T), [V28.B16, V29.B16, V30.B16, V31.B16] \
+#define     TB0 V0
+#define     TB1 V1
 
-#define loadInput(R) \
-	LDPW    (R), (z0, z1) \
-	LDPW    8(R), (z2, z3) \
+// 1st set of state, naming convension from sm4.go
+#define     Z0  V2
+#define     Z1  V3
+#define     Z2  V4
+#define     Z3  V5
 
-#define storeOutput(R) \
-    STPW    (z3, z2), (R) \
-    STPW    (z1, z0), 8(R) \
+// round key, loaded per round
+#define     RK  V6
 
-#define loadRoundKey(idx, R) \
-	LDPW    idx(R), (rk0, rk1) \
-	LDPW    idx+8(R), (rk2, rk3) \
-	REVW    rk0, rk0 \ //TODO this could be moved to key expansion
-	REVW    rk1, rk1 \
-	REVW    rk2, rk2 \
-	REVW    rk3, rk3 \
+// 2nd set of state if we are going to do 2X (1X deals with up to 4 blocks in parallel, 2X 8 blocks)
+#define     Y0  V7
+#define     Y1  V8
+#define     Y2  V9
+#define     Y3  V10
 
-#define getXor(B, C, D, RK) \
-    EORW    B, C, t0 \
-    EORW    D, RK, t1 \
-    EORW    t0, t1, t \
-    VMOV    t, V0.S[0] \
+// draft registers, served as temporal variables
+#define     T0  V11
+#define     T1  V12
+#define     T2  V13
 
-// use PMULL to implement the L transformation
-#define transformL() \
-    \//VPMULL   V0.D1, V1.D1, V2.Q1 \
-    \//VMOV    V2.S[0], t0 \
-    \//VMOV    V2.S[1], t1 \
-    \//EOR     t0, t1, t \
+#define     ROTATE  V14
+#define     CONST V15
 
-#define lX1() \
-    VMOV    V0.S[0], R0 \
-    REVW    R0, R0 \
-	RORW	$30, R0, R1 \
-	RORW	$22, R0, R2 \
-	EOR	R1, R2, R1 \
-	RORW	$14, R0, R2 \
-	RORW	$8, R0, R3 \
-	EOR	R2, R3, R2 \
-	EOR	R1, R0, R0 \
-	EOR	R2, R0, t \
-	REVW    t, t \
+#define loadSBox(Rx) \
+    MOVD    $SBox<>(SB), Rx \
+    VLD1.P  64(Rx), [V16.B16, V17.B16, V18.B16, V19.B16] \
+    VLD1.P  64(Rx), [V20.B16, V21.B16, V22.B16, V23.B16] \
+    VLD1.P  64(Rx), [V24.B16, V25.B16, V26.B16, V27.B16] \
+    VLD1.P  64(Rx), [V28.B16, V29.B16, V30.B16, V31.B16] \
 
-#define tableLookup() \
-    VSUB    V15.B16, V0.B16, V9.B16 \
-    VTBL    V0.B16, [V16.B16, V17.B16, V18.B16, V19.B16], V0.B16 \ //WORD    $0x0E006000 | 0x00<<16 | 16<<5 | 0x00
-    VSUB    V15.B16, V9.B16, V10.B16 \
-    WORD    $0x0E007000 | 9<<16 | 20<<5 | 0x00 \ //VTBX    V9.B16, [V20.B16, V21.B16, V22.B16, V23.B16], V0.B16 \
-    VSUB    V15.B16, V10.B16, V11.B16 \
-    WORD    $0x0E007000 | 10<<16 | 24<<5 | 0x00 \ //VTBX    V10.B16, [V24.B16, V25.B16, V26.B16, V27.B16], V0.B16 \
-    WORD    $0x0E007000 | 11<<16 | 28<<5 | 0x00 \ //VTBX    V11.B16, [V28.B16, V29.B16, V30.B16, V31.B16], V0.B16 \
+// lookup up to 4 data blcoks (16bytes / block)
+// block1: V0 -> V11 -> V12 -> V13
+#define tableLookupX4() \
+    VSUB    CONST.B16, V0.B16, V11.B16 \
+    VTBL    V0.B16, [V16.B16, V17.B16, V18.B16, V19.B16], V0.B16 \
+    VSUB    CONST.B16, V11.B16, V12.B16 \
+    WORD    $0x4E007000 | 11<<16 | 20<<5 | 0x00 \ //VTBX    V11.B16, [V20.B16, V21.B16, V22.B16, V23.B16], V0.B16 \
+    VSUB    CONST.B16, V12.B16, V13.B16 \
+    WORD    $0x4E007000 | 12<<16 | 24<<5 | 0x00 \ //VTBX    V12.B16, [V24.B16, V25.B16, V26.B16, V27.B16], V0.B16 \
+    WORD    $0x4E007000 | 13<<16 | 28<<5 | 0x00 \ //VTBX    V13.B16, [V28.B16, V29.B16, V30.B16, V31.B16], V0.B16 \
 
-#define subRound(A, B, C, D, RK) \
-    getXor(B, C, D, RK) \
-    tableLookup() \
-    lX1() \
-    EORW    t, A, A \
+// lookup up to 8 data blocks
+// interleaved to hide the latency of TBL and TBX (partially)
+// block1: V0 -> V11 -> V13 -> V11
+// block2: V1 -> V12 -> V14 -> V12
+#define tableLookupX8() \
+    VSUB    CONST.B16, V0.B16, V11.B16 \
+    VTBL    V0.B16, [V16.B16, V17.B16, V18.B16, V19.B16], V0.B16 \
+    VSUB    CONST.B16, V1.B16, V12.B16 \
+    VTBL    V1.B16, [V16.B16, V17.B16, V18.B16, V19.B16], V1.B16 \
+    VSUB    CONST.B16, V11.B16, V13.B16 \
+    WORD    $0x4E007000 | 11<<16 | 20<<5 | 0x00 \
+    VSUB    CONST.B16, V12.B16, V14.B16 \
+    WORD    $0x4E007000 | 12<<16 | 20<<5 | 0x01 \
+    VSUB    CONST.B16, V13.B16, V11.B16 \
+    WORD    $0x4E007000 | 13<<16 | 24<<5 | 0x00 \
+    VSUB    CONST.B16, V14.B16, V12.B16 \
+    WORD    $0x4E007000 | 14<<16 | 24<<5 | 0x01 \
+    WORD    $0x4E007000 | 11<<16 | 28<<5 | 0x00 \
+    WORD    $0x4E007000 | 12<<16 | 28<<5 | 0x01 \
 
-#define round(A, B, C, D, IDX, R) \
-    loadRoundKey(IDX, R) \
-    subRound(A, B, C, D, rk0) \
-    subRound(B, C, D, A, rk1) \
-    subRound(C, D, A, B, rk2) \
-    subRound(D, A, B, C, rk3) \
+#define loadInputX2(R) \
+    LDPW    (R), (R0, R1) \
+    VMOV    R0, Z0.S[0] \
+    VMOV    R1, Z1.S[0] \
+    LDPW    8(R), (R2, R3) \
+    VMOV    R2, Z2.S[0] \
+    VMOV    R3, Z3.S[0] \
+    LDPW    16(R), (R0, R1) \
+    VMOV    R0, Z0.S[1] \
+    VMOV    R1, Z1.S[1] \
+    LDPW    24(R), (R2, R3) \
+    VMOV    R2, Z2.S[1] \
+    VMOV    R3, Z3.S[1] \
+
+#define storeOutputX2(R) \
+    VMOV    Z0.S[0], R0 \
+    VMOV    Z1.S[0], R1 \
+    STPW    (R0, R1), (R) \
+    VMOV    Z2.S[0], R2 \
+    VMOV    Z3.S[0], R3 \
+    STPW    (R2, R3), 8(R) \
+    VMOV    Z0.S[1], R0 \
+    VMOV    Z1.S[1], R1 \
+    STPW    (R0, R1), 16(R) \
+    VMOV    Z2.S[1], R2 \
+    VMOV    Z3.S[1], R3 \
+    STPW    (R2, R3), 24(R) \
+
+#define swap(A, B) \
+    \//VSWP     A, B //unrecognized instruction, TODO
+    VMOV    A, T0.B16 \
+    VMOV    B, A \
+    VMOV    T0.B16, B \
+
+#define loadInputX8(R) \
+    VLD4.P  64(R), [Z0.S4, Z1.S4, Z2.S4, Z3.S4] \
+    VLD4    64(R), [Y0.S4, Y1.S4, Y2.S4, Y3.S4] \
+
+#define storeOutputX8(R) \
+    VST4.P  [Z0.S4, Z1.S4, Z2.S4, Z3.S4], 64(R) \
+    VST4    [Y0.S4, Y1.S4, Y2.S4, Y3.S4], 64(R) \
+
+#define getXor(B, C, D, DST) \
+    VEOR    B.B16, C.B16, T0.B16 \
+    VEOR    D.B16, RK.B16, T1.B16 \
+    VEOR    T0.B16, T1.B16, DST.B16 \
+
+// use VPMULL to implement the L transformation?
+// transform in-place
+#define transformL(Data) \
+    VREV32  Data.B16, Data.B16 \
+    VSHL    $2,  Data.S4, T0.S4 \
+    VSRI    $30, Data.S4, T0.S4 \
+    VSHL    $10, Data.S4, T1.S4 \
+    VSRI    $22, Data.S4, T1.S4 \
+    VEOR    T0.B16, T1.B16, T0.B16 \
+    VSHL    $18, Data.S4, T2.S4 \
+    VSRI    $14, Data.S4, T2.S4 \
+    VSHL    $24, Data.S4, T1.S4 \
+    VSRI    $8,  Data.S4, T1.S4 \
+    VEOR    T2.B16, T1.B16, T2.B16 \
+    VEOR    T0.B16, T2.B16, T0.B16 \
+    VEOR    T0.B16, Data.B16, Data.B16 \
+    VREV32  Data.B16, Data.B16 \
 
 TEXT ·expandKeyAsm(SB),NOSPLIT,$0-16
 
     RET
 
-//func encryptBlockAsm(rk *uint32, dst, src *byte)
-TEXT ·encryptBlockAsm(SB),NOSPLIT,$0-24
-    loadSBox(R9)
+//func cryptoBlockAsm(rk *uint32, dst, src *byte)
+TEXT ·cryptoBlockAsm(SB),NOSPLIT,$0-24
+
+    // TODO moving data between ARM & NEON is expensive, optimize load/store X1 & X2
+    #define loadInputX1(R) \
+        LDPW    (R), (R0, R1) \
+        VMOV    R0, Z0.S[0] \
+        VMOV    R1, Z1.S[0] \
+        LDPW    8(R), (R2, R3) \
+        VMOV    R2, Z2.S[0] \
+        VMOV    R3, Z3.S[0] \
+
+    #define storeOutputX1(R) \
+        VMOV    Z3.S[0], R3 \
+        VMOV    Z2.S[0], R2 \
+        STPW    (R3, R2), (R) \
+        VMOV    Z1.S[0], R1 \
+        VMOV    Z0.S[0], R0 \
+        STPW    (R1, R0), 8(R) \
+
+    #define loadRoundKeyX1(idx, R) \
+        ADD     $idx, R, R1 \
+        VLD1    (R1), RK.S[0] \
+        VREV32  RK.B16, RK.B16 \
+
+    #define subRoundX1(A, B, C, D, TB) \
+        getXor(B, C, D, TB) \
+        tableLookupX4() \
+        transformL(TB) \
+        VEOR    TB.B16, A.B16, A.B16 \
+
+    #define round(IDX, R) \
+        loadRoundKeyX1(IDX, R) \
+        subRoundX1(Z0, Z1, Z2, Z3, TB0) \
+        loadRoundKeyX1(IDX+4, R) \
+        subRoundX1(Z1, Z2, Z3, Z0, TB0) \
+        loadRoundKeyX1(IDX+8, R) \
+        subRoundX1(Z2, Z3, Z0, Z1, TB0) \
+        loadRoundKeyX1(IDX+12, R) \
+        subRoundX1(Z3, Z0, Z1, Z2, TB0) \
+
+    loadSBox(R0)
 
 	MOVD	rk+0(FP), R10
 	MOVD	dst+8(FP), R11
 	MOVD	src+16(FP), R12
 
-    loadInput(R12)
-    VMOVI   $0x40, V15.B16
+    VMOVI   $0x40, CONST.B16
+    loadInputX1(R12)
 
-    round(z0, z1, z2, z3, 0, R10)
-    round(z0, z1, z2, z3, 16, R10)
-    round(z0, z1, z2, z3, 32, R10)
-    round(z0, z1, z2, z3, 48, R10)
-    round(z0, z1, z2, z3, 64, R10)
-    round(z0, z1, z2, z3, 80, R10)
-    round(z0, z1, z2, z3, 96, R10)
-    round(z0, z1, z2, z3, 112, R10)
+    round(0, R10)
+    round(16, R10)
+    round(32, R10)
+    round(48, R10)
+    round(64, R10)
+    round(80, R10)
+    round(96, R10)
+    round(112, R10)
 
-    storeOutput(R11)
+    //storeOutputX1(R11) // input load OK
+    //VST1    [RK.B16], (R11) // round key load OK
+    //VST1    [TB0.B16], (R11) // getXor, table lookup, transform OK
+    //VST1    [Z0.B16], (R11) // first subround OK
+    //storeOutputX1(R11) // first round OK
 
+    storeOutputX1(R11)
     RET
 
-TEXT ·decryptBlockAsm(SB),NOSPLIT,$0-24
+//func cryptoBlockAsmX4(rk *uint32, dst, src *byte)
+TEXT ·cryptoBlockAsmX4(SB),NOSPLIT,$0-24
 
+    #define loadInputX4(R) \
+        VLD4    (R), [Z0.S4, Z1.S4, Z2.S4, Z3.S4] \
+
+    #define storeOutputX4(R) \
+        swap(Z0.B16, Z3.B16) \
+        swap(Z1.B16, Z2.B16) \
+        VST4    [Z0.S4, Z1.S4, Z2.S4, Z3.S4], (R) \
+
+    #define loadRoundKeyX4(idx, R) \
+        ADD     $idx, R, R1 \
+        VLD1    (R1), RK.S[0] \
+        VDUP    RK.S[0], RK.S4 \
+        VREV32  RK.B16, RK.B16 \
+
+    #define subRoundX4(A, B, C, D, TB) \
+        getXor(B, C, D, TB) \
+        tableLookupX4() \
+        transformL(TB) \
+        VEOR    TB.B16, A.B16, A.B16 \
+
+    #define roundX4(IDX, R) \
+        loadRoundKeyX4(IDX, R) \
+        subRoundX4(Z0, Z1, Z2, Z3, TB0) \
+        loadRoundKeyX4(IDX+4, R) \
+        subRoundX4(Z1, Z2, Z3, Z0, TB0) \
+        loadRoundKeyX4(IDX+8, R) \
+        subRoundX4(Z2, Z3, Z0, Z1, TB0) \
+        loadRoundKeyX4(IDX+12, R) \
+        subRoundX4(Z3, Z0, Z1, Z2, TB0) \
+
+    loadSBox(R0)
+
+	MOVD	rk+0(FP), R10
+	MOVD	dst+8(FP), R11
+	MOVD	src+16(FP), R12
+
+    VMOVI   $0x40, CONST.B16
+    loadInputX4(R12)
+
+    roundX4(0, R10)
+    roundX4(16, R10)
+    roundX4(32, R10)
+    roundX4(48, R10)
+    roundX4(64, R10)
+    roundX4(80, R10)
+    roundX4(96, R10)
+    roundX4(112, R10)
+
+    storeOutputX4(R11)
     RET
+

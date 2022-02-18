@@ -11,6 +11,23 @@ import (
 	"testing"
 )
 
+func Test_genSample(t *testing.T) {
+	plain, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
+	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
+
+	sm4, err := newCipherGeneric(key)
+	if err != nil {
+		t.Fail()
+	}
+
+	cipher := make([]byte, 16)
+	for i:=0; i<4; i++ {
+		sm4.Encrypt(cipher, plain)
+		fmt.Printf("generated: %x\n", cipher)
+		copy(plain, cipher)
+	}
+}
+
 func Test_samples(t *testing.T) {
 	plain, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")

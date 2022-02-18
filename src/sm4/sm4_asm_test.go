@@ -19,22 +19,38 @@ func Test_newCipher(t *testing.T) {
 	fmt.Println(CPU.FeatureSet())
 }
 
-func Test_encryptBlockAsmProto(t *testing.T) {
-	src := make([]byte, 16)
-	dst := make([]byte, 16)
-	rk := make([]uint32, 32)
+func Test_encryptCrossBlock(t *testing.T) {
+	plain, _ := hex.DecodeString("0123456789abcdeffedcba9876543210681edf34d206965e86b3e94f536e4246f324184f3c8892b72bdc9d7c612919dece4dd6b81f6de992a830daab1f008028")
+	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
+	expected, _ := hex.DecodeString("681edf34d206965e86b3e94f536e4246f324184f3c8892b72bdc9d7c612919dece4dd6b81f6de992a830daab1f00802836d33f04088dae09b94bbf39f0209d29")
 
-	for i:=0; i<16; i++ {
-		//src[i] = byte(i)
+	cipher := make([]byte, 64)
+
+	sm4 := sm4Cipher{}
+	expandKey(key, &sm4.enc, &sm4.dec)
+
+	cryptoBlockAsmX4(&sm4.enc[0], &cipher[0], &plain[0])
+	fmt.Printf("Result: %x\nExpected: %x\n", cipher, expected)
+	if !reflect.DeepEqual(cipher, expected) {
+		t.Fail()
 	}
-	src[4] = 0x1
-	src[5] = 0x2
-	src[6] = 0x3
-	src[7] = 0xff
+}
 
+func Test_encryptBlockAsmX4(t *testing.T) {
+	plain, _ := hex.DecodeString("0123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210")
+	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
+	expected, _ := hex.DecodeString("681edf34d206965e86b3e94f536e4246681edf34d206965e86b3e94f536e4246681edf34d206965e86b3e94f536e4246681edf34d206965e86b3e94f536e4246")
 
-	encryptBlockAsm(&rk[0], &dst[0], &src[0])
-	fmt.Printf("%x\n", dst)
+	cipher := make([]byte, 64)
+
+	sm4 := sm4Cipher{}
+	expandKey(key, &sm4.enc, &sm4.dec)
+
+	cryptoBlockAsmX4(&sm4.enc[0], &cipher[0], &plain[0])
+	fmt.Printf("Result: %x\nExpected: %x\n", cipher, expected)
+	if !reflect.DeepEqual(cipher, expected) {
+		t.Fail()
+	}
 }
 
 func Test_encryptBlockAsm(t *testing.T) {
@@ -47,7 +63,7 @@ func Test_encryptBlockAsm(t *testing.T) {
 	sm4 := sm4Cipher{}
 	expandKey(key, &sm4.enc, &sm4.dec)
 
-	encryptBlockAsm(&sm4.enc[0], &cipher[0], &plain[0])
+	cryptoBlockAsm(&sm4.enc[0], &cipher[0], &plain[0])
 	fmt.Printf("Result: %x\nExpected: %x\n", cipher, expected)
 	if !reflect.DeepEqual(cipher, expected) {
 		t.Fail()
@@ -58,7 +74,7 @@ func Test_encryptBlockAsm(t *testing.T) {
 	inter := make([]byte, 16)
 	copy(inter, plain)
 	for i:=0; i<1000000; i++ {
-		sm4.Encrypt(cipher, inter)
+		cryptoBlockAsm(&sm4.enc[0], &cipher[0], &inter[0])
 		copy(inter, cipher)
 	}
 
@@ -69,7 +85,7 @@ func Test_encryptBlockAsm(t *testing.T) {
 
 }
 
-func Benchmark_encryptBlockAsm(b *testing.B) {
+func Benchmark_encryptBlockAsmX1(b *testing.B) {
 	plain, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 	dst := make([]byte, 16)
@@ -80,7 +96,22 @@ func Benchmark_encryptBlockAsm(b *testing.B) {
 	b.ReportAllocs()
 	b.SetBytes(16)
 	for i:=0; i<b.N; i++ {
-		encryptBlockAsm(&sm4.enc[0], &dst[0], &plain[0])
+		cryptoBlockAsm(&sm4.enc[0], &dst[0], &plain[0])
+	}
+}
+
+func Benchmark_encryptBlockAsmX4(b *testing.B) {
+	plain, _ := hex.DecodeString("0123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210")
+	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
+	dst := make([]byte, 64)
+	sm4 := sm4Cipher{}
+	expandKey(key, &sm4.enc, &sm4.dec)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	b.SetBytes(64)
+	for i:=0; i<b.N; i++ {
+		cryptoBlockAsmX4(&sm4.enc[0], &dst[0], &plain[0])
 	}
 }
 

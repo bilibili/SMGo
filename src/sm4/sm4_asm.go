@@ -32,27 +32,27 @@ func (sm4 *sm4CipherAsm) BlockSize() int {return blockSize}
 func expandKeyAsm(key *byte, rk *uint32)
 
 //go:noescape
-func encryptBlockAsm(rk *uint32, dst, src *byte)
+func cryptoBlockAsm(rk *uint32, dst, src *byte)
 
 //go:noescape
-func decryptBlockAsm(rk *uint32, dst, src *byte)
+func cryptoBlockAsmX4(rk *uint32, dst, src *byte)
 
-func (sm4 *sm4CipherAsm) Encrypt(dst, src []byte) {
-	if len(src) < blockSize {
-		panic("sm4: input not full block")
+func (sm4 *sm4CipherAsm) EncryptX4(dst, src []byte) {
+	if len(src) < blockSize<<2 {
+		panic("sm4: input not 4 full blocks")
 	}
-	if len(dst) < blockSize {
-		panic("sm4: output not full block")
+	if len(dst) < blockSize<<2 {
+		panic("sm4: output not 4 full blocks")
 	}
-	encryptBlockAsm(&sm4.enc[0], &dst[0], &src[0])
+	cryptoBlockAsmX4(&sm4.enc[0], &dst[0], &src[0])
 }
 
-func (sm4 *sm4CipherAsm) Decrypt(dst, src []byte) {
-	if len(src) < blockSize {
-		panic("sm4: input not full block")
+func (sm4 *sm4CipherAsm) DecryptX4(dst, src []byte) {
+	if len(src) < blockSize<<2 {
+		panic("sm4: input not 4 full blocks")
 	}
-	if len(dst) < blockSize {
-		panic("sm4: output not full block")
+	if len(dst) < blockSize<<2 {
+		panic("sm4: output not 4 full blocks")
 	}
-	decryptBlockAsm(&sm4.enc[0], &dst[0], &src[0])
+	cryptoBlockAsmX4(&sm4.dec[0], &dst[0], &src[0])
 }
