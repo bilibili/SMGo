@@ -117,34 +117,6 @@ GLOBL SBox<>(SB), (NOPTR+RODATA), $256
     WORD    $0x4E007000 | 11<<16 | 28<<5 | 0x00 \
     WORD    $0x4E007000 | 12<<16 | 28<<5 | 0x01 \
 
-#define loadInputX2(R) \
-    LDPW    (R), (R0, R1) \
-    VMOV    R0, Z0.S[0] \
-    VMOV    R1, Z1.S[0] \
-    LDPW    8(R), (R2, R3) \
-    VMOV    R2, Z2.S[0] \
-    VMOV    R3, Z3.S[0] \
-    LDPW    16(R), (R0, R1) \
-    VMOV    R0, Z0.S[1] \
-    VMOV    R1, Z1.S[1] \
-    LDPW    24(R), (R2, R3) \
-    VMOV    R2, Z2.S[1] \
-    VMOV    R3, Z3.S[1] \
-
-#define storeOutputX2(R) \
-    VMOV    Z0.S[0], R0 \
-    VMOV    Z1.S[0], R1 \
-    STPW    (R0, R1), (R) \
-    VMOV    Z2.S[0], R2 \
-    VMOV    Z3.S[0], R3 \
-    STPW    (R2, R3), 8(R) \
-    VMOV    Z0.S[1], R0 \
-    VMOV    Z1.S[1], R1 \
-    STPW    (R0, R1), 16(R) \
-    VMOV    Z2.S[1], R2 \
-    VMOV    Z3.S[1], R3 \
-    STPW    (R2, R3), 24(R) \
-
 #define swap(A, B) \
     \//VSWP     A, B //unrecognized instruction, TODO
     VMOV    A, T0.B16 \
@@ -156,7 +128,6 @@ GLOBL SBox<>(SB), (NOPTR+RODATA), $256
     VEOR    D.B16, RK.B16, T1.B16 \
     VEOR    T0.B16, T1.B16, DST.B16 \
 
-// use VPMULL to implement the L transformation?
 // transform in-place
 #define transformL(Data) \
     VREV32  Data.B16, Data.B16 \
@@ -181,26 +152,20 @@ TEXT ·expandKeyAsm(SB),NOSPLIT,$0-16
 //func cryptoBlockAsm(rk *uint32, dst, src *byte)
 TEXT ·cryptoBlockAsm(SB),NOSPLIT,$0-24
 
-    // TODO moving data between ARM & NEON is expensive, optimize load/store X1 & X2
     #define loadInputX1(R) \
-        LDPW    (R), (R0, R1) \
-        VMOV    R0, Z0.S[0] \
-        VMOV    R1, Z1.S[0] \
-        LDPW    8(R), (R2, R3) \
-        VMOV    R2, Z2.S[0] \
-        VMOV    R3, Z3.S[0] \
+        VLD1    (R), [Z0.S4] \
+        VMOV    Z0.S[1], Z1.S[0] \
+        VMOV    Z0.S[2], Z2.S[0] \
+        VMOV    Z0.S[3], Z3.S[0] \
 
     #define storeOutputX1(R) \
-        VMOV    Z3.S[0], R3 \
-        VMOV    Z2.S[0], R2 \
-        STPW    (R3, R2), (R) \
-        VMOV    Z1.S[0], R1 \
-        VMOV    Z0.S[0], R0 \
-        STPW    (R1, R0), 8(R) \
+        VMOV    Z0.S[0], Z3.S[3] \
+        VMOV    Z1.S[0], Z3.S[2] \
+        VMOV    Z2.S[0], Z3.S[1] \
+        VST1    [Z3.B16], (R)
 
-    #define loadRoundKeyX1(idx, R) \
-        ADD     $idx, R, R1 \
-        VLD1    (R1), RK.S[0] \
+    #define loadRoundKeyX1(R) \
+        VLD1.P  4(R), RK.S[0] \
         VREV32  RK.B16, RK.B16 \
 
     #define subRoundX1(A, B, C, D, TB) \
@@ -209,14 +174,14 @@ TEXT ·cryptoBlockAsm(SB),NOSPLIT,$0-24
         transformL(TB) \
         VEOR    TB.B16, A.B16, A.B16 \
 
-    #define round(IDX, R) \
-        loadRoundKeyX1(IDX, R) \
+    #define round(R) \
+        loadRoundKeyX1(R) \
         subRoundX1(Z0, Z1, Z2, Z3, TB0) \
-        loadRoundKeyX1(IDX+4, R) \
+        loadRoundKeyX1(R) \
         subRoundX1(Z1, Z2, Z3, Z0, TB0) \
-        loadRoundKeyX1(IDX+8, R) \
+        loadRoundKeyX1(R) \
         subRoundX1(Z2, Z3, Z0, Z1, TB0) \
-        loadRoundKeyX1(IDX+12, R) \
+        loadRoundKeyX1(R) \
         subRoundX1(Z3, Z0, Z1, Z2, TB0) \
 
     loadSBox(R0)
@@ -228,27 +193,20 @@ TEXT ·cryptoBlockAsm(SB),NOSPLIT,$0-24
     VMOVI   $0x40, CONST.B16
     loadInputX1(R12)
 
-    round(0, R10)
-    round(16, R10)
-    round(32, R10)
-    round(48, R10)
-    round(64, R10)
-    round(80, R10)
-    round(96, R10)
-    round(112, R10)
-
-    //storeOutputX1(R11) // input load OK
-    //VST1    [RK.B16], (R11) // round key load OK
-    //VST1    [TB0.B16], (R11) // getXor, table lookup, transform OK
-    //VST1    [Z0.B16], (R11) // first subround OK
-    //storeOutputX1(R11) // first round OK
+    round(R10)
+    round(R10)
+    round(R10)
+    round(R10)
+    round(R10)
+    round(R10)
+    round(R10)
+    round(R10)
 
     storeOutputX1(R11)
     RET
 
-#define loadRoundKeyX4(idx, R) \
-    ADD     $idx, R, R1 \
-    VLD1    (R1), RK.S[0] \
+#define loadRoundKeyX4(R) \
+    VLD1.P  4(R), RK.S[0] \
     VDUP    RK.S[0], RK.S4 \
     VREV32  RK.B16, RK.B16 \
 
@@ -269,14 +227,14 @@ TEXT ·cryptoBlockAsmX4(SB),NOSPLIT,$0-24
         transformL(TB) \
         VEOR    TB.B16, A.B16, A.B16 \
 
-    #define roundX4(IDX, R) \
-        loadRoundKeyX4(IDX, R) \
+    #define roundX4(R) \
+        loadRoundKeyX4(R) \
         subRoundX4(Z0, Z1, Z2, Z3, TB0) \
-        loadRoundKeyX4(IDX+4, R) \
+        loadRoundKeyX4(R) \
         subRoundX4(Z1, Z2, Z3, Z0, TB0) \
-        loadRoundKeyX4(IDX+8, R) \
+        loadRoundKeyX4(R) \
         subRoundX4(Z2, Z3, Z0, Z1, TB0) \
-        loadRoundKeyX4(IDX+12, R) \
+        loadRoundKeyX4(R) \
         subRoundX4(Z3, Z0, Z1, Z2, TB0) \
 
     loadSBox(R0)
@@ -288,14 +246,14 @@ TEXT ·cryptoBlockAsmX4(SB),NOSPLIT,$0-24
     VMOVI   $0x40, CONST.B16
     loadInputX4(R12)
 
-    roundX4(0, R10)
-    roundX4(16, R10)
-    roundX4(32, R10)
-    roundX4(48, R10)
-    roundX4(64, R10)
-    roundX4(80, R10)
-    roundX4(96, R10)
-    roundX4(112, R10)
+    roundX4(R10)
+    roundX4(R10)
+    roundX4(R10)
+    roundX4(R10)
+    roundX4(R10)
+    roundX4(R10)
+    roundX4(R10)
+    roundX4(R10)
 
     storeOutputX4(R11)
     RET
@@ -324,14 +282,14 @@ TEXT ·cryptoBlockAsmX8(SB),NOSPLIT,$0-24
         VEOR    TBz.B16, A.B16, A.B16 \
         VEOR    TBy.B16, E.B16, E.B16 \
 
-    #define roundX8(IDX, R) \
-        loadRoundKeyX4(IDX, R) \
+    #define roundX8(R) \
+        loadRoundKeyX4(R) \
         subRoundX8(Z0, Z1, Z2, Z3, TB0, Y0, Y1, Y2, Y3, TB1) \
-        loadRoundKeyX4(IDX+4, R) \
+        loadRoundKeyX4(R) \
         subRoundX8(Z1, Z2, Z3, Z0, TB0, Y1, Y2, Y3, Y0, TB1) \
-        loadRoundKeyX4(IDX+8, R) \
+        loadRoundKeyX4(R) \
         subRoundX8(Z2, Z3, Z0, Z1, TB0, Y2, Y3, Y0, Y1, TB1) \
-        loadRoundKeyX4(IDX+12, R) \
+        loadRoundKeyX4(R) \
         subRoundX8(Z3, Z0, Z1, Z2, TB0, Y3, Y0, Y1, Y2, TB1) \
 
     loadSBox(R0)
@@ -343,14 +301,14 @@ TEXT ·cryptoBlockAsmX8(SB),NOSPLIT,$0-24
     VMOVI   $0x40, CONST.B16
     loadInputX8(R12)
 
-    roundX8(0, R10)
-    roundX8(16, R10)
-    roundX8(32, R10)
-    roundX8(48, R10)
-    roundX8(64, R10)
-    roundX8(80, R10)
-    roundX8(96, R10)
-    roundX8(112, R10)
+    roundX8(R10)
+    roundX8(R10)
+    roundX8(R10)
+    roundX8(R10)
+    roundX8(R10)
+    roundX8(R10)
+    roundX8(R10)
+    roundX8(R10)
 
     storeOutputX8(R11)
     RET
