@@ -37,6 +37,9 @@ func cryptoBlockAsm(rk *uint32, dst, src *byte)
 //go:noescape
 func cryptoBlockAsmX4(rk *uint32, dst, src *byte)
 
+//go:noescape
+func cryptoBlockAsmX8(rk *uint32, dst, src *byte)
+
 func (sm4 *sm4CipherAsm) EncryptX4(dst, src []byte) {
 	if len(src) < blockSize<<2 {
 		panic("sm4: input not 4 full blocks")

@@ -19,7 +19,7 @@ func Test_newCipher(t *testing.T) {
 	fmt.Println(CPU.FeatureSet())
 }
 
-func Test_encryptCrossBlock(t *testing.T) {
+func Test_encryptCrossBlockX4(t *testing.T) {
 	plain, _ := hex.DecodeString("0123456789abcdeffedcba9876543210681edf34d206965e86b3e94f536e4246f324184f3c8892b72bdc9d7c612919dece4dd6b81f6de992a830daab1f008028")
 	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 	expected, _ := hex.DecodeString("681edf34d206965e86b3e94f536e4246f324184f3c8892b72bdc9d7c612919dece4dd6b81f6de992a830daab1f00802836d33f04088dae09b94bbf39f0209d29")
@@ -30,6 +30,23 @@ func Test_encryptCrossBlock(t *testing.T) {
 	expandKey(key, &sm4.enc, &sm4.dec)
 
 	cryptoBlockAsmX4(&sm4.enc[0], &cipher[0], &plain[0])
+	fmt.Printf("Result: %x\nExpected: %x\n", cipher, expected)
+	if !reflect.DeepEqual(cipher, expected) {
+		t.Fail()
+	}
+}
+
+func Test_encryptCrossBlockX8(t *testing.T) {
+	plain, _ := hex.DecodeString("0123456789abcdeffedcba9876543210681edf34d206965e86b3e94f536e4246f324184f3c8892b72bdc9d7c612919dece4dd6b81f6de992a830daab1f00802836d33f04088dae09b94bbf39f0209d295df3683cfdb6e4574fc5a43b9b8a3e1af189be7d529ce65f3c8bcfac9943dc62b2ce8a0c7304f37675dc627f51022963")
+	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
+	expected, _ := hex.DecodeString("681edf34d206965e86b3e94f536e4246f324184f3c8892b72bdc9d7c612919dece4dd6b81f6de992a830daab1f00802836d33f04088dae09b94bbf39f0209d295df3683cfdb6e4574fc5a43b9b8a3e1af189be7d529ce65f3c8bcfac9943dc62b2ce8a0c7304f37675dc627f51022963cd4ca27a861b064e39a0c047501aad6c")
+
+	cipher := make([]byte, 128)
+
+	sm4 := sm4Cipher{}
+	expandKey(key, &sm4.enc, &sm4.dec)
+
+	cryptoBlockAsmX8(&sm4.enc[0], &cipher[0], &plain[0])
 	fmt.Printf("Result: %x\nExpected: %x\n", cipher, expected)
 	if !reflect.DeepEqual(cipher, expected) {
 		t.Fail()
@@ -112,6 +129,21 @@ func Benchmark_encryptBlockAsmX4(b *testing.B) {
 	b.SetBytes(64)
 	for i:=0; i<b.N; i++ {
 		cryptoBlockAsmX4(&sm4.enc[0], &dst[0], &plain[0])
+	}
+}
+
+func Benchmark_encryptBlockAsmX8(b *testing.B) {
+	plain, _ := hex.DecodeString("0123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210")
+	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
+	dst := make([]byte, 128)
+	sm4 := sm4Cipher{}
+	expandKey(key, &sm4.enc, &sm4.dec)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	b.SetBytes(128)
+	for i:=0; i<b.N; i++ {
+		cryptoBlockAsmX8(&sm4.enc[0], &dst[0], &plain[0])
 	}
 }
 

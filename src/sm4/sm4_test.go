@@ -21,7 +21,7 @@ func Test_genSample(t *testing.T) {
 	}
 
 	cipher := make([]byte, 16)
-	for i:=0; i<4; i++ {
+	for i:=0; i<8; i++ {
 		sm4.Encrypt(cipher, plain)
 		fmt.Printf("generated: %x\n", cipher)
 		copy(plain, cipher)

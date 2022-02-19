@@ -75,8 +75,8 @@ GLOBL SBox<>(SB), (NOPTR+RODATA), $256
 #define     T0  V11
 #define     T1  V12
 #define     T2  V13
+#define     T3  V14
 
-#define     ROTATE  V14
 #define     CONST V15
 
 #define loadSBox(Rx) \
@@ -150,14 +150,6 @@ GLOBL SBox<>(SB), (NOPTR+RODATA), $256
     VMOV    A, T0.B16 \
     VMOV    B, A \
     VMOV    T0.B16, B \
-
-#define loadInputX8(R) \
-    VLD4.P  64(R), [Z0.S4, Z1.S4, Z2.S4, Z3.S4] \
-    VLD4    64(R), [Y0.S4, Y1.S4, Y2.S4, Y3.S4] \
-
-#define storeOutputX8(R) \
-    VST4.P  [Z0.S4, Z1.S4, Z2.S4, Z3.S4], 64(R) \
-    VST4    [Y0.S4, Y1.S4, Y2.S4, Y3.S4], 64(R) \
 
 #define getXor(B, C, D, DST) \
     VEOR    B.B16, C.B16, T0.B16 \
@@ -254,6 +246,12 @@ TEXT ·cryptoBlockAsm(SB),NOSPLIT,$0-24
     storeOutputX1(R11)
     RET
 
+#define loadRoundKeyX4(idx, R) \
+    ADD     $idx, R, R1 \
+    VLD1    (R1), RK.S[0] \
+    VDUP    RK.S[0], RK.S4 \
+    VREV32  RK.B16, RK.B16 \
+
 //func cryptoBlockAsmX4(rk *uint32, dst, src *byte)
 TEXT ·cryptoBlockAsmX4(SB),NOSPLIT,$0-24
 
@@ -264,12 +262,6 @@ TEXT ·cryptoBlockAsmX4(SB),NOSPLIT,$0-24
         swap(Z0.B16, Z3.B16) \
         swap(Z1.B16, Z2.B16) \
         VST4    [Z0.S4, Z1.S4, Z2.S4, Z3.S4], (R) \
-
-    #define loadRoundKeyX4(idx, R) \
-        ADD     $idx, R, R1 \
-        VLD1    (R1), RK.S[0] \
-        VDUP    RK.S[0], RK.S4 \
-        VREV32  RK.B16, RK.B16 \
 
     #define subRoundX4(A, B, C, D, TB) \
         getXor(B, C, D, TB) \
@@ -306,5 +298,60 @@ TEXT ·cryptoBlockAsmX4(SB),NOSPLIT,$0-24
     roundX4(112, R10)
 
     storeOutputX4(R11)
+    RET
+
+//func cryptoBlockAsmX8(rk *uint32, dst, src *byte)
+TEXT ·cryptoBlockAsmX8(SB),NOSPLIT,$0-24
+
+    #define loadInputX8(R) \
+        VLD4.P  64(R), [Z0.S4, Z1.S4, Z2.S4, Z3.S4] \
+        VLD4.P  64(R), [Y0.S4, Y1.S4, Y2.S4, Y3.S4] \
+
+    #define storeOutputX8(R) \
+        swap(Z0.B16, Z3.B16) \
+        swap(Z1.B16, Z2.B16) \
+        swap(Y0.B16, Y3.B16) \
+        swap(Y1.B16, Y2.B16) \
+        VST4.P  [Z0.S4, Z1.S4, Z2.S4, Z3.S4], 64(R) \
+        VST4.P  [Y0.S4, Y1.S4, Y2.S4, Y3.S4], 64(R) \
+
+    #define subRoundX8(A, B, C, D, TBz, E, F, G, H, TBy) \
+        getXor(B, C, D, TBz) \
+        getXor(F, G, H, TBy) \
+        tableLookupX8() \
+        transformL(TBz) \
+        transformL(TBy) \
+        VEOR    TBz.B16, A.B16, A.B16 \
+        VEOR    TBy.B16, E.B16, E.B16 \
+
+    #define roundX8(IDX, R) \
+        loadRoundKeyX4(IDX, R) \
+        subRoundX8(Z0, Z1, Z2, Z3, TB0, Y0, Y1, Y2, Y3, TB1) \
+        loadRoundKeyX4(IDX+4, R) \
+        subRoundX8(Z1, Z2, Z3, Z0, TB0, Y1, Y2, Y3, Y0, TB1) \
+        loadRoundKeyX4(IDX+8, R) \
+        subRoundX8(Z2, Z3, Z0, Z1, TB0, Y2, Y3, Y0, Y1, TB1) \
+        loadRoundKeyX4(IDX+12, R) \
+        subRoundX8(Z3, Z0, Z1, Z2, TB0, Y3, Y0, Y1, Y2, TB1) \
+
+    loadSBox(R0)
+
+	MOVD	rk+0(FP), R10
+	MOVD	dst+8(FP), R11
+	MOVD	src+16(FP), R12
+
+    VMOVI   $0x40, CONST.B16
+    loadInputX8(R12)
+
+    roundX8(0, R10)
+    roundX8(16, R10)
+    roundX8(32, R10)
+    roundX8(48, R10)
+    roundX8(64, R10)
+    roundX8(80, R10)
+    roundX8(96, R10)
+    roundX8(112, R10)
+
+    storeOutputX8(R11)
     RET
 
