@@ -102,6 +102,30 @@ func Test_encryptBlockAsm(t *testing.T) {
 
 }
 
+func Test_encryptBlockAsmX16(t *testing.T) {
+	plainX1, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
+	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
+
+	cipher := make([]byte, 256)
+	expected := make([]byte, 256)
+
+	sm4 := sm4Cipher{}
+	expandKey(key, &sm4.enc, &sm4.dec)
+
+	plainX16 := make([]byte, 272)
+	copy(plainX16, plainX1)
+	for i:=0; i<16; i++ {
+		sm4.Encrypt(expected[i*16:], plainX16[i*16:])
+		copy(plainX16[(i+1)*16 : (i+2)*16], expected[i*16 : (i+1)*16])
+	}
+
+	cryptoBlockAsmX16(&sm4.enc[0], &cipher[0], &plainX16[0])
+	fmt.Printf("Result:   %x\nExpected: %x\n", cipher, expected)
+	if !reflect.DeepEqual(cipher, expected) {
+		t.Fail()
+	}
+}
+
 func Benchmark_encryptBlockAsmX1(b *testing.B) {
 	plain, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
@@ -144,6 +168,21 @@ func Benchmark_encryptBlockAsmX8(b *testing.B) {
 	b.SetBytes(128)
 	for i:=0; i<b.N; i++ {
 		cryptoBlockAsmX8(&sm4.enc[0], &dst[0], &plain[0])
+	}
+}
+
+func Benchmark_encryptBlockAsmX16(b *testing.B) {
+	plain, _ := hex.DecodeString("0123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210")
+	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
+	dst := make([]byte, 256)
+	sm4 := sm4Cipher{}
+	expandKey(key, &sm4.enc, &sm4.dec)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	b.SetBytes(256)
+	for i:=0; i<b.N; i++ {
+		cryptoBlockAsmX16(&sm4.enc[0], &dst[0], &plain[0])
 	}
 }
 
