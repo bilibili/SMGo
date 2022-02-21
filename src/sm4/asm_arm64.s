@@ -320,7 +320,6 @@ TEXT ·cryptoBlockAsmX8(SB),NOSPLIT,$0-24
 //func cryptoBlockAsmX16Internal(rk *uint32, dst, src, tmp *byte)
 TEXT ·cryptoBlockAsmX16Internal(SB),NOSPLIT,$0-32
 
-    // stash/pop could be optimized to stash/pop only 1 vector register instead of 4 TODO
     #define stashZ(R) \
         VST1    [Z0.B16, Z1.B16, Z2.B16, Z3.B16], (R) \
 
@@ -333,7 +332,7 @@ TEXT ·cryptoBlockAsmX16Internal(SB),NOSPLIT,$0-32
     #define popY(R) \
         VLD1    (R), [Y0.B16, Y1.B16, Y2.B16, Y3.B16] \
 
-    #define loadInputX16(R) \ // optimize later, does not matter much here though
+    #define loadInputX16(R) \
         loadInputX8(R) \
         stashZ(StashZ) \
         stashY(StashY) \
@@ -353,7 +352,8 @@ TEXT ·cryptoBlockAsmX16Internal(SB),NOSPLIT,$0-32
     // interleaved to hide the latency of TBL and TBX
     // block1: V0 -> V11 -> V13 -> V11
     // block2: V1 -> V12 -> V14 -> V12
-    // use Z0~Z3(V2~V5) as T0~T3(V11~V14), use Y0/V7 as TB0/V0, Y1/V8 as TB1/V1
+    // use Z0~Z3(V2~V5) same way as T0~T3(V11~V14), use Y0/V7 as TB0/V0, Y1/V8 as TB1/V1
+    // see tableLookupX8 if confused
     #define tableLookupX16() \
         \// 1st
         VSUB    CONST.B16, V0.B16, V11.B16 \
@@ -394,13 +394,11 @@ TEXT ·cryptoBlockAsmX16Internal(SB),NOSPLIT,$0-32
         getXor(F, G, H, TBy) \
         \// Zx for 1st 4 blocks and Yx for 2nd 4 blocks swapped out:
         stashY(StashY) \
-        popZ(StashX) \ // leaving optimization later
+        popZ(StashX) \
         getXor(B, C, D, Y0) \ // we are running out of vector registers so let's reuse some
         popZ(StashW) \
         getXor(B, C, D, Y1) \
         \// Then we can go with table lookup
-        \// we need Z registers as temporal states (much the same as T0~T3)
-        \// theoretically we can avoid A/E to save stash/pop, but we then will need 4 copies of subRoundX16 and tableLookupX16 as VTBX has to be encoded with machine code
         tableLookupX16() \
         \// And in-place transformation
         transformL(TBz) \
