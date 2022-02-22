@@ -1,6 +1,7 @@
 package sm4
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	"fmt"
 	. "github.com/klauspost/cpuid/v2"
@@ -193,5 +194,66 @@ func Test_printDataBlock(t *testing.T) {
 			fmt.Printf("%02x", sbox[i*8 + 7 - j])
 		}
 		fmt.Println()
+	}
+}
+
+func Test_printCKeys(t *testing.T) {
+	for i:=0; i<32; i++ {
+		fmt.Printf("DATA CK<>+0x%02x(SB)/4, $0x", i*4)
+		fmt.Printf("%08x\n", ck[i])
+	}
+}
+
+func Test_expandKeyAsmZeroKey(t *testing.T) {
+	key := make([]byte, 16)
+
+	ref := sm4Cipher{}
+	tested := sm4Cipher{}
+
+	expandKey(key, &ref.enc, &ref.dec)
+	expandKeyAsm(&key[0], &tested.enc[0], &tested.dec[0])
+
+	if !reflect.DeepEqual(ref.enc, tested.enc) || !reflect.DeepEqual(ref.dec, tested.dec) {
+		fmt.Printf("key: %x\n", key)
+		fmt.Printf("Go enc: %08x\n   dec: %08x\n", ref.enc, ref.dec)
+		fmt.Printf("Asm enc:%08x\n   dec: %08x\n", tested.enc, tested.dec)
+		t.Fail()
+	}
+}
+
+
+
+func Test_expandKeyAsmFixedKey(t *testing.T) {
+	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
+
+	ref := sm4Cipher{}
+	tested := sm4Cipher{}
+
+	expandKey(key, &ref.enc, &ref.dec)
+	expandKeyAsm(&key[0], &tested.enc[0], &tested.dec[0])
+
+	if !reflect.DeepEqual(ref.enc, tested.enc) || !reflect.DeepEqual(ref.dec, tested.dec) {
+		fmt.Printf("key: %x\n", key)
+		fmt.Printf("Go enc: %08x\n   dec: %08x\n", ref.enc, ref.dec)
+		fmt.Printf("Asm enc:%08x\n   dec: %08x\n", tested.enc, tested.dec)
+		t.Fail()
+	}
+}
+
+func Test_expandKeyAsmRandomKey(t *testing.T) {
+	key := make([]byte, 16)
+	rand.Read(key)
+
+	ref := sm4Cipher{}
+	tested := sm4Cipher{}
+
+	expandKey(key, &ref.enc, &ref.dec)
+	expandKeyAsm(&key[0], &tested.enc[0], &tested.dec[0])
+
+	if !reflect.DeepEqual(ref.enc, tested.enc) || !reflect.DeepEqual(ref.dec, tested.dec) {
+		fmt.Printf("key: %x\n", key)
+		fmt.Printf("Go enc: %08x\n   dec: %08x\n", ref.enc, ref.dec)
+		fmt.Printf("Asm enc:%08x\n   dec: %08x\n", tested.enc, tested.dec)
+		t.Fail()
 	}
 }

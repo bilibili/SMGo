@@ -7,29 +7,28 @@ package sm4
 
 import (
 	"crypto/cipher"
-	. "github.com/klauspost/cpuid/v2"
 )
 
 type sm4CipherAsm struct {
 	sm4Cipher
 }
 
-var candoAsm = CPU.Supports(PMULL) // for ARM64 we implement with NEON and PMULL, and NEON should be available by default
+//var candoAsm = CPU.Supports(PMULL) // for ARM64 we implement with NEON and PMULL, and NEON should be available by default
 
 func newCipher(key []byte) (cipher.Block, error) {
-	if !candoAsm {
-		return newCipherGeneric(key)
-	}
-
+	//if !candoAsm {
+	//	return newCipherGeneric(key)
+	//}
+	//
 	sm4 := sm4CipherAsm{}
-	expandKeyAsm(&key[0], &sm4.enc[0])
+	expandKeyAsm(&key[0], &sm4.enc[0], &sm4.dec[0])
 	return &sm4, nil
 }
 
 func (sm4 *sm4CipherAsm) BlockSize() int {return blockSize}
 
 //go:noescape
-func expandKeyAsm(key *byte, rk *uint32)
+func expandKeyAsm(key *byte, enc, dec *uint32)
 
 //go:noescape
 func cryptoBlockAsm(rk *uint32, dst, src *byte)

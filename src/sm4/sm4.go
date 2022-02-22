@@ -222,14 +222,15 @@ func ssX2(t uint64) uint64 {
 }
 
 func expandKey(mk []byte, enc, dec *[32]uint32) {
-	var k [36]uint32
+	var k0, k1, k2, k3 uint32
 	var mks [4] uint32
 	byte16ToUint32(mk[:], mks[:])
-	k[0], k[1], k[2], k[3] = mks[0]^fk0, mks[1]^fk1, mks[2]^fk2, mks[3]^fk3
-	for i := 0; i < 32; i++ {
-		k[i+4] = k[i] ^ transTPrime(k[i+1]^k[i+2]^k[i+3]^ck[i])
-		enc[i] = k[i+4]
-		dec[31-i] = enc[i]
+	k0, k1, k2, k3 = mks[0]^fk0, mks[1]^fk1, mks[2]^fk2, mks[3]^fk3
+	for i := 0; i < 32;  {
+		k0 ^= transTPrime(k1^k2^k3^ck[i]); enc[i] = k0; dec[31-i] = k0; i++
+		k1 ^= transTPrime(k2^k3^k0^ck[i]); enc[i] = k1; dec[31-i] = k1; i++
+		k2 ^= transTPrime(k3^k0^k1^ck[i]); enc[i] = k2; dec[31-i] = k2; i++
+		k3 ^= transTPrime(k0^k1^k2^ck[i]); enc[i] = k3; dec[31-i] = k3; i++
 	}
 }
 func byte16ToUint32(bytes []byte, uints []uint32) {

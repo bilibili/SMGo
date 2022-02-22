@@ -41,6 +41,47 @@ DATA SBox<>+0xf0(SB)/8, $0x204ddc3aec7df018
 DATA SBox<>+0xf8(SB)/8, $0x4839cbd73e5fee79
 GLOBL SBox<>(SB), (NOPTR+RODATA), $256
 
+//partially reversed
+DATA FK<>+0x00(SB)/4, $0xa3b1bac6
+DATA FK<>+0x04(SB)/4, $0x56aa3350
+DATA FK<>+0x08(SB)/4, $0x677d9197
+DATA FK<>+0x0c(SB)/4, $0xb27022dc
+GLOBL FK<>(SB), (NOPTR+RODATA), $16
+
+DATA CK<>+0x00(SB)/4, $0x00070e15
+DATA CK<>+0x04(SB)/4, $0x1c232a31
+DATA CK<>+0x08(SB)/4, $0x383f464d
+DATA CK<>+0x0c(SB)/4, $0x545b6269
+DATA CK<>+0x10(SB)/4, $0x70777e85
+DATA CK<>+0x14(SB)/4, $0x8c939aa1
+DATA CK<>+0x18(SB)/4, $0xa8afb6bd
+DATA CK<>+0x1c(SB)/4, $0xc4cbd2d9
+DATA CK<>+0x20(SB)/4, $0xe0e7eef5
+DATA CK<>+0x24(SB)/4, $0xfc030a11
+DATA CK<>+0x28(SB)/4, $0x181f262d
+DATA CK<>+0x2c(SB)/4, $0x343b4249
+DATA CK<>+0x30(SB)/4, $0x50575e65
+DATA CK<>+0x34(SB)/4, $0x6c737a81
+DATA CK<>+0x38(SB)/4, $0x888f969d
+DATA CK<>+0x3c(SB)/4, $0xa4abb2b9
+DATA CK<>+0x40(SB)/4, $0xc0c7ced5
+DATA CK<>+0x44(SB)/4, $0xdce3eaf1
+DATA CK<>+0x48(SB)/4, $0xf8ff060d
+DATA CK<>+0x4c(SB)/4, $0x141b2229
+DATA CK<>+0x50(SB)/4, $0x30373e45
+DATA CK<>+0x54(SB)/4, $0x4c535a61
+DATA CK<>+0x58(SB)/4, $0x686f767d
+DATA CK<>+0x5c(SB)/4, $0x848b9299
+DATA CK<>+0x60(SB)/4, $0xa0a7aeb5
+DATA CK<>+0x64(SB)/4, $0xbcc3cad1
+DATA CK<>+0x68(SB)/4, $0xd8dfe6ed
+DATA CK<>+0x6c(SB)/4, $0xf4fb0209
+DATA CK<>+0x70(SB)/4, $0x10171e25
+DATA CK<>+0x74(SB)/4, $0x2c333a41
+DATA CK<>+0x78(SB)/4, $0x484f565d
+DATA CK<>+0x7c(SB)/4, $0x646b7279
+GLOBL CK<>(SB), (NOPTR+RODATA), $128
+
 // Register allocation
 // V16 ~ V31: SBox
 // V15: constant for table lookup
@@ -141,7 +182,75 @@ GLOBL SBox<>(SB), (NOPTR+RODATA), $256
     transformL(TB) \
     VEOR    TB.B16, A.B16, A.B16 \
 
-TEXT ·expandKeyAsm(SB),NOSPLIT,$0-16
+TEXT ·expandKeyAsm(SB),NOSPLIT,$0-24
+
+    #define getXorWCk(B, C, D, DST) \
+        VEOR    B.B16, C.B16, T0.B16 \
+        VEOR    D.B16, RK.B16, T1.B16 \
+        VEOR    T0.B16, T1.B16, DST.B16 \
+
+    #define saveKeys(Renc, Rdec, A) \
+        VST1.P  A.S[0], 4(Renc) \
+        VST1    A.S[0], (Rdec) \
+        SUB     $4, Rdec, Rdec \
+
+    #define loadCKey(R) \
+        VLD1.P  4(R), RK.S[0] \
+
+    #define transformLPrime(Data) \
+        VSHL    $13,  Data.S4, T0.S4 \
+        VSRI    $19, Data.S4, T0.S4 \
+        VSHL    $23, Data.S4, T1.S4 \
+        VSRI    $9, Data.S4, T1.S4 \
+        VEOR    T0.B16, T1.B16, T0.B16 \
+        VEOR    T0.B16, Data.B16, Data.B16 \
+
+    #define expandSubRound(A, B, C, D, Renc, Rdec) \
+        loadCKey(R13) \
+        getXorWCk(B, C, D, TB0) \
+        tableLookupX4() \
+        transformLPrime(TB0) \
+        VEOR    TB0.B16, A.B16, A.B16 \
+        saveKeys(Renc, Rdec, A) \
+
+    #define expandRound(Renc, Rdec) \
+        expandSubRound(Z0, Z1, Z2, Z3, Renc, Rdec) \
+        expandSubRound(Z1, Z2, Z3, Z0, Renc, Rdec) \
+        expandSubRound(Z2, Z3, Z0, Z1, Renc, Rdec) \
+        expandSubRound(Z3, Z0, Z1, Z2, Renc, Rdec) \
+
+    loadSBox(R0)
+
+	MOVD	mk+0(FP), R10
+	MOVD	enc+8(FP), R11
+	MOVD	dec+16(FP), R12
+	MOVD    $CK<>(SB), R13
+
+    ADD     $124, R12, R12
+
+    VMOVI   $0x40, CONST.B16
+
+    // load FKs into Yx
+    MOVD    $FK<>(SB), R1
+    VLD1    (R1), [Y0.S4]
+
+    VLD1    (R10), [Z0.S4]
+    VREV32  Z0.B16, Z0.B16
+
+    VEOR    Y0.B16, Z0.B16, Z0.B16
+
+    VMOV    Z0.S[1], Z1.S[0]
+    VMOV    Z0.S[2], Z2.S[0]
+    VMOV    Z0.S[3], Z3.S[0]
+
+    expandRound(R11, R12)
+    expandRound(R11, R12)
+    expandRound(R11, R12)
+    expandRound(R11, R12)
+    expandRound(R11, R12)
+    expandRound(R11, R12)
+    expandRound(R11, R12)
+    expandRound(R11, R12)
 
     RET
 
