@@ -153,6 +153,18 @@ GLOBL CK<>(SB), (NOPTR+RODATA), $128
     VMOV    B, A \
     VMOV    T0.B16, B \
 
+#define revZ() \
+    VREV32  Z0.B16, Z0.B16 \
+    VREV32  Z1.B16, Z1.B16 \
+    VREV32  Z2.B16, Z2.B16 \
+    VREV32  Z3.B16, Z3.B16 \
+
+#define revY() \
+    VREV32  Y0.B16, Y0.B16 \
+    VREV32  Y1.B16, Y1.B16 \
+    VREV32  Y2.B16, Y2.B16 \
+    VREV32  Y3.B16, Y3.B16 \
+
 // It should only use T0 & T1 as drafts
 #define getXor(B, C, D, DST) \
     VEOR    B.B16, C.B16, T0.B16 \
@@ -161,7 +173,6 @@ GLOBL CK<>(SB), (NOPTR+RODATA), $128
 
 // transform in-place
 #define transformL(Data) \
-    VREV32  Data.B16, Data.B16 \
     VSHL    $2,  Data.S4, T0.S4 \
     VSRI    $30, Data.S4, T0.S4 \
     VSHL    $10, Data.S4, T1.S4 \
@@ -174,7 +185,6 @@ GLOBL CK<>(SB), (NOPTR+RODATA), $128
     VEOR    T2.B16, T1.B16, T2.B16 \
     VEOR    T0.B16, T2.B16, T0.B16 \
     VEOR    T0.B16, Data.B16, Data.B16 \
-    VREV32  Data.B16, Data.B16 \
 
 #define subRoundX4(A, B, C, D, TB) \
     getXor(B, C, D, TB) \
@@ -262,8 +272,10 @@ TEXT ·cryptoBlockAsm(SB),NOSPLIT,$0-24
         VLD1.P  4(R), Z1.S[0] \
         VLD1.P  4(R), Z2.S[0] \
         VLD1.P  4(R), Z3.S[0] \
+        revZ() \
 
     #define storeOutputX1(R) \
+        revZ() \
         VST1.P  Z3.S[0], 4(R) \
         VST1.P  Z2.S[0], 4(R) \
         VST1.P  Z1.S[0], 4(R) \
@@ -271,7 +283,6 @@ TEXT ·cryptoBlockAsm(SB),NOSPLIT,$0-24
 
     #define loadRoundKeyX1(R) \
         VLD1.P  4(R), RK.S[0] \
-        VREV32  RK.B16, RK.B16 \
 
     #define round(R) \
         loadRoundKeyX1(R) \
@@ -307,13 +318,16 @@ TEXT ·cryptoBlockAsm(SB),NOSPLIT,$0-24
 #define loadRoundKeyX4(R) \
     VLD1.P  4(R), RK.S[0] \
     VDUP    RK.S[0], RK.S4 \
-    VREV32  RK.B16, RK.B16 \
 
 #define loadInputX8(R) \
     VLD4.P  64(R), [Z0.S4, Z1.S4, Z2.S4, Z3.S4] \
     VLD4.P  64(R), [Y0.S4, Y1.S4, Y2.S4, Y3.S4] \
+    revZ() \
+    revY() \
 
 #define storeOutputX8(R) \
+    revZ() \
+    revY() \
     swap(Z0.B16, Z3.B16) \
     swap(Z1.B16, Z2.B16) \
     swap(Y0.B16, Y3.B16) \
@@ -326,8 +340,10 @@ TEXT ·cryptoBlockAsmX4(SB),NOSPLIT,$0-24
 
     #define loadInputX4(R) \
         VLD4    (R), [Z0.S4, Z1.S4, Z2.S4, Z3.S4] \
+        revZ() \
 
     #define storeOutputX4(R) \
+        revZ() \
         swap(Z0.B16, Z3.B16) \
         swap(Z1.B16, Z2.B16) \
         VST4    [Z0.S4, Z1.S4, Z2.S4, Z3.S4], (R) \
