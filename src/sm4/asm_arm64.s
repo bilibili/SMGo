@@ -1,5 +1,7 @@
 // Copyright 2021 ~ 2022 bilibili. All rights reserved. Author: Guo, Weiji guoweiji@bilibili.com
+// This source file contains patented technique. A written permission must be obtained from bilibili prior to commercial use.
 // 哔哩哔哩版权所有 2021 ~ 2022。作者：郭伟基 guoweiji@bilibili.com
+// 本源程序文件含有专利技术实现。如用于商业目的，须事先取得B站的书面许可。
 
 // "table lookup in NEON" method credited to Ard Biesheuve from Linaro, see https://www.linaro.org/blog/accelerated-aes-for-the-arm64-linux-kernel/
 // ARM opcode refs: https://github.com/CAS-Atlantic/AArch64-Encoding
@@ -41,7 +43,6 @@ DATA SBox<>+0xf0(SB)/8, $0x204ddc3aec7df018
 DATA SBox<>+0xf8(SB)/8, $0x4839cbd73e5fee79
 GLOBL SBox<>(SB), (NOPTR+RODATA), $256
 
-//partially reversed
 DATA FK<>+0x00(SB)/4, $0xa3b1bac6
 DATA FK<>+0x04(SB)/4, $0x56aa3350
 DATA FK<>+0x08(SB)/4, $0x677d9197
@@ -107,7 +108,7 @@ GLOBL CK<>(SB), (NOPTR+RODATA), $128
 #define     Z2  V4
 #define     Z3  V5
 
-// round key, loaded per round
+// round key, loaded per round; also used to load CK during key expansion
 #define     RK  V6
 
 // 2nd set of state if we are going to do 2X (1X deals with up to 4 blocks in parallel, 2X 8 blocks)
