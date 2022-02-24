@@ -5,6 +5,7 @@ package internal
 
 import (
 	"crypto/elliptic"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math"
@@ -43,6 +44,12 @@ func GetN() *big.Int {
 	return new(big.Int).Set(getCurve().Params().N)
 }
 
+func GetZBytes() []byte {
+	// a || b || Gx || Gy
+	ret, _ := hex.DecodeString("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFC28E9FA9E9D9F5E344D5A9E4BCF6509A7F39789F515AB8F92DDBCBD414D940E9332C4AE2C1F1981195F9904466A39C9948FE30BBFF2660BE1715A4589334C74C7BC3736A2F4F6779C59BDCEE36B692153D0A9877CC62A474002DF32E52139F0A0")
+	return ret
+}
+
 func (curve sm2Curve) Params() *elliptic.CurveParams {
 	return curve.params
 }
@@ -50,7 +57,7 @@ func (curve sm2Curve) Params() *elliptic.CurveParams {
 // ScalarMult Scalar multiplication, returns [scalar]P when no error.
 // scalar is big endian and its integer value should lie in range of [1, n-1]
 // ***secure implementation***, this could be used for ECDH with unsigned 4-NAF
-func ScalarMult(P *SM2Point, scalar *[]byte) (*SM2Point, error) {
+func ScalarMult(P *SM2Point, scalar []byte) (*SM2Point, error) {
 	const nafWindowWidth = 4
 	const nafPrecomputes = 1 << nafWindowWidth - 1
 
@@ -67,7 +74,7 @@ func ScalarMult(P *SM2Point, scalar *[]byte) (*SM2Point, error) {
 
 	skip := true
 	ret := NewSM2Point()
-	for _, b := range *scalar {
+	for _, b := range scalar {
 		if !skip {
 			ret.Double(ret)
 			ret.Double(ret)
@@ -97,7 +104,7 @@ func ScalarMult(P *SM2Point, scalar *[]byte) (*SM2Point, error) {
 // k is big endian and its integer value should lie in range of [1, n-1]
 // ***secure implementation***, this could be used for
 // sign or key generation, all sensitive operations
-func ScalarBaseMult(k *[]byte) (*SM2Point, error) {
+func ScalarBaseMult(k []byte) (*SM2Point, error) {
 	//return scalarBaseMult_SkipBitExtraction_4_2_32(k)
 	//return scalarBaseMult_SkipBitExtraction_5_3_17(k)
 	return scalarBaseMult_SkipBitExtraction_6_3_14(k)
@@ -108,7 +115,7 @@ func ScalarBaseMult(k *[]byte) (*SM2Point, error) {
 // gScalar and scalar are big endian and their integer values should lie in range of [1, n-1]
 // usually used for signature verification and not sensitive
 // This is an internal function. Do NOT use it out of this library. Use sm2.* functions instead.
-func ScalarMixedMult_Unsafe(gScalar *[]byte, P *SM2Point, scalar *[]byte) (*SM2Point, error) {
+func ScalarMixedMult_Unsafe(gScalar []byte, P *SM2Point, scalar []byte) (*SM2Point, error) {
 	// signed 4-NAF
 	const nafWindowWidth = 4
 	const nafPrecomputes = 1 << (nafWindowWidth -1) // 8
@@ -198,7 +205,7 @@ func ScalarMixedMult_Unsafe(gScalar *[]byte, P *SM2Point, scalar *[]byte) (*SM2P
 // the algorithm. We need to pre-compute 204 points, which is less than
 // 13 KB static data. This should fit into the L1 cache of most modern
 // processors, at least those 64 bit ones.
-func scalarBaseMult_SkipBitExtraction_6_3_14(k *[]byte) (*SM2Point, error) {
+func scalarBaseMult_SkipBitExtraction_6_3_14(k []byte) (*SM2Point, error) {
 	return scalarBaseMult_SkipBitExtration(k, &sm2Precomputed_6_3_14, &sm2Precomputed_6_3_14_Remainder, 6, 3, 14, 4)
 }
 
@@ -207,19 +214,19 @@ func scalarBaseMult_SkipBitExtraction_6_3_14(k *[]byte) (*SM2Point, error) {
 // and no branching)
 // The runtime cost is 16 DOUBLE + 49 ADD, plus, about half caching of static data
 // as compared to 6-3-14 scheme.
-func scalarBaseMult_SkipBitExtraction_5_3_17(k *[]byte) (*SM2Point, error) {
+func scalarBaseMult_SkipBitExtraction_5_3_17(k []byte) (*SM2Point, error) {
 	return scalarBaseMult_SkipBitExtration(k, &sm2Precomputed_5_3_17, &sm2Precomputed_5_3_17_Remainder,5, 3, 17, 1)
 }
 
-func scalarBaseMult_SkipBitExtraction_4_2_32(k *[]byte) (*SM2Point, error) {
+func scalarBaseMult_SkipBitExtraction_4_2_32(k []byte) (*SM2Point, error) {
 	return scalarBaseMult_SkipBitExtration(k, &sm2Precomputed_4_2_32, nil,4, 2, 32, 0)
 }
 
-func scalarBaseMult_SkipBitExtraction_7_3_12(k *[]byte) (*SM2Point, error) {
+func scalarBaseMult_SkipBitExtraction_7_3_12(k []byte) (*SM2Point, error) {
 	return scalarBaseMult_SkipBitExtration(k, &sm2Precomputed_7_3_12, &sm2Precomputed_7_3_12_Remainder,7, 3, 12, 4)
 }
 
-func scalarBaseMult_SkipBitExtration(k *[]byte, first *[][][]*[4]uint64, second *[][]*[4]uint64,
+func scalarBaseMult_SkipBitExtration(k []byte, first *[][][]*[4]uint64, second *[][]*[4]uint64,
 	window, subTableCount, iterations, remainder int) (*SM2Point, error) {
 
 	if window > 8 || remainder < 0 || remainder > 4 {
@@ -236,8 +243,8 @@ func scalarBaseMult_SkipBitExtration(k *[]byte, first *[][][]*[4]uint64, second 
 	}
 
 	// k should be in big endian and 32 bytes or this algorithm does not work
-	if len(*k) != SM2ElementLength {
-		return nil, errors.New(fmt.Sprintf("scalar length (%d) is not %d", len(*k), SM2ElementLength))
+	if len(k) != SM2ElementLength {
+		return nil, errors.New(fmt.Sprintf("scalar length (%d) is not %d", len(k), SM2ElementLength))
 	}
 
 	ret := NewSM2Point()
@@ -279,7 +286,7 @@ func scalarBaseMult_SkipBitExtration(k *[]byte, first *[][][]*[4]uint64, second 
 	return ret, nil
 }
 
-func extractHigherBits(k *[]byte, idx, window, stepSize int) byte {
+func extractHigherBits(k []byte, idx, window, stepSize int) byte {
 	var bits = byte(0)
 
 	for i:=0; i<window; i++ {
@@ -290,10 +297,10 @@ func extractHigherBits(k *[]byte, idx, window, stepSize int) byte {
 }
 
 // extractBit extracts the specified bit from byte array in constant time
-func extractBit(k *[]byte, idx int) byte {
+func extractBit(k []byte, idx int) byte {
 	// k is in big endian so higher index means more on the left
 	byteIdx := SM2ElementLength -1 - idx>>3
-	byteValue := (*k)[byteIdx]
+	byteValue := k[byteIdx]
 
 	bitIdx := idx & 7
 	bitValue := byteValue >> bitIdx
@@ -301,8 +308,8 @@ func extractBit(k *[]byte, idx int) byte {
 	return bitValue & 1
 }
 
-func extractLowerBits(k *[]byte, count int) byte {
-	b := (*k)[SM2ElementLength - 1]
+func extractLowerBits(k []byte, count int) byte {
+	b := k[SM2ElementLength - 1]
 	return b & (1<<count - 1)
 }
 
@@ -323,9 +330,9 @@ func selectPoints(out *SM2Point, precomputed *[][]*[4]uint64, width int, bits by
 // slow and UNSAFE version first: let's run double and add
 // not meant for external use, serves as baseline for correctness
 // 注意，GM/T 0003.1-2012第四节所规定的数据类型转换，要求使用big endian（即自然序，最左边的权重最大，例如123表示100+20+3）
-func scalarMult_Unsafe_DaA(q *SM2Point, scalar *[]byte) (*SM2Point, error) {
+func scalarMult_Unsafe_DaA(q *SM2Point, scalar []byte) (*SM2Point, error) {
 	out := NewSM2Point()
-	for _, b := range *scalar {
+	for _, b := range scalar {
 		for bitNum := 0; bitNum < 8; bitNum++ {
 			out.Double(out)
 			if b&0x80 == 0x80 {

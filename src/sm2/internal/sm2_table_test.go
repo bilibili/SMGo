@@ -21,7 +21,7 @@ func Test_6_3_14(t *testing.T) {
 	p := makePoint(px, py)
 
 	b = makeBigInt([]int64{4})
-	q, _ = scalarMult_Unsafe_DaA(NewSM2Generator(), &b)
+	q, _ = scalarMult_Unsafe_DaA(NewSM2Generator(), b)
 
 	if !reflect.DeepEqual(p.Bytes_Unsafe(), q.Bytes_Unsafe()) {
 		t.Fail()
@@ -33,7 +33,7 @@ func Test_6_3_14(t *testing.T) {
 	p = makePoint(px, py)
 
 	b = makeBigInt([]int64{210, 168, 126, 84, 42, 0})
-	q, _ = scalarMult_Unsafe_DaA(makePoint(sm2Precomputed_6_3_14[0][0][0], sm2Precomputed_6_3_14[0][1][0]), &b)
+	q, _ = scalarMult_Unsafe_DaA(makePoint(sm2Precomputed_6_3_14[0][0][0], sm2Precomputed_6_3_14[0][1][0]), b)
 	if !reflect.DeepEqual(p.Bytes_Unsafe(), q.Bytes_Unsafe()) {
 		t.Fail()
 	}
@@ -44,7 +44,7 @@ func Test_6_3_14(t *testing.T) {
 	p = makePoint(px, py)
 
 	b = makeBigInt([]int64{224, 182, 140, 98, 56, 14})
-	q, _ = scalarMult_Unsafe_DaA(makePoint(sm2Precomputed_6_3_14[0][0][0], sm2Precomputed_6_3_14[0][1][0]), &b)
+	q, _ = scalarMult_Unsafe_DaA(makePoint(sm2Precomputed_6_3_14[0][0][0], sm2Precomputed_6_3_14[0][1][0]), b)
 	if !reflect.DeepEqual(p.Bytes_Unsafe(), q.Bytes_Unsafe()) {
 		t.Fail()
 	}

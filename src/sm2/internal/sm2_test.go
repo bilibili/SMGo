@@ -28,7 +28,7 @@ func TestSM2Point_ScalarBaseMult(t *testing.T) {
 	// 公钥x：09F9DF31 1E5421A1 50DD7D16 1E4BC5C6 72179FAD 1833FC07 6BB08FF3 56F35020
 	// 公钥y: CCEA490C E26775A5 2DC6EA71 8CC1AA60 0AED05FB F35E084A 6632F607 2DA9AD13
 	priv := bigFromHex("3945208F7B2144B13F36E38AC6D39F95889393692860B51A42FB81EF4DF7C5B8").Bytes()
-	pub, _ := ScalarBaseMult(&priv)
+	pub, _ := ScalarBaseMult(priv)
 	expected := make([]byte, 65)
 	buf := append(expected[:0], 4)
 	x := bigFromHex("09F9DF311E5421A150DD7D161E4BC5C672179FAD1833FC076BB08FF356F35020").Bytes()
@@ -45,8 +45,8 @@ func TestSM2Point_ScalarBaseMult2(t *testing.T) {
 	priv[31] = 0xff
 	priv[0] = 0xff
 	// the result should equal G
-	pub, _ := ScalarBaseMult(&priv)
-	q, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &priv)
+	pub, _ := ScalarBaseMult(priv)
+	q, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), priv)
 	if !reflect.DeepEqual(q.Bytes(), pub.Bytes()) {
 		t.Fail()
 	}
@@ -56,7 +56,7 @@ func TestSM2Point_ScalarBaseMult2S(t *testing.T) {
 	priv := make([]byte, 32)
 	priv[31] = 0x1
 	// the result should equal G
-	pub, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &priv)
+	pub, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), priv)
 	if !reflect.DeepEqual(NewSM2Generator().Bytes(), pub.Bytes()) {
 		t.Fail()
 	}
@@ -64,8 +64,8 @@ func TestSM2Point_ScalarBaseMult2S(t *testing.T) {
 
 func TestSM2Point_ScalarBaseMult3(t *testing.T) {
 	priv := bigFromHex("7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF").Bytes()
-	pub, _ := ScalarBaseMult(&priv)
-	expected, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &priv)
+	pub, _ := ScalarBaseMult(priv)
+	expected, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), priv)
 	if !reflect.DeepEqual(expected.Bytes(), pub.Bytes()) {
 		t.Fail()
 	}
@@ -73,7 +73,7 @@ func TestSM2Point_ScalarBaseMult3(t *testing.T) {
 
 func TestSM2Point_ScalarBaseMult4(t *testing.T) {
 	priv := make([]byte, 32)
-	pub, err := ScalarBaseMult(&priv)
+	pub, err := ScalarBaseMult(priv)
 
 	if err != nil {
 		t.Fail()
@@ -149,7 +149,7 @@ func TestSM2Point_ScalarMult_4(t *testing.T) {
 // Tests if calculation leads to infinity how the program handles
 func TestSM2Point_ScalarMult_to_inf(t *testing.T) {
 	nBytes := sm2.Params().N.Bytes()
-	res, err := scalarMult_Unsafe_DaA(NewSM2Generator(), &nBytes)
+	res, err := scalarMult_Unsafe_DaA(NewSM2Generator(), nBytes)
 	if err != nil {
 		fmt.Printf("Error: %s", err.Error())
 		t.Fail()
@@ -165,7 +165,7 @@ func TestSM2Point_ScalarMult_warparound_inf(t *testing.T) {
 	np1 := new(big.Int).Set(sm2.Params().N)
 	np1.Add(np1, new(big.Int).SetInt64(1))
 	np1Bytes := np1.Bytes()
-	res, err := scalarMult_Unsafe_DaA(NewSM2Generator(), &np1Bytes)
+	res, err := scalarMult_Unsafe_DaA(NewSM2Generator(), np1Bytes)
 	if err != nil {
 		fmt.Printf("Error: %s", err.Error())
 		t.Fail()
@@ -188,8 +188,8 @@ func TestCompleteness(t *testing.T) {
 		raw.Add(raw, inrange)
 
 		inrangeBytes, rawBytes := inrange.Bytes(), raw.Bytes()
-		res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &inrangeBytes)
-		res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &rawBytes)
+		res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), inrangeBytes)
+		res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), rawBytes)
 
 		if !reflect.DeepEqual(res1.Bytes_Unsafe(), res2.Bytes_Unsafe()) {
 			fmt.Printf("round #%d, %x\n", i, sm2.Params().N)
@@ -206,8 +206,8 @@ func TestScalarBaseMult(t *testing.T) {
 	for i:=0; i< 1000; i++ {
 		rand.Read(bytes)
 
-		res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &bytes)
-		res2, _ := ScalarBaseMult(&bytes)
+		res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), bytes)
+		res2, _ := ScalarBaseMult(bytes)
 		if !reflect.DeepEqual(res1.Bytes_Unsafe(), res2.Bytes_Unsafe()) {
 			t.Fail()
 		}
@@ -217,8 +217,8 @@ func TestScalarBaseMult(t *testing.T) {
 	rand.Read(bytes)
 	bytes[0] = 0
 	bytes[1] = 0
-	res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &bytes)
-	res2, _ := ScalarBaseMult(&bytes)
+	res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), bytes)
+	res2, _ := ScalarBaseMult(bytes)
 	if !reflect.DeepEqual(res1.Bytes_Unsafe(), res2.Bytes_Unsafe()) {
 		t.Fail()
 	}
@@ -226,7 +226,7 @@ func TestScalarBaseMult(t *testing.T) {
 	bytes2 := make([]byte, 33)
 	rand.Read(bytes2)
 
-	_, err2 := ScalarBaseMult(&bytes2)
+	_, err2 := ScalarBaseMult(bytes2)
 	if err2 == nil {
 		t.Fail()
 	}
@@ -234,7 +234,7 @@ func TestScalarBaseMult(t *testing.T) {
 	bytes3 := make([]byte, 31)
 	rand.Read(bytes3[:])
 
-	_, err3 := ScalarBaseMult(&bytes3)
+	_, err3 := ScalarBaseMult(bytes3)
 	if err3 == nil {
 		t.Fail()
 	}
@@ -244,8 +244,8 @@ func TestScalarMixedMult_Unsafe_baseonly(t *testing.T) {
 	var gScalar = make([]byte, 32)
 	var scalar = make([]byte, 32)
 
-	res1, _ := ScalarMixedMult_Unsafe(&gScalar, NewSM2Point(), &scalar)
-	res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &gScalar)
+	res1, _ := ScalarMixedMult_Unsafe(gScalar, NewSM2Point(), scalar)
+	res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), gScalar)
 	if !reflect.DeepEqual(res1.Bytes_Unsafe(), res2.Bytes_Unsafe()) {
 		t.Fail()
 	}
@@ -257,8 +257,8 @@ func TestScalarMixedMult_Unsafe_nobase(t *testing.T) {
 
 	scalar[31] = 1
 
-	res1, _ := ScalarMixedMult_Unsafe(&gScalar, NewSM2Generator(), &scalar)
-	res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &scalar)
+	res1, _ := ScalarMixedMult_Unsafe(gScalar, NewSM2Generator(), scalar)
+	res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), scalar)
 	if !reflect.DeepEqual(res1.Bytes_Unsafe(), res2.Bytes_Unsafe()) {
 		t.Fail()
 	}
@@ -272,9 +272,9 @@ func TestScalarMixedMult_Unsafe(t *testing.T) {
 		rand.Read(gScalar)
 		rand.Read(scalar)
 
-		res1, _ := ScalarMixedMult_Unsafe(&gScalar, NewSM2Generator(), &scalar)
-		res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &gScalar)
-		res3, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &scalar)
+		res1, _ := ScalarMixedMult_Unsafe(gScalar, NewSM2Generator(), scalar)
+		res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), gScalar)
+		res3, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), scalar)
 		res3.Add(res2, res3)
 		if !reflect.DeepEqual(res1.Bytes_Unsafe(), res3.Bytes_Unsafe()) {
 			t.Fail()
@@ -288,8 +288,8 @@ func TestScalarMult(t *testing.T) {
 	for i:=0; i< 1000; i++ {
 		rand.Read(scalar)
 
-		res1, _ := ScalarMult(NewSM2Generator(), &scalar)
-		res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &scalar)
+		res1, _ := ScalarMult(NewSM2Generator(), scalar)
+		res2, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), scalar)
 		if !reflect.DeepEqual(res1.Bytes_Unsafe(), res2.Bytes_Unsafe()) {
 			t.Fail()
 		}
@@ -302,7 +302,7 @@ func BenchmarkScalarNult(b *testing.B) {
 	p := NewSM2Generator()
 
 	for i:=0; i<b.N; i++ {
-		ScalarMult(p, &scalar)
+		ScalarMult(p, scalar)
 	}
 }
 
@@ -315,7 +315,7 @@ func BenchmarkScalarMixedMult_Unsafe(b *testing.B) {
 		//rand.Read(scalar)
 		scalar[0] = 0xf2
 
-		ScalarMixedMult_Unsafe(&gScalar, NewSM2Generator(), &scalar)
+		ScalarMixedMult_Unsafe(gScalar, NewSM2Generator(), scalar)
 	}
 }
 
@@ -328,7 +328,7 @@ func BenchmarkSM2Point_ScalarMult_Unsafe_DaA(b *testing.B) {
 	b.ResetTimer()
 	for i:=0; i<b.N; i++ {
 		rand.Read(bytes[:])
-		scalarMult_Unsafe_DaA(g, &bytes)
+		scalarMult_Unsafe_DaA(g, bytes)
 	}
 }
 
@@ -339,7 +339,7 @@ func BenchmarkScalarBaseMult(b *testing.B) {
 	b.ResetTimer()
 	for i:=0; i<b.N; i++ {
 		rand.Read(bytes[:])
-		ScalarBaseMult(&bytes)
+		ScalarBaseMult(bytes)
 	}
 }
 
@@ -350,7 +350,7 @@ func Benchmark_scalarBaseMult_SkipBitExtraction_6_3_14(b *testing.B) {
 	b.ResetTimer()
 	for i:=0; i<b.N; i++ {
 		rand.Read(bytes[:])
-		scalarBaseMult_SkipBitExtraction_6_3_14(&bytes)
+		scalarBaseMult_SkipBitExtraction_6_3_14(bytes)
 	}
 }
 
@@ -361,7 +361,7 @@ func Benchmark_scalarBaseMult_SkipBitExtraction_5_3_17(b *testing.B) {
 	b.ResetTimer()
 	for i:=0; i<b.N; i++ {
 		rand.Read(bytes[:])
-		scalarBaseMult_SkipBitExtraction_5_3_17(&bytes)
+		scalarBaseMult_SkipBitExtraction_5_3_17(bytes)
 	}
 }
 
@@ -372,7 +372,7 @@ func Benchmark_scalarBaseMult_SkipBitExtraction_4_2_32(b *testing.B) {
 	b.ResetTimer()
 	for i:=0; i<b.N; i++ {
 		rand.Read(bytes[:])
-		scalarBaseMult_SkipBitExtraction_4_2_32(&bytes)
+		scalarBaseMult_SkipBitExtraction_4_2_32(bytes)
 	}
 }
 
@@ -383,7 +383,7 @@ func Benchmark_scalarBaseMult_SkipBitExtraction_7_3_12(b *testing.B) {
 	b.ResetTimer()
 	for i:=0; i<b.N; i++ {
 		rand.Read(bytes[:])
-		scalarBaseMult_SkipBitExtraction_7_3_12(&bytes)
+		scalarBaseMult_SkipBitExtraction_7_3_12(bytes)
 	}
 }
 
@@ -425,7 +425,7 @@ func BenchmarkSM2Point_Double(b *testing.B) {
 func genRandomPoint() *SM2Point {
 	bytes := make([]byte, 31)
 	rand.Read(bytes)
-	p, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), &bytes)
+	p, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), bytes)
 	return p
 }
 
@@ -489,7 +489,7 @@ func testWithStringsAndPoint(p, x, y string, point *SM2Point) bool {
 
 	var bytes []byte
 	bytes = makeElement(p).Bytes()
-	res, _ := scalarMult_Unsafe_DaA(point, &bytes)
+	res, _ := scalarMult_Unsafe_DaA(point, bytes)
 	if !reflect.DeepEqual(res.Bytes_Unsafe(), q.Bytes_Unsafe()) {
 		return false
 	}
@@ -498,7 +498,7 @@ func testWithStringsAndPoint(p, x, y string, point *SM2Point) bool {
 	larger.Add(larger, sm2.Params().N) // this shall not change the result if the Add and Double are implemented "completely"
 	bytes = larger.Bytes()
 	fmt.Printf("larger scalar has %d bytes\n", len(bytes))
-	res2, _ := scalarMult_Unsafe_DaA(point, &bytes)
+	res2, _ := scalarMult_Unsafe_DaA(point, bytes)
 	if !reflect.DeepEqual(res2.Bytes_Unsafe(), res.Bytes_Unsafe()) {
 		return false
 	}
@@ -540,7 +540,7 @@ func Test_extractHigherBits(t *testing.T) {
 
 	// extract bits at 0, 42, 84, 126, 168, 210
 	// which should be (0, 1, 1, 0, 1, 0), or 0 + 2^1 + 2^2 + 0 + 2^4 = 22
-	bits := extractHigherBits(&bytes, 0, 6, 42)
+	bits := extractHigherBits(bytes, 0, 6, 42)
 	if bits != 22 {
 		t.Fail()
 	}
@@ -552,25 +552,25 @@ func Test_extractBit(t *testing.T) {
 	bytes[31] = 0xf0
 	for i:=0; i<4; i++ {
 		//last 4 bits, which means bytes[31] should be all 0 here
-		bits := extractBit(&bytes, i)
+		bits := extractBit(bytes, i)
 		if bits != 0 {
 			t.Fail()
 		}
 	}
 	for i:=4; i<8; i++ {
-		bits := extractBit(&bytes, i)
+		bits := extractBit(bytes, i)
 		if bits != 1 {
 			t.Fail()
 		}
 	}
 	for i:=248; i<252; i++ {
-		bits := extractBit(&bytes, i)
+		bits := extractBit(bytes, i)
 		if bits != 1 {
 			t.Fail()
 		}
 	}
 	for i:=252; i<256; i++ {
-		bits := extractBit(&bytes, i)
+		bits := extractBit(bytes, i)
 		if bits != 0 {
 			t.Fail()
 		}
@@ -581,7 +581,7 @@ func Test_extractLowerBits(t *testing.T) {
 	bytes := make([]byte, 32)
 	bytes[31] = 0x1f
 	for i:=1; i<8; i++ {
-		bits := extractLowerBits(&bytes, i)
+		bits := extractLowerBits(bytes, i)
 		var passed bool
 		switch i {
 		case 1: passed = bits == 1
