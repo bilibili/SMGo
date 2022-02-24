@@ -15,6 +15,20 @@ import (
 	"smgo/utils"
 )
 
+// DerivePublic takes private key and return the X and Y coordinates of the corresponding public key.
+func DerivePublic(priv []byte) (x, y []byte, err error) {
+	var pub *internal.SM2Point
+	pub, err = internal.ScalarBaseMult(priv)
+	if err != nil {
+		return
+	}
+
+	var pubBytes []byte
+	pubBytes = pub.Bytes_Unsafe()
+
+	return pubBytes[1:33], pubBytes[33:], nil
+}
+
 // GenerateKey generate private key with provided random source
 // note that private key will lie in range [1, n-2] as we need
 // to calculate 1/(d + 1) for signature

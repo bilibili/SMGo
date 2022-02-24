@@ -18,11 +18,44 @@ func BenchmarkSignHashed(b *testing.B) {
 	e := make([]byte, 32)
 	rand.Read(e)
 
-	b.SetBytes(1000*1000) // hacking to report ops/s, it will be the number leading MS/s
+	b.SetBytes(1000*1000) // hacking to report ops/s, it will be the number leading MB/s
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		SignHashed(myRandVar, priv, e)
+	}
+}
+
+func BenchmarkSignZa(b *testing.B) {
+	priv, _, _, _ := GenerateKey(rand.Reader)
+
+	za := make([]byte, 32)
+	rand.Read(za)
+
+	msg := make([]byte, 32)
+	rand.Read(msg)
+
+	b.SetBytes(1000*1000) // hacking to report ops/s, it will be the number leading MB/s
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		SignZa(myRandVar, priv, za, msg)
+	}
+}
+
+func BenchmarkSign(b *testing.B) {
+	priv, x, y, _ := GenerateKey(rand.Reader)
+
+	msg := make([]byte, 32)
+	rand.Read(msg)
+
+	id, _ := hex.DecodeString("12345678")
+
+	b.SetBytes(1000*1000) // hacking to report ops/s, it will be the number leading MB/s
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Sign(id, x, y, myRandVar, priv, msg)
 	}
 }
 
@@ -37,11 +70,68 @@ func BenchmarkVerifyHashed(b *testing.B) {
 		b.Fail()
 	}
 
-	b.SetBytes(1000*1000) // hacking to report ops/s, it will be the number leading MS/s
+	b.SetBytes(1000*1000) // hacking to report ops/s, it will be the number leading MB/s
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		v, err := VerifyHashed(x, y, e, r, s)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+		if !v {
+			b.Fail()
+		}
+	}
+}
+
+func BenchmarkVerifyZa(b *testing.B) {
+	priv, x, y, _ := GenerateKey(rand.Reader)
+
+	za := make([]byte, 32)
+	rand.Read(za)
+
+	msg := make([]byte, 32)
+	rand.Read(msg)
+
+
+	r, s, err := SignZa(rand.Reader, priv, za, msg)
+	if err != nil {
+		b.Fail()
+	}
+
+	b.SetBytes(1000*1000) // hacking to report ops/s, it will be the number leading MB/s
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		v, err := VerifyZa(x, y, za, msg, r, s)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+		if !v {
+			b.Fail()
+		}
+	}
+}
+
+func BenchmarkVerify(b *testing.B) {
+	priv, x, y, _ := GenerateKey(rand.Reader)
+
+	msg := make([]byte, 32)
+	rand.Read(msg)
+
+	id, _ := hex.DecodeString("12345678")
+
+
+	r, s, err := Sign(id, x, y, rand.Reader, priv, msg)
+	if err != nil {
+		b.Fail()
+	}
+
+	b.SetBytes(1000*1000) // hacking to report ops/s, it will be the number leading MB/s
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		v, err := Verify(id, x, y, msg, r, s)
 		if err != nil {
 			fmt.Println(err.Error())
 		}
@@ -90,6 +180,24 @@ func Test_za(t *testing.T) {
 
 	if !reflect.DeepEqual(z, out[:]) {
 		fmt.Printf("out: %X\n", out)
+		t.Fail()
+	}
+}
+
+func TestDerivePublic(t *testing.T) {
+	priv, x, y, err := GenerateKey(rand.Reader)
+
+	if err != nil {
+		t.Fail()
+	}
+
+	px, py, err2 := DerivePublic(priv)
+
+	if err2 != nil {
+		t.Fail()
+	}
+
+	if !reflect.DeepEqual(x, px) || !reflect.DeepEqual(y, py) {
 		t.Fail()
 	}
 }
