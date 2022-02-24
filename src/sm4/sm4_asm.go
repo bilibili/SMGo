@@ -1,25 +1,27 @@
 // Copyright 2021 ~ 2022 bilibili. All rights reserved. Author: Guo, Weiji guoweiji@bilibili.com
 // 哔哩哔哩版权所有 2021 ~ 2022。作者：郭伟基 guoweiji@bilibili.com
 
-//go:build arm64
+//go:build amd64 || arm64
 
 package sm4
 
 import (
 	"crypto/cipher"
+	. "github.com/klauspost/cpuid/v2"
 )
 
 type sm4CipherAsm struct {
 	sm4Cipher
 }
 
-//var candoAsm = CPU.Supports(PMULL) // for ARM64 we implement with NEON and PMULL, and NEON should be available by default
+// no other feature ID could be used to identify ARM64 so AESARM as representative
+var candoAsm = CPU.Supports(AESARM) || (CPU.Supports(AVX512F) && CPU.Supports(GFNI))
 
 func newCipher(key []byte) (cipher.Block, error) {
-	//if !candoAsm {
-	//	return newCipherGeneric(key)
-	//}
-	//
+	if !candoAsm {
+		return newCipherGeneric(key)
+	}
+
 	sm4 := sm4CipherAsm{}
 	expandKeyAsm(&key[0], &sm4.enc[0], &sm4.dec[0])
 	return &sm4, nil
@@ -38,14 +40,6 @@ func cryptoBlockAsmX4(rk *uint32, dst, src *byte)
 
 //go:noescape
 func cryptoBlockAsmX8(rk *uint32, dst, src *byte)
-
-func cryptoBlockAsmX16(rk *uint32, dst, src *byte) {
-	var tmp [256]byte
-	cryptoBlockAsmX16Internal(rk, dst, src, &tmp[0])
-}
-
-//go:noescape
-func cryptoBlockAsmX16Internal(rk *uint32, dst, src, tmp *byte) // I know it looks ugly, but let's not wrestle with Go stack management logics
 
 func (sm4 *sm4CipherAsm) EncryptX4(dst, src []byte) {
 	if len(src) < blockSize<<2 {
