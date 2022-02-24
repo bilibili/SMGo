@@ -33,7 +33,7 @@ func TestDecompose4NAF(t *testing.T) {
 	var s = make([]byte, 32)
 
 	s[31] = 0x1
-	DecomposeNAF(out[:], &s, 257, 4)
+	DecomposeNAF(out[:], s, 257, 4)
 	fmt.Printf("%d\n%x\n", out, s)
 	if out[0] != 0x1 {
 		t.Fail()
@@ -42,7 +42,7 @@ func TestDecompose4NAF(t *testing.T) {
 	out = make([]int, 257)
 	s = make([]byte, 32)
 	s[31] = 0b00101111
-	DecomposeNAF(out[:], &s, 257, 4)
+	DecomposeNAF(out[:], s, 257, 4)
 	fmt.Printf("%d\n%x\n", out, s)
 	if out[0] != 0b1111 || out[5] != 0x0001 {
 		t.Fail()
@@ -51,7 +51,7 @@ func TestDecompose4NAF(t *testing.T) {
 	out = make([]int, 257)
 	s = make([]byte, 32)
 	s[31] = 0b00111111
-	DecomposeNAF(out[:], &s, 257, 4)
+	DecomposeNAF(out[:], s, 257, 4)
 	fmt.Printf("%d\n%x\n", out, s)
 	if out[0] != -1 || out[6] != 1 {
 		t.Fail()
@@ -60,7 +60,7 @@ func TestDecompose4NAF(t *testing.T) {
 	out = make([]int, 257)
 	s = make([]byte, 32)
 	s[0] = 0b00101111
-	DecomposeNAF(out[:], &s, 257, 4)
+	DecomposeNAF(out[:], s, 257, 4)
 	fmt.Printf("%d\n%x\n", out, s)
 	if out[248] != 0b1111 || out[253] != 0x0001 {
 		t.Fail()
@@ -69,7 +69,7 @@ func TestDecompose4NAF(t *testing.T) {
 	out = make([]int, 257)
 	s = make([]byte, 32)
 	s[0] = 0b00111111
-	DecomposeNAF(out[:], &s, 257, 4)
+	DecomposeNAF(out[:], s, 257, 4)
 	fmt.Printf("%d\n%x\n", out, s)
 	if out[248] != -1 || out[254] != 1 {
 		t.Fail()
@@ -78,7 +78,7 @@ func TestDecompose4NAF(t *testing.T) {
 	out = make([]int, 257)
 	s = make([]byte, 32)
 	s[0] = 0b11111111
-	DecomposeNAF(out[:], &s, 257, 4)
+	DecomposeNAF(out[:], s, 257, 4)
 	fmt.Printf("%d\n%x\n", out, s)
 	if out[256] != 1 {
 		t.Fail()
@@ -87,7 +87,7 @@ func TestDecompose4NAF(t *testing.T) {
 	out = make([]int, 257)
 	s = make([]byte, 32)
 	rand.Read(s)
-	DecomposeNAF(out[:], &s, 257, 4)
+	DecomposeNAF(out[:], s, 257, 4)
 	fmt.Printf("%d\n%x\n", out, s)
 	consecutiveZeroCounter := 4
 	for i:=0; i<len(out); i++ {
@@ -123,6 +123,6 @@ func BenchmarkDecomposeNAF(b *testing.B) {
 
 	rand.Read(s)
 	for i:=0; i<b.N; i++ {
-		DecomposeNAF(out[:], &s, 257, 4)
+		DecomposeNAF(out[:], s, 257, 4)
 	}
 }

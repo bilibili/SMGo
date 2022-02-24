@@ -4,12 +4,14 @@
 package sm2
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"math/big"
 	"smgo/sm2/internal"
 	"smgo/sm2/internal/fiat"
+	"smgo/sm3"
 	"smgo/utils"
 )
 
@@ -34,14 +36,18 @@ func GenerateKey(rand io.Reader) (priv, x, y []byte, err error) {
 	priv = make([]byte, 32)
 
 	for {
-		io.ReadFull(rand, priv)
-		if TestPrivateKey(&priv) == 0 {
+		_, err = io.ReadFull(rand, priv)
+		if err != nil {
+			err = errors.New("random number generator error: " + err.Error())
+			return
+		}
+		if TestPrivateKey(priv) == 0 {
 			break
 		}
 	}
 
 	var pub *internal.SM2Point
-	pub, err = internal.ScalarBaseMult(&priv)
+	pub, err = internal.ScalarBaseMult(priv)
 	if err != nil {
 		return
 	}
@@ -53,14 +59,14 @@ func GenerateKey(rand io.Reader) (priv, x, y []byte, err error) {
 }
 
 // CheckOnCurve checks if the point given in x and y coordinates, lies on the curve.
-func CheckOnCurve(x, y *[]byte) bool {
+func CheckOnCurve(x, y []byte) bool {
 	var xe, ye *fiat.SM2Element
 	var err error
-	xe, err = new(fiat.SM2Element).SetBytes(*x)
+	xe, err = new(fiat.SM2Element).SetBytes(x)
 	if err != nil {
 		return false
 	}
-	ye, err = new(fiat.SM2Element).SetBytes(*y)
+	ye, err = new(fiat.SM2Element).SetBytes(y)
 	if err != nil {
 		return false
 	}
@@ -72,14 +78,15 @@ var n = internal.GetN()
 var nBytes = n.Bytes()
 var nMinus1 = new(big.Int).Sub(n, one)
 var nMinus1Bytes = nMinus1.Bytes()
+var zBytes = internal.GetZBytes()
 
 // TestPrivateKey tests if the priv has at most 32 bytes, and if it is in range [1, n-2]
 // Returns the length difference if longer than 32, or -1 if not in the range,
 // or 0 if everything checks out
 //
 // TestPrivateKey runs in constant time.
-func TestPrivateKey(priv *[]byte) int {
-	l := len(*priv) - 32
+func TestPrivateKey(priv []byte) int {
+	l := len(priv) - 32
 	if l > 0 {
 		return l
 	}
@@ -87,12 +94,59 @@ func TestPrivateKey(priv *[]byte) int {
 		return 0
 	}
 
-	cmp := utils.ConstantTimeCmp((*priv)[:], nMinus1Bytes[:], 32)
+	cmp := utils.ConstantTimeCmp(priv, nMinus1Bytes, 32)
 	if cmp == -1 {
 		return 0
 	}
 
 	return -1
+}
+
+// ZA calculates the ZA data according to the GMT 0003.2-2012 spec
+// The spec does not tell what to do about empty user ID. So it is accepted as well.
+func ZA(id, pubx, puby []byte) (za []byte, err error) {
+	entl := len(id) << 3
+	if entl > 1 << 16 {
+		err = errors.New("entity ID too long")
+		return
+	}
+
+	var entlBytes [2]byte
+	binary.BigEndian.PutUint16(entlBytes[:], uint16(entl))
+
+	hash := sm3.New()
+	hash.Write(entlBytes[:])
+	hash.Write(id)
+	hash.Write(zBytes)
+	hash.Write(pubx)
+	hash.Write(puby)
+
+	return hash.Sum(nil), nil
+}
+
+// Sign takes user id, user public key coordinates, then calls ZA to derive the za value, and then
+// calls SignZa, returns signature data.
+// For random data generator, private key or return value, see SignHashed
+func Sign(id, pubx, puby []byte, rand io.Reader, priv, msg []byte) (r, s []byte, err error) {
+	var za []byte
+	za, err = ZA(id, pubx, puby)
+	if err != nil {
+		return
+	}
+
+	return SignZa(rand, priv, za, msg)
+}
+
+// SignZa takes the message data and za as calculated user hash which have been derived from user ID,
+// curve public parameters, and user public key (see ZA), hash them together, calls SignHashed and returns signature data.
+// For random data generator, private key or return value, see SignHashed
+func SignZa(rand io.Reader, priv, za, msg []byte) (r, s []byte, err error) {
+	hash := sm3.New()
+	hash.Write(za)
+	hash.Write(msg)
+
+	e := hash.Sum(nil)
+	return SignHashed(rand, priv, e)
 }
 
 // SignHashed signs the data which have been hashed from message and public parameters.
@@ -102,7 +156,7 @@ func TestPrivateKey(priv *[]byte) int {
 //  r, s: has 32 bytes each
 //
 // Standard demands that priv should lie in [1, n-2], SignHashed only accepts private key in that range.
-func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
+func SignHashed(rand io.Reader, priv, e []byte) (r, s []byte, err error) {
 	test := TestPrivateKey(priv)
 	if  test != 0 {
 		err = errors.New(fmt.Sprintf("invalid private key, reason code: %d.", test))
@@ -123,7 +177,7 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 
 		var kG *internal.SM2Point
 		KK := K[:]
-		kG, err = internal.ScalarBaseMult(&KK)
+		kG, err = internal.ScalarBaseMult(KK)
 		if err != nil {
 			return
 		}
@@ -133,7 +187,7 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 
 		x := kG.GetAffineX_Unsafe() // 避免计算y坐标，可以节约计算量。由于x不需要保密，可以使用快速版本，但z的数值会泄露信息吗？TODO
 
-		eInt.SetBytes(*e)
+		eInt.SetBytes(e)
 		rInt.Add(x, &eInt)
 		rInt.Mod(&rInt, n)
 
@@ -148,11 +202,11 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 		rkInt.Add(&rInt, &k)
 		// 标准要求排除的第二种情形
 		rkBytes := rkInt.Bytes()
-		if len(rkBytes) == 32 && utils.ConstantTimeCmp(rkBytes[:], nBytes[:], 32) == 0 {
+		if len(rkBytes) == 32 && utils.ConstantTimeCmp(rkBytes, nBytes, 32) == 0 {
 			continue
 		}
 
-		dInt.SetBytes(*priv)
+		dInt.SetBytes(priv)
 		d1Int.Add(&dInt, one)
 
 		//SM2ScalarElement.SetBytes要求长度为32，因此，如果私钥实际长度短于32字节（标准不排除此种情形），左边补零（标准规定使用大端字节序）
@@ -160,7 +214,7 @@ func SignHashed(rand io.Reader, priv, e *[]byte) (r, s []byte, err error) {
 		var buf [32]byte
 		copy(buf[32-len(d1Bytes) : ], d1Bytes)
 
-		d1.SetBytes(buf[:]) // priv = n - 1 已经被排除，因此不会导致 d1 = 0
+		d1.SetBytes(buf[:]) // priv = n - 1 已经被排除，因此不会导致 d1 = 0. 编译器告警此处可忽略，因私钥的范围已经在一开始就检查过了
 		d1Inv.Invert(&d1) // **常数时间**算法 constant time inversion here, about 10% performance hit
 
 		// 标准要求计算  (k - r * priv) / (1 + priv)
@@ -186,19 +240,42 @@ func ensure32Bytes(i *big.Int) []byte {
 	return buf[:]
 }
 
+// Verify takes user id, user public key coordinates, then calls ZA to derive the za value, and then
+// calls VerifyZa, returns verification result.
+func Verify(id, pubx, puby, msg, r, s []byte) (bool, error) {
+	za, err := ZA(id, pubx, puby)
+	if err != nil {
+		return false, err
+	}
+
+	return VerifyZa(pubx, puby, za, msg, r, s)
+}
+
+// VerifyZa takes the message data and za as calculated user hash which have been derived from user ID,
+// curve public parameters, and user public key (see ZA), hash them together, calls VerifyHashed
+// and returns verification result.
+func VerifyZa(pubx, puby, za, msg, r, s []byte) (bool, error) {
+	hash := sm3.New()
+	hash.Write(za)
+	hash.Write(msg)
+
+	e := hash.Sum(nil)
+	return VerifyHashed(pubx, puby, e, r, s)
+}
+
 // VerifyHashed verifies if a signature is valid or not.
 // All parameters should be given in byte arrays big endian and in 32 bytes
-func VerifyHashed(pubx, puby, e, r, s *[]byte) (bool, error) {
+func VerifyHashed(pubx, puby, e, r, s []byte) (bool, error) {
 
-	if len(*pubx) != 32 || len(*puby) != 32 || len(*e) != 32 || len(*r) != 32 || len(*s) != 32 {
+	if len(pubx) != 32 || len(puby) != 32 || len(e) != 32 || len(r) != 32 || len(s) != 32 {
 		return false, errors.New(fmt.Sprintf("parameter not in 32 bytes: %d, %d, %d, %d, %d\n",
-			len(*pubx), len(*puby), len(*e), len(*r), len(*s)))
+			len(pubx), len(puby), len(e), len(r), len(s)))
 	}
 
 	var rInt, sInt, eInt, t big.Int
 
-	rInt.SetBytes(*r)
-	sInt.SetBytes(*s)
+	rInt.SetBytes(r)
+	sInt.SetBytes(s)
 
 	if rInt.Cmp(one) < 0 || sInt.Cmp(one) < 0 || rInt.Cmp(n) >= 0 || sInt.Cmp(n) >= 0 {
 		return false, errors.New("r or s not in range [1, n-1]")
@@ -215,8 +292,8 @@ func VerifyHashed(pubx, puby, e, r, s *[]byte) (bool, error) {
 	var result, pub *internal.SM2Point
 
 	buf := append(pubBytes[:0], 4)
-	buf = append(buf, *pubx...)
-	buf = append(buf, *puby...)
+	buf = append(buf, pubx...)
+	buf = append(buf, puby...)
 
 	pub, err = internal.NewSM2Point().SetBytes(pubBytes[:])
 	if err != nil {
@@ -227,15 +304,16 @@ func VerifyHashed(pubx, puby, e, r, s *[]byte) (bool, error) {
 	var tBytes []byte
 	tBytes = t.Bytes()
 
-	result, err = internal.ScalarMixedMult_Unsafe(s, pub, &tBytes)
+	result, err = internal.ScalarMixedMult_Unsafe(s, pub, tBytes)
 	if err != nil {
 		return false, err
 	}
 
 	R := result.GetAffineX_Unsafe()
-	eInt.SetBytes(*e)
+	eInt.SetBytes(e)
 	R.Add(R, &eInt)
 	R.Mod(R, n)
 
 	return R.Cmp(&rInt) == 0, nil
 }
+
