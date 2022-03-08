@@ -17,7 +17,6 @@ func Test_newCipher(t *testing.T) {
 	fmt.Printf("SM4: %t\n", CPU.Supports(SM4))
 	fmt.Printf("AESARM: %t\n", CPU.Supports(AESARM))
 	fmt.Printf("PMULL: %t\n", CPU.Supports(PMULL)) // polynomial multiplication, for GCM
-	fmt.Println(CPU.FeatureSet())
 }
 
 func Test_encryptCrossBlockX4(t *testing.T) {

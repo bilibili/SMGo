@@ -4,7 +4,19 @@
 // 本源程序文件含有专利技术实现。如用于商业目的，须事先取得B站的书面许可。
 
 // "table lookup in NEON" method credited to Ard Biesheuve from Linaro, see https://www.linaro.org/blog/accelerated-aes-for-the-arm64-linux-kernel/
-// ARM opcode refs: https://github.com/CAS-Atlantic/AArch64-Encoding
+
+// TBX is not available in Go assembly for ARM64 so we have to code the machine word.
+// See ARM opcode refs: https://github.com/CAS-Atlantic/AArch64-Encoding
+
+// A useful referenc will be the "NEON Programmer's Guide", by ARM.
+
+// Note: this assembly file is developed and benchmarked with Apple M1. It might perform differently with other NOEN implementations.
+// According to works of Dougall Johnson here: https://dougallj.github.io/applecpu/firestorm-simd.html
+// TBX with 4 registers and 16B query with Apple M1 has a latency of 8.
+
+// According to the "Arm Cortex-X1 Core Software Optimization Guide", the TBX instruction with 4 registers, has a altency of 6.
+// By now (early 2022) Cortex-X1 is the most performant ARM microarchitecture. So this suggests a need for X16 implementation.
+// But only test results can tell. Let us know your results should you run benchmarks on any other NEON implementations.
 
 #include "textflag.h"
 //see Test_printDataBlock for data generation
@@ -173,6 +185,9 @@ GLOBL CK<>(SB), (NOPTR+RODATA), $128
     VEOR    T0.B16, T1.B16, DST.B16 \
 
 // transform in-place
+// Note: VMUL & VMULL instructions can perform polynormial multiplication for P8 & P16 data types.
+// But we would need P32.
+// Also, these two intructions are not available in Go arm64 assembly.
 #define transformL(Data) \
     VSHL    $2,  Data.S4, T0.S4 \
     VSRI    $30, Data.S4, T0.S4 \
