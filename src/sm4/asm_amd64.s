@@ -95,6 +95,9 @@ GLOBL Shuffle<>(SB), (NOPTR+RODATA), $16
 // R8~15: general purpose drafts
 // AX, BX, CX, DX: parameters
 
+// the mask for saving round keys during key expansion
+#define MASK K1
+
 // X/Y/Z 0~5 draft registers
 #define T0x X0
 #define T1x X1
@@ -281,11 +284,6 @@ TEXT ·transpose1x4(SB),NOSPLIT,$0-16
     VGF2P8AFFINEQB $PreAffineConstant, PreMatrix, Src, Interim \ //GFNI + AVX512VL(128;256) / AVX512F(512)
     VGF2P8AFFINEINVQB $PostAffineConstant, PostMatrix, Interim, Dst \ //latency 3?, CPI 0.5(128;256)/1(512)
 
-
-TEXT ·expandKeyAsm(SB),NOSPLIT,$0-24
-
-    RET
-
 #define loadShuffle128() \
     MOVQ        $Shuffle<>(SB), R10 \
     VMOVDQU32   (R10), VxShuffle \
@@ -295,6 +293,71 @@ TEXT ·expandKeyAsm(SB),NOSPLIT,$0-24
 
 #define getXorX(B, C, D, Dst) \
     getXor(B, C, D, Dst, T0x, T1x, VxRoundKey) \
+
+TEXT ·expandKeyAsm(SB),NOSPLIT,$0-24
+
+    #define loadMask() \
+        MOVQ        $1, R8 \
+        KMOVW       R8, MASK \
+
+    #define saveKeys(Renc, Rdec, A) \
+        VMOVDQU32    A, MASK, (Renc) \
+        VMOVDQU32    A, MASK, (Rdec) \
+        ADDQ         $4, Renc \
+        SUBQ         $4, Rdec \
+
+    #define loadCKey(R, Dst) \
+        loadRoundKey(R, Dst) \
+
+    #define transformLPrime(Data) \
+        VPROLD    $13,  Data, T0x \ // AVX512F(512)+AVX512VL(128;256), latency 1, CPI 0.5(128;256)/1(512)
+        VPROLD    $23, Data, T1x \
+        VPXORD    T0x, T1x, T0x \
+        VPXORD    T0x, Data, Data \
+
+    #define expandSubRound(A, B, C, D, Renc, Rdec) \
+        loadCKey(DX, VxRoundKey) \
+        getXorX(B, C, D, VxSrc) \
+        affine(VxPreMatrix, VxPostMatrix, VxSrc, VxInterim, VxDst) \
+        transformLPrime(VxDst) \
+        VPXORD    VxDst, A, A \
+        saveKeys(Renc, Rdec, A) \
+
+    #define expandRound(Renc, Rdec) \
+        expandSubRound(VxState1, VxState2, VxState3, VxState4, Renc, Rdec) \
+        expandSubRound(VxState2, VxState3, VxState4, VxState1, Renc, Rdec) \
+        expandSubRound(VxState3, VxState4, VxState1, VxState2, Renc, Rdec) \
+        expandSubRound(VxState4, VxState1, VxState2, VxState3, Renc, Rdec) \
+
+    loadMask()
+    loadShuffle128()
+    loadMatrix(VxPreMatrix, VxPostMatrix)
+
+    MOVD	mk+0(FP), AX
+    MOVD	enc+8(FP), BX
+    MOVD	dec+16(FP), CX
+    MOVD    $CK<>(SB), DX
+
+    ADDQ    $124, CX
+
+    VMOVDQU32   (AX), VxState1
+    MOVQ        $FK<>(SB), R8
+    VMOVDQU32   (R8), T0x
+    rev32(VxShuffle, VxState1)
+    VPXORD      T0x, VxState1, VxState1
+
+    transpose1x4(VxState1, VxState2, VxState3, VxState4, T0x, T1x)
+
+    expandRound(BX, CX)
+    expandRound(BX, CX)
+    expandRound(BX, CX)
+    expandRound(BX, CX)
+    expandRound(BX, CX)
+    expandRound(BX, CX)
+    expandRound(BX, CX)
+    expandRound(BX, CX)
+
+    RET
 
 #define transformLX(Data) \
     transformL(Data, T0x, T1x, T2x, T3x)
