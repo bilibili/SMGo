@@ -15,7 +15,7 @@ type sm4CipherAsm struct {
 }
 
 // no other feature ID could be used to identify ARM64 so AESARM as representative
-var candoAsm = CPU.Supports(AESARM) || (CPU.Supports(AVX512F) && CPU.Supports(GFNI))
+var candoAsm = CPU.Supports(AESARM) || (CPU.Supports(AVX512F) && CPU.Supports(AVX512DQ) && CPU.Supports(AVX512VL) && CPU.Supports(AVX) && CPU.Supports(GFNI) && CPU.Supports(SSE3) && CPU.Supports(SSE2))
 
 func newCipher(key []byte) (cipher.Block, error) {
 	if !candoAsm {
@@ -27,7 +27,7 @@ func newCipher(key []byte) (cipher.Block, error) {
 	return &sm4, nil
 }
 
-func (sm4 *sm4CipherAsm) BlockSize() int {return blockSize}
+func (sm4 *sm4CipherAsm) BlockSize() int { return blockSize }
 
 //go:noescape
 func expandKeyAsm(key *byte, enc, dec *uint32)

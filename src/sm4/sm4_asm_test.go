@@ -6,13 +6,18 @@ import (
 	"fmt"
 	. "github.com/klauspost/cpuid/v2"
 	"reflect"
+	"strings"
 	"testing"
 )
 
 func Test_newCipher(t *testing.T) {
-	fmt.Printf("AESNI: %t\n", CPU.Supports(AESNI))
-	fmt.Printf("AVX512: %t\n", CPU.Supports(AVX512F))
 	fmt.Printf("GFNI: %t\n", CPU.Supports(GFNI))
+	fmt.Printf("AVX512F: %t\n", CPU.Supports(AVX512F))
+	fmt.Printf("AVX512VL: %t\n", CPU.Supports(AVX512VL))
+	fmt.Printf("AVX512DQ: %t\n", CPU.Supports(AVX512DQ))
+	fmt.Printf("AVX: %t\n", CPU.Supports(AVX))
+	fmt.Printf("SSE3: %t\n", CPU.Supports(SSE3))
+	fmt.Printf("SSE2: %t\n", CPU.Supports(SSE2))
 	fmt.Printf("SM3: %t\n", CPU.Supports(SM3))
 	fmt.Printf("SM4: %t\n", CPU.Supports(SM4))
 	fmt.Printf("AESARM: %t\n", CPU.Supports(AESARM))
@@ -81,7 +86,7 @@ func Test_encryptBlockAsm(t *testing.T) {
 	expandKey(key, &sm4.enc, &sm4.dec)
 
 	cryptoBlockAsm(&sm4.enc[0], &cipher[0], &plain[0])
-	fmt.Printf("Result: %x\nExpected: %x\n", cipher, expected)
+	fmt.Printf("Result:   %x\nExpected: %x\n", cipher, expected)
 	if !reflect.DeepEqual(cipher, expected) {
 		t.Fail()
 	}
@@ -90,7 +95,7 @@ func Test_encryptBlockAsm(t *testing.T) {
 	// 示例2，加密1000000次
 	inter := make([]byte, 16)
 	copy(inter, plain)
-	for i:=0; i<1000000; i++ {
+	for i := 0; i < 1000000; i++ {
 		cryptoBlockAsm(&sm4.enc[0], &cipher[0], &inter[0])
 		copy(inter, cipher)
 	}
@@ -114,16 +119,85 @@ func Test_encryptBlockAsmX16(t *testing.T) {
 
 	plainX16 := make([]byte, 272)
 	copy(plainX16, plainX1)
-	for i:=0; i<16; i++ {
+	for i := 0; i < 16; i++ {
 		sm4.Encrypt(expected[i*16:], plainX16[i*16:])
-		copy(plainX16[(i+1)*16 : (i+2)*16], expected[i*16 : (i+1)*16])
+		copy(plainX16[(i+1)*16:(i+2)*16], expected[i*16:(i+1)*16])
 	}
 
 	cryptoBlockAsmX16(&sm4.enc[0], &cipher[0], &plainX16[0])
-	fmt.Printf("Result:   %x\nExpected: %x\n", cipher, expected)
+	fmt.Printf("Plain:    %x\nResult:   %x\nExpected: %x\n", plainX16, cipher, expected)
 	if !reflect.DeepEqual(cipher, expected) {
 		t.Fail()
 	}
+}
+
+//go:noescape
+func transpose4x4(dst *uint32, src *uint32)
+
+func Test_transpose4x4(t *testing.T) {
+	plain := makeMatrix()
+	out := make([]uint32, 16)
+	transpose4x4(&out[0], &plain[0])
+	for i := 0; i < 16; i++ {
+		fmt.Printf("%02x, ", plain[i])
+	}
+	fmt.Println()
+	result := ""
+	for i := 0; i < 16; i++ {
+		result += fmt.Sprintf("%02x, ", out[i])
+	}
+
+	fmt.Println(result)
+	expected := "a0, b0, c0, d0, a1, b1, c1, d1, a2, b2, c2, d2, a3, b3, c3, d3, "
+
+	if strings.Compare(result, expected) != 0 {
+		t.Fail()
+	}
+}
+
+//go:noescape
+func transpose1x4(dst *uint32, src *uint32)
+
+func Test_transpose1x4(t *testing.T) {
+	plain := makeMatrix()
+	out := make([]uint32, 16)
+	transpose1x4(&out[0], &plain[0])
+	for i := 0; i < 4; i++ {
+		fmt.Printf("%02x, ", plain[i])
+	}
+	fmt.Println()
+	result := ""
+	for i := 0; i < 4; i++ {
+		result += fmt.Sprintf("%02x, ", out[i*4])
+	}
+
+	fmt.Println(result)
+	expected := "a0, a1, a2, a3, "
+
+	if strings.Compare(result, expected) != 0 {
+		t.Fail()
+	}
+}
+
+func makeMatrix() []uint32 {
+	var ret = make([]uint32, 16)
+	ret[0] = 0xa0
+	ret[1] = 0xa1
+	ret[2] = 0xa2
+	ret[3] = 0xa3
+	ret[4] = 0xb0
+	ret[5] = 0xb1
+	ret[6] = 0xb2
+	ret[7] = 0xb3
+	ret[8] = 0xc0
+	ret[9] = 0xc1
+	ret[10] = 0xc2
+	ret[11] = 0xc3
+	ret[12] = 0xd0
+	ret[13] = 0xd1
+	ret[14] = 0xd2
+	ret[15] = 0xd3
+	return ret
 }
 
 func Benchmark_encryptBlockAsmX1(b *testing.B) {
@@ -136,7 +210,7 @@ func Benchmark_encryptBlockAsmX1(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	b.SetBytes(16)
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		cryptoBlockAsm(&sm4.enc[0], &dst[0], &plain[0])
 	}
 }
@@ -151,7 +225,7 @@ func Benchmark_encryptBlockAsmX4(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	b.SetBytes(64)
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		cryptoBlockAsmX4(&sm4.enc[0], &dst[0], &plain[0])
 	}
 }
@@ -166,7 +240,7 @@ func Benchmark_encryptBlockAsmX8(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	b.SetBytes(128)
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		cryptoBlockAsmX8(&sm4.enc[0], &dst[0], &plain[0])
 	}
 }
@@ -181,23 +255,23 @@ func Benchmark_encryptBlockAsmX16(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	b.SetBytes(256)
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		cryptoBlockAsmX16(&sm4.enc[0], &dst[0], &plain[0])
 	}
 }
 
 func Test_printDataBlock(t *testing.T) {
-	for i:=0; i<32; i++ {
+	for i := 0; i < 32; i++ {
 		fmt.Printf("DATA SBox<>+0x%02x(SB)/8, $0x", i*8)
-		for j:=0; j<8; j++ {
-			fmt.Printf("%02x", sbox[i*8 + 7 - j])
+		for j := 0; j < 8; j++ {
+			fmt.Printf("%02x", sbox[i*8+7-j])
 		}
 		fmt.Println()
 	}
 }
 
 func Test_printCKeys(t *testing.T) {
-	for i:=0; i<32; i++ {
+	for i := 0; i < 32; i++ {
 		fmt.Printf("DATA CK<>+0x%02x(SB)/4, $0x", i*4)
 		fmt.Printf("%08x\n", ck[i])
 	}
@@ -219,8 +293,6 @@ func Test_expandKeyAsmZeroKey(t *testing.T) {
 		t.Fail()
 	}
 }
-
-
 
 func Test_expandKeyAsmFixedKey(t *testing.T) {
 	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
