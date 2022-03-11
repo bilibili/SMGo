@@ -210,18 +210,13 @@ GLOBL CK<>(SB), (NOPTR+RODATA), $128
 
 TEXT ·expandKeyAsm(SB),NOSPLIT,$0-24
 
-    #define getXorWCk(B, C, D, DST) \
-        VEOR    B.B16, C.B16, T0.B16 \
-        VEOR    D.B16, RK.B16, T1.B16 \
-        VEOR    T0.B16, T1.B16, DST.B16 \
-
     #define saveKeys(Renc, Rdec, A) \
         VST1.P  A.S[0], 4(Renc) \
         VST1    A.S[0], (Rdec) \
         SUB     $4, Rdec, Rdec \
 
-    #define loadCKey(R) \
-        VLD1.P  4(R), RK.S[0] \
+    #define loadCKey(R, Dst) \
+        VLD1.P  4(R), Dst.S[0] \
 
     #define transformLPrime(Data) \
         VSHL    $13,  Data.S4, T0.S4 \
@@ -232,8 +227,8 @@ TEXT ·expandKeyAsm(SB),NOSPLIT,$0-24
         VEOR    T0.B16, Data.B16, Data.B16 \
 
     #define expandSubRound(A, B, C, D, Renc, Rdec) \
-        loadCKey(R13) \
-        getXorWCk(B, C, D, TB0) \
+        loadCKey(R13, RK) \
+        getXor(B, C, D, TB0) \
         tableLookupX4() \
         transformLPrime(TB0) \
         VEOR    TB0.B16, A.B16, A.B16 \
