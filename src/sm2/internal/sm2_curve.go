@@ -345,3 +345,23 @@ func scalarMult_Unsafe_DaA(q *SM2Point, scalar []byte) (*SM2Point, error) {
 	return out, nil
 }
 
+// this function is only for publications -- to demonstrate Montgomery Ladder method
+func scalarMult_Unsafe_Ladder(q *SM2Point, scalar []byte) (*SM2Point, error) {
+	out := NewSM2Point()
+	tmp := NewSM2Point().Set(q)
+	for _, b := range scalar {
+		for bitNum := 0; bitNum < 8; bitNum++ {
+			if b&0x80 == 0x80 {
+				out.Add(out, tmp)
+				tmp.Double(tmp)
+			} else {
+				tmp.Add(out, tmp)
+				out.Double(out)
+			}
+			b <<= 1
+		}
+	}
+
+	return out, nil
+}
+

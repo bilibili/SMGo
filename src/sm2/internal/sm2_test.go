@@ -595,3 +595,15 @@ func Test_extractLowerBits(t *testing.T) {
 		}
 	}
 }
+
+func Test_MontgomeryLadder(t *testing.T) {
+	k := make([]byte, 32)
+	rand.Read(k)
+	// the result should equal G
+	R1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), k)
+	R2, _ := scalarMult_Unsafe_Ladder(NewSM2Generator(), k)
+	if !reflect.DeepEqual(R1.Bytes(), R2.Bytes()) {
+		t.Fail()
+	}
+}
+
