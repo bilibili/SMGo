@@ -230,15 +230,15 @@ func Test_gcm(t *testing.T) {
 
 	fmt.Printf("%x\n", sealed)
 
-	openned, e := gcm.Open(nil, nonce, sealed, aad)
+	opened, e := gcm.Open(nil, nonce, sealed, aad)
 
 	if e != nil {
 		fmt.Println(e.Error())
 		t.Fail()
 	}
 
-	if !reflect.DeepEqual(openned, plain) {
-		fmt.Printf("%x\n", openned)
+	if !reflect.DeepEqual(opened, plain) {
+		fmt.Printf("%x\n", opened)
 		t.Fail()
 	}
 
