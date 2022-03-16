@@ -4,6 +4,7 @@
 package sm4
 
 import (
+	"crypto/cipher"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
@@ -211,5 +212,50 @@ func bench(b *testing.B, n int) {
 				encryptX2(&sm4, cipher[32*j:], plain[32*j:])
 			}
 		}
+	}
+}
+
+func Test_gcm(t *testing.T) {
+	plain, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
+	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
+
+	sm4, _ := NewCipher(key)
+	gcm, _ := cipher.NewGCM(sm4)
+	fmt.Println(gcm.Overhead(), gcm.NonceSize())
+
+	nonce, _ := hex.DecodeString("0123456789ab0123456789ab")
+	aad, _ := hex.DecodeString("abcdef")
+
+	sealed := gcm.Seal(nil, nonce, plain, aad)
+
+	fmt.Printf("%x\n", sealed)
+
+	openned, e := gcm.Open(nil, nonce, sealed, aad)
+
+	if e != nil {
+		fmt.Println(e.Error())
+		t.Fail()
+	}
+
+	if !reflect.DeepEqual(openned, plain) {
+		fmt.Printf("%x\n", openned)
+		t.Fail()
+	}
+
+	nonce[0] = 0xff
+	_, e = gcm.Open(nil, nonce, sealed, aad)
+	if e == nil {
+		t.Fail()
+	} else {
+		fmt.Println(e.Error())
+	}
+
+	nonce, _ = hex.DecodeString("0123456789ab0123456789ab")
+	aad[0] = 0xff
+	_, e = gcm.Open(nil, nonce, sealed, aad)
+	if e == nil {
+		t.Fail()
+	} else {
+		fmt.Println(e.Error())
 	}
 }
