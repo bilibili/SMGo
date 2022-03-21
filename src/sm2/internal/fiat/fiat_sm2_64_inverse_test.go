@@ -1,8 +1,10 @@
 package fiat
 
 import (
+	"fmt"
 	"math/big"
 	"math/rand"
+	"reflect"
 	"testing"
 )
 
@@ -250,6 +252,45 @@ func generateRandom(a *[BYTES]byte) {
 	for j:=BYTES-8; j<BYTES; j++ {
 		a[j] = 0
 	}
+}
+
+func Test_SquareAndMultiply(t *testing.T) {
+
+	xBytes := make([]byte, 16)
+	rand.Read(xBytes)
+	x := new(big.Int).SetBytes(xBytes)
+
+	n,_ := new(big.Int).SetString("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54123", 16)
+	n2,_ := new(big.Int).SetString("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54121", 16)
+
+	y := new(big.Int).ModInverse(x, n)
+	z := squareAndMultiply(x, n2, n)
+
+	if !reflect.DeepEqual(y.Bytes(), z.Bytes()) {
+		fmt.Printf("%x\n%x\n", y.Bytes(), z.Bytes())
+		t.Fail()
+	}
+}
+
+
+func squareAndMultiply(x, power, mod *big.Int) *big.Int {
+	out := new(big.Int).SetUint64(1)
+	s := 0
+	m := 0
+	for i:=0; i<256; i++ {
+		out.Mul(out, out)
+		out.Mod(out, mod)
+		s +=1
+		if power.Bit(255-i) == 1 {
+			out.Mul(out, x)
+			out.Mod(out, mod)
+			m += 1
+		}
+	}
+
+	fmt.Printf("square: %d, multiply: %d\n", s, m)
+
+	return out
 }
 
 
