@@ -326,6 +326,66 @@ TEXT ·cryptoBlockAsm(SB),NOSPLIT,$0-24
     storeOutputX1(R11)
     RET
 
+//func cryptoBlockAsmX2(rk *uint32, dst, src *byte)
+TEXT ·cryptoBlockAsmX2(SB),NOSPLIT,$0-24
+
+    #define loadInputX2(R) \
+        VLD1.P  4(R), Z0.S[0] \
+        VLD1.P  4(R), Z1.S[0] \
+        VLD1.P  4(R), Z2.S[0] \
+        VLD1.P  4(R), Z3.S[0] \
+        VLD1.P  4(R), Z0.S[1] \
+        VLD1.P  4(R), Z1.S[1] \
+        VLD1.P  4(R), Z2.S[1] \
+        VLD1.P  4(R), Z3.S[1] \
+        revZ() \
+
+    #define storeOutputX2(R) \
+        revZ() \
+        VST1.P  Z3.S[0], 4(R) \
+        VST1.P  Z2.S[0], 4(R) \
+        VST1.P  Z1.S[0], 4(R) \
+        VST1.P  Z0.S[0], 4(R) \
+        VST1.P  Z3.S[1], 4(R) \
+        VST1.P  Z2.S[1], 4(R) \
+        VST1.P  Z1.S[1], 4(R) \
+        VST1.P  Z0.S[1], 4(R) \
+
+    #define loadRoundKeyX2(R) \
+        VLD1.P  4(R), RK.S[0] \
+        VDUP    RK.S[0], RK.S2 \
+
+    #define roundX2(R) \
+        loadRoundKeyX2(R) \
+        subRoundX4(Z0, Z1, Z2, Z3, TB0) \
+        loadRoundKeyX2(R) \
+        subRoundX4(Z1, Z2, Z3, Z0, TB0) \
+        loadRoundKeyX2(R) \
+        subRoundX4(Z2, Z3, Z0, Z1, TB0) \
+        loadRoundKeyX2(R) \
+        subRoundX4(Z3, Z0, Z1, Z2, TB0) \
+
+    loadSBox(R0)
+
+	MOVD	rk+0(FP), R10
+	MOVD	dst+8(FP), R11
+	MOVD	src+16(FP), R12
+
+    VMOVI   $0x40, CONST.B16
+    loadInputX2(R12)
+
+    roundX2(R10)
+    roundX2(R10)
+    roundX2(R10)
+    roundX2(R10)
+    roundX2(R10)
+    roundX2(R10)
+    roundX2(R10)
+    roundX2(R10)
+
+    storeOutputX2(R11)
+    RET
+
 #define loadRoundKeyX4(R) \
     VLD1.P  4(R), RK.S[0] \
     VDUP    RK.S[0], RK.S4 \

@@ -74,6 +74,23 @@ func Test_encryptBlockAsmX4(t *testing.T) {
 	}
 }
 
+func Test_encryptBlockAsmX2(t *testing.T) {
+	plain, _ := hex.DecodeString("0123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210")
+	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
+	expected, _ := hex.DecodeString("681edf34d206965e86b3e94f536e4246681edf34d206965e86b3e94f536e4246")
+
+	cipher := make([]byte, 32)
+
+	sm4 := sm4Cipher{}
+	expandKey(key, &sm4.enc, &sm4.dec)
+
+	cryptoBlockAsmX2(&sm4.enc[0], &cipher[0], &plain[0])
+	fmt.Printf("Result: %x\nExpected: %x\n", cipher, expected)
+	if !reflect.DeepEqual(cipher, expected) {
+		t.Fail()
+	}
+}
+
 func Test_encryptBlockAsm(t *testing.T) {
 	plain, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")

@@ -36,12 +36,15 @@ func expandKeyAsm(key *byte, enc, dec *uint32)
 func cryptoBlockAsm(rk *uint32, dst, src *byte)
 
 //go:noescape
+func cryptoBlockAsmX2(rk *uint32, dst, src *byte)
+
+//go:noescape
 func cryptoBlockAsmX4(rk *uint32, dst, src *byte)
 
 //go:noescape
 func cryptoBlockAsmX8(rk *uint32, dst, src *byte)
 
-func (sm4 *sm4CipherAsm) EncryptX4(dst, src []byte) {
+func (sm4 *sm4CipherAsm) encryptX4(dst, src []byte) {
 	if len(src) < blockSize<<2 {
 		panic("sm4: input not 4 full blocks")
 	}
@@ -51,7 +54,7 @@ func (sm4 *sm4CipherAsm) EncryptX4(dst, src []byte) {
 	cryptoBlockAsmX4(&sm4.enc[0], &dst[0], &src[0])
 }
 
-func (sm4 *sm4CipherAsm) DecryptX4(dst, src []byte) {
+func (sm4 *sm4CipherAsm) decryptX4(dst, src []byte) {
 	if len(src) < blockSize<<2 {
 		panic("sm4: input not 4 full blocks")
 	}
