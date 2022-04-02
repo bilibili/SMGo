@@ -206,6 +206,44 @@ TEXT ·transpose4x4(SB),NOSPLIT,$0-16
 
     RET
 
+// for 2 128-bit lanes
+//      suppose we begin with: {a0, a1, a2, a3}, {b0, b1, b2, b3}, -, -
+//      we want to reach:      {a0, b0--}, {a1, b1--}, {a2,b2--}, {a3,b3--}
+#define transpose2x4(V1, V2, V3, V4, Tmp1, Tmp2) \
+    VPUNPCKHDQ  V2, V1, Tmp1 \      // Tmp1: a2, b2, a3, b3                     //128: SSE2; 256: AVX2; 512: AVX512F
+    VPUNPCKLDQ  V2, V1, V1 \        // V1: a0, b0, a1, b1                       //latency 1, CPI 1
+    VPUNPCKHQDQ V1, V1, V2 \        // V2: a1, b1, -, -
+    VPUNPCKLQDQ V1, Tmp1, V3 \      // V3: a2, b2, -, -
+    VPUNPCKHQDQ V1, Tmp1, V4 \      // V4: a2, b2, -, -
+
+//      suppose we begin with: {a0, b0--}, {a1, b1,--}, {a2, b2--}, {a3, b3--}
+//      we want to reach:      {a0, a1, a2, a3}, {b0, b1, b2, b3}, -, -
+#define transpose4x2(V1, V2, V3, V4, Tmp1, Tmp2) \
+    VPUNPCKLDQ  V2, V1, Tmp1 \        // Tmp1: a0, a1, b0, b1
+    VPUNPCKLDQ  V4, V3, Tmp2 \        // Tmp2: a2, a3, b2, b3
+    VPUNPCKLQDQ Tmp2, Tmp1, V1 \      // V1: a0, a1, a2, a3
+    VPUNPCKHQDQ Tmp2, Tmp1, V2 \      // V1: b0, b1, b2, b3
+
+//func transpose1x4(dst *uint32, src *uint32)
+TEXT ·transpose2x4(SB),NOSPLIT,$0-16
+
+	MOVQ    dst+0(FP), AX
+	MOVQ    src+8(FP), BX
+
+    VMOVDQU32   (BX), X1
+    VMOVDQU32   16(BX), X2
+    VMOVDQU32   32(BX), X3
+    VMOVDQU32   48(BX), X4
+
+    transpose2x4(X1, X2, X3, X4, X5, X6)
+
+    VMOVDQU32   X1, (AX)
+    VMOVDQU32   X2, 16(AX)
+    VMOVDQU32   X3, 32(AX)
+    VMOVDQU32   X4, 48(AX)
+
+    RET
+
 // for ONE 128-bit lane
 //      suppose we begin with: {a0, a1, a2, a3}, -, -, -
 //      we want to reach:      {a0---}, {a1---}, {a2---}, {a3---}
@@ -412,6 +450,46 @@ TEXT ·cryptoBlockAsm(SB),NOSPLIT,$0-24
     rev32(VxShuffle, VxState4)
 
     storeOutputX1(VxState4, BX)
+
+    RET
+
+//func cryptoBlockAsmX2(rk *uint32, dst, src *byte)
+TEXT ·cryptoBlockAsmX2(SB),NOSPLIT,$0-24
+
+    #define loadInputX2(Src, V1, V2) \ // we should perform transpose/rev later
+        VMOVDQU32   (Src), V1 \
+        VMOVDQU32   (16)(Src), V2 \
+
+    #define storeOutputX2(V1, V2, Dst) \
+        VMOVDQU32   V1, (Dst) \ //SSE2, latency 5, CPI 1
+        VMOVDQU32   V2, (16)(Dst) \
+
+    loadShuffle128()
+	MOVQ    src+16(FP), CX
+    loadInputX2(CX, VxState1, VxState2)
+    loadMatrix(VxPreMatrix, VxPostMatrix)
+
+	MOVQ    rk+0(FP), AX
+	MOVQ    dst+8(FP), BX
+
+    rev32(VxShuffle, VxState1) // latency hiden successfully
+    rev32(VxShuffle, VxState2)
+    transpose2x4(VxState1, VxState2, VxState3, VxState4, T0x, T1x)
+
+    roundX(AX)
+    roundX(AX)
+    roundX(AX)
+    roundX(AX)
+    roundX(AX)
+    roundX(AX)
+    roundX(AX)
+    roundX(AX)
+
+    transpose4x2(VxState4, VxState3, VxState2, VxState1, T0x, T1x)
+    rev32(VxShuffle, VxState4)
+    rev32(VxShuffle, VxState3)
+
+    storeOutputX2(VxState4, VxState3, BX)
 
     RET
 
