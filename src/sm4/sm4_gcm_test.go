@@ -264,3 +264,46 @@ func Benchmark_sm4GcmAsm_SealX16(b *testing.B) {
 		gcmAsm.Seal(dst, nonce, src, aad)
 	}
 }
+
+func Benchmark_sm4GcmAsm_Seal_16(b *testing.B) {
+	benchgcm(16, b)
+}
+
+func Benchmark_sm4GcmAsm_Seal_64(b *testing.B) {
+	benchgcm(64, b)
+}
+
+func Benchmark_sm4GcmAsm_Seal_256(b *testing.B) {
+	benchgcm(256, b)
+}
+
+func Benchmark_sm4GcmAsm_Seal_1024(b *testing.B) {
+	benchgcm(1024, b)
+}
+
+func Benchmark_sm4GcmAsm_Seal_8192(b *testing.B) {
+	benchgcm(8192, b)
+}
+
+func Benchmark_sm4GcmAsm_Seal_16384(b *testing.B) {
+	benchgcm(16384, b)
+}
+
+
+func benchgcm(count int, b *testing.B) {
+	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
+	src := make([]byte, count)
+	nonce, _ := hex.DecodeString("0123456789ab0123456789ab")
+	aad, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
+	dst := make([]byte, count+16)
+
+	sm4Asm, _ := NewCipher(key)
+	gcmAsm, _ := cipher.NewGCM(sm4Asm)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	b.SetBytes(int64(count))
+	for i:=0; i<b.N; i++ {
+		gcmAsm.Seal(dst, nonce, src, aad)
+	}
+}
