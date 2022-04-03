@@ -3,45 +3,76 @@
 
 #include "textflag.h"
 
-#define     T0  V11
-#define     T1  V12
-#define     T2  V13
-#define     T3  V14
+#define     Dat     V0
+#define     Dat2    V1
+#define     Dat3    V2
+#define     Dat4    V3
 
-#define     Tag     V15
-#define     Dat     V16
-#define     H       V17
-#define     H2      V18
-#define     Hi      V19 // the high part of the multiplication
-#define     Mid     V20 // the middle part of the multiplication (no need for the low part - just use Tag)
-#define     Zero    V21
-#define     Reduce  V22 // for reduce from 256 bit to 128 bit over x^128 + x^7 + x^2 + x + 1
+#define     H       V4
+#define     Hs      V5
+#define     Hpower2 V6
+#define     Hp2s    V7
+#define     Hpower3 V8
+#define     Hp3s    V9
+#define     Hpower4 V10
+#define     Hp4s    V11
 
-#define mul() \
-    VEXT        $8, Dat.B16, Dat.B16, T0.B16 \
-    VEOR        Dat.B16, T0.B16, T0.B16 \ // Dat.h ^ Dat.l
+#define     Zero    V12
+#define     Reduce  V13 // for reduce from 256 bit to 128 bit over x^128 + x^7 + x^2 + x + 1
+
+#define     T0      V14
+#define     T1      V15
+#define     T2      V16
+#define     T3      V17
+
+#define     Low1    V18
+#define     Mid1    V19
+#define     High1   V20
+
+#define     Low2    V21
+#define     Mid2    V22
+#define     High2   V23
+
+#define     Low3    V24
+#define     Mid3    V25
+#define     High3   V26
+
+#define     Low4    V27
+#define     Mid4    V28
+#define     High4   V29
+
+#define     Tag     V30
+
+#define     DEBUG   V31
+
+#define mul(Factor, FactorS, Input, Lo, Mid, Hi) \
+    VEXT        $8, Input.B16, Input.B16, T0.B16 \
+    VEOR        Input.B16, T0.B16, T0.B16 \ // Dat.h ^ Dat.l
     \ //Karatsuba Multiplication
-    VPMULL      Dat.D1, H.D1, Tag.Q1 \ // the low 128 bit
-    VPMULL2     Dat.D2, H.D2, Hi.Q1 \ // the high 128 bit
-    VPMULL      T0.D1, H2.D1, Mid.Q1 \
-    VEOR        Hi.B16, Tag.B16, T1.B16 \
+    VPMULL      Input.D1, Factor.D1, Lo.Q1 \ // the low 128 bit
+    VPMULL2     Input.D2, Factor.D2, Hi.Q1 \ // the high 128 bit
+    VPMULL      T0.D1, FactorS.D1, Mid.Q1 \
+
+#define reduce(Output, Lo, Mid, Hi) \
+    \ // merge Middle 128 bits to High & Low
+    VEOR        Hi.B16, Lo.B16, T1.B16 \
     VEOR        Mid.B16, T1.B16, Mid.B16 \ // the middle 128 bit
     VEXT        $8, Zero.B16, Mid.B16, T2.B16 \ // ** higher ** 64 bits of middle
     VEXT        $8, Mid.B16, Zero.B16, T3.B16 \ // ** lower ** 64 bit of middle
     VEOR        Hi.B16, T2.B16, Hi.B16 \
-    VEOR        Tag.B16, T3.B16, Tag.B16 \
-    \ // reduce 256 bit (Tag:Hi) to 128 bit (Tag) over g(x) = 1 + x + x^2 + x^7 + x^128
+    VEOR        Lo.B16, T3.B16, Lo.B16 \
+    \ // reduce 256 bit (Lo:Hi) to 128 bit (Lo) over g(x) = 1 + x + x^2 + x^7 + x^128
     \ // for this multiplication: (l:h)*(poly:0) = l*poly ^ (h*poly)>>64
     \ // with poly = 1 + x + x^2 + x^7
     VPMULL      Reduce.D1, Hi.D1, T0.Q1 \ // the low part
     VPMULL2     Reduce.D2, Hi.D2, T1.Q1 \ // the high part
     VEXT        $8, T1.B16, Zero.B16, T2.B16 \
     VEOR        T2.B16, T0.B16, T0.B16 \
-    VEOR        T0.B16, Tag.B16, Tag.B16 \
+    VEOR        T0.B16, Lo.B16, Lo.B16 \
     \ // we then repeat the multiplication for the highest-64 bit part of previous multiplication (upper of h*poly).
     VEXT        $8, Zero.B16, T1.B16, T2.B16 \
     VPMULL      T2.D1, Reduce.D1, T3.Q1 \
-    VEOR        T3.B16, Tag.B16, Tag.B16 \
+    VEOR        T3.B16, Lo.B16, Output.B16 \
 
 //func gHashBlocks(H *byte, tag *byte, data *byte, count int)
 TEXT ·gHashBlocks(SB),NOSPLIT,$0-32
@@ -56,25 +87,78 @@ TEXT ·gHashBlocks(SB),NOSPLIT,$0-32
     VRBIT       H.B16, H.B16
     VRBIT       Tag.B16, Tag.B16
 
-    VEXT        $8, H.B16, H.B16, H2.B16
-    VEOR        H.B16, H2.B16, H2.B16 // (Hh^Hl : Hh^Hl)
+    VEXT        $8, H.B16, H.B16, Hs.B16
+    VEOR        H.B16, Hs.B16, Hs.B16 // (Hh^Hl : Hh^Hl)
 
     VEOR        Zero.B16, Zero.B16, Zero.B16 // clear the content
 
 	MOVD	    $0x87, R9
 	VDUP	    R9, Reduce.D2
 
-loopBlocks:
+    CMP         $8, R13 // this could be fine tuned based on benchmark results
+    BLT         loopBy1
+
+    // precompute H^2, H^3 & H^4
+    mul(H, Hs, H, Low1, Mid1, High1)
+    reduce(Hpower2, Low1, Mid1, High1)
+    VEXT        $8, Hpower2.B16, Hpower2.B16, Hp2s.B16
+    VEOR        Hpower2.B16, Hp2s.B16, Hp2s.B16
+
+    mul(H, Hs, Hpower2, Low1, Mid1, High1)
+    reduce(Hpower3, Low1, Mid1, High1)
+    VEXT        $8, Hpower3.B16, Hpower3.B16, Hp3s.B16
+    VEOR        Hpower3.B16, Hp3s.B16, Hp3s.B16
+
+    mul(H, Hs, Hpower3, Low1, Mid1, High1)
+    reduce(Hpower4, Low1, Mid1, High1)
+    VEXT        $8, Hpower4.B16, Hpower4.B16, Hp4s.B16
+    VEOR        Hpower4.B16, Hp4s.B16, Hp4s.B16
+
+loopBy4:
+    VLD1.P      64(R12), [Dat.B16, Dat2.B16, Dat3.B16, Dat4.B16]
+    VRBIT       Dat.B16, Dat.B16
+    VRBIT       Dat2.B16, Dat2.B16
+    VRBIT       Dat3.B16, Dat3.B16
+    VRBIT       Dat4.B16, Dat4.B16
+    VEOR        Tag.B16, Dat.B16, Dat.B16
+
+    mul(Hpower4, Hp4s, Dat, Low1, Mid1, High1)
+    mul(Hpower3, Hp3s, Dat2, Low2, Mid2, High2)
+    mul(Hpower2, Hp2s, Dat3, Low3, Mid3, High3)
+    mul(H, Hs, Dat4, Low4, Mid4, High4)
+
+    VEOR        Low2.B16, Low3.B16, T0.B16
+    VEOR        Mid2.B16, Mid3.B16, T1.B16
+    VEOR        High2.B16, High3.B16, T2.B16
+    VEOR        Low4.B16, T0.B16, T0.B16
+    VEOR        Mid4.B16, T1.B16, T1.B16
+    VEOR        High4.B16, T2.B16, T2.B16
+    VEOR        T0.B16, Low1.B16, Low1.B16
+    VEOR        T1.B16, Mid1.B16, Mid1.B16
+    VEOR        T2.B16, High1.B16, High1.B16
+
+    reduce(Tag, Low1, Mid1, High1)
+
+    SUB         $4, R13
+    CMP         $3, R13
+    BGT         loopBy4
+
+    CMP         $0, R13
+    BEQ         blocksEnd
+
+loopBy1:
     VLD1.P      16(R12), [Dat.B16]
     VRBIT       Dat.B16, Dat.B16
     VEOR        Tag.B16, Dat.B16, Dat.B16
 
-    mul()
+    mul(H, Hs, Dat, Low1, Mid1, High1)
+    reduce(Tag, Low1, Mid1, High1)
 
     SUB         $1, R13
     CMP         $0, R13
-    BGT         loopBlocks
+    BGT         loopBy1
 
+blocksEnd:
     VRBIT       Tag.B16, Tag.B16
     VST1        [Tag.B16], (R11)
 

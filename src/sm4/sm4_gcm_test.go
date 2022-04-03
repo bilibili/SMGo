@@ -156,10 +156,13 @@ func Test_sm4GcmAsm_Seal(t *testing.T) {
 }
 
 func Test_sm4GcmAsm_SealXN(t *testing.T) {
-	for blocks := 1; blocks<100; blocks++ {
+	for blocks := 0; blocks<100; blocks++ {
 		key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 
 		src := make([]byte, 16*blocks)
+		if blocks == 0 {
+			src = nil
+		}
 		rand.Read(src)
 
 		nonce := make([]byte, 12)
@@ -183,11 +186,19 @@ func Test_sm4GcmAsm_SealXN(t *testing.T) {
 		asm2Go, e1 := gcmGo.Open(nil, nonce, dst, aad)
 		go2Asm, e2 := gcmAsm.Open(nil, nonce, expected, aad)
 
-		if e1 != nil || e2 != nil {
+		if e1 != nil {
+			fmt.Println(blocks)
+			fmt.Println(e1.Error())
 			t.Fail()
+		}
+		if e2 != nil {
+			fmt.Println(blocks)
+			fmt.Println(e2.Error())
 		}
 
 		if !reflect.DeepEqual(go2Asm, src) || !reflect.DeepEqual(asm2Go, src) {
+			fmt.Println(blocks)
+			fmt.Printf("go2Asm %x\nasm2Go %x\n", go2Asm, asm2Go)
 			t.Fail()
 		}
 	}
