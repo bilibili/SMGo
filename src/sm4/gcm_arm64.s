@@ -3,10 +3,10 @@
 
 #include "textflag.h"
 
-#define     Dat     V0
-#define     Dat2    V1
-#define     Dat3    V2
-#define     Dat4    V3
+#define     Dat4    V0
+#define     Dat3    V1
+#define     Dat2    V2
+#define     Dat     V3
 
 #define     H       V4
 #define     Hs      V5
@@ -74,6 +74,48 @@
     VPMULL      T2.D1, Reduce.D1, T3.Q1 \
     VEOR        T3.B16, Lo.B16, Output.B16 \
 
+#define load4X() \
+    VLD1.P      64(R12), [Dat4.B16, Dat3.B16, Dat2.B16, Dat.B16] \
+    VRBIT       Dat4.B16, Dat4.B16 \
+    VRBIT       Dat3.B16, Dat3.B16 \
+    VRBIT       Dat2.B16, Dat2.B16 \
+    VRBIT       Dat.B16, Dat.B16 \
+
+#define load3X() \
+    VLD1.P      48(R12), [Dat3.B16, Dat2.B16, Dat.B16] \
+    VRBIT       Dat3.B16, Dat3.B16 \
+    VRBIT       Dat2.B16, Dat2.B16 \
+    VRBIT       Dat.B16, Dat.B16 \
+
+#define load2X() \
+    VLD1.P      32(R12), [Dat2.B16, Dat.B16] \
+    VRBIT       Dat2.B16, Dat2.B16 \
+    VRBIT       Dat.B16, Dat.B16 \
+
+#define load1X() \
+    VLD1.P      16(R12), [Dat.B16] \
+    VRBIT       Dat.B16, Dat.B16 \
+
+#define mul3rd() \
+    mul(Hpower3, Hp3s, Dat3, Low2, Mid2, High2) \
+    VEOR        Low2.B16, Low1.B16, Low1.B16 \
+    VEOR        Mid2.B16, Mid1.B16, Mid1.B16 \
+    VEOR        High2.B16, High1.B16, High1.B16 \
+
+#define mul2nd() \
+    mul(Hpower2, Hp2s, Dat2, Low3, Mid3, High3) \
+    VEOR        Low3.B16, Low1.B16, Low1.B16 \
+    VEOR        Mid3.B16, Mid1.B16, Mid1.B16 \
+    VEOR        High3.B16, High1.B16, High1.B16 \
+
+#define mul1st() \
+    mul(H, Hs, Dat, Low4, Mid4, High4) \
+    VEOR        Low4.B16, Low1.B16, Low1.B16 \
+    VEOR        Mid4.B16, Mid1.B16, Mid1.B16 \
+    VEOR        High4.B16, High1.B16, High1.B16 \
+
+
+
 //func gHashBlocks(H *byte, tag *byte, data *byte, count int)
 TEXT ·gHashBlocks(SB),NOSPLIT,$0-32
 
@@ -115,42 +157,52 @@ TEXT ·gHashBlocks(SB),NOSPLIT,$0-32
     VEOR        Hpower4.B16, Hp4s.B16, Hp4s.B16
 
 loopBy4:
-    VLD1.P      64(R12), [Dat.B16, Dat2.B16, Dat3.B16, Dat4.B16]
-    VRBIT       Dat.B16, Dat.B16
-    VRBIT       Dat2.B16, Dat2.B16
-    VRBIT       Dat3.B16, Dat3.B16
-    VRBIT       Dat4.B16, Dat4.B16
-    VEOR        Tag.B16, Dat.B16, Dat.B16
+    load4X()
 
-    mul(Hpower4, Hp4s, Dat, Low1, Mid1, High1)
-    mul(Hpower3, Hp3s, Dat2, Low2, Mid2, High2)
-    mul(Hpower2, Hp2s, Dat3, Low3, Mid3, High3)
-    mul(H, Hs, Dat4, Low4, Mid4, High4)
+    VEOR        Tag.B16, Dat4.B16, Dat4.B16
+    mul(Hpower4, Hp4s, Dat4, Low1, Mid1, High1)
 
-    VEOR        Low2.B16, Low3.B16, T0.B16
-    VEOR        Mid2.B16, Mid3.B16, T1.B16
-    VEOR        High2.B16, High3.B16, T2.B16
-    VEOR        Low4.B16, T0.B16, T0.B16
-    VEOR        Mid4.B16, T1.B16, T1.B16
-    VEOR        High4.B16, T2.B16, T2.B16
-    VEOR        T0.B16, Low1.B16, Low1.B16
-    VEOR        T1.B16, Mid1.B16, Mid1.B16
-    VEOR        T2.B16, High1.B16, High1.B16
+    mul3rd()
+    mul2nd()
+    mul1st()
 
     reduce(Tag, Low1, Mid1, High1)
 
     SUB         $4, R13
     CMP         $3, R13
     BGT         loopBy4
+    BLT         loopBy2orLess
 
-    CMP         $0, R13
-    BEQ         blocksEnd
+    // loop by 3X
+    load3X()
+    VEOR        Tag.B16, Dat3.B16, Dat3.B16
+    mul(Hpower3, Hp3s, Dat3, Low1, Mid1, High1)
+
+    mul2nd()
+    mul1st()
+    reduce(Tag, Low1, Mid1, High1)
+
+    B           blocksEnd
+
+loopBy2orLess:
+    CMP         $1, R13
+    BEQ         loopBy1
+    BLT         blocksEnd
+
+    // loop by 2X
+    load2X()
+    VEOR        Tag.B16, Dat2.B16, Dat2.B16
+    mul(Hpower2, Hp2s, Dat2, Low1, Mid1, High1)
+
+    mul1st()
+    reduce(Tag, Low1, Mid1, High1)
+
+    B           blocksEnd
 
 loopBy1:
-    VLD1.P      16(R12), [Dat.B16]
-    VRBIT       Dat.B16, Dat.B16
-    VEOR        Tag.B16, Dat.B16, Dat.B16
+    load1X()
 
+    VEOR        Tag.B16, Dat.B16, Dat.B16
     mul(H, Hs, Dat, Low1, Mid1, High1)
     reduce(Tag, Low1, Mid1, High1)
 
