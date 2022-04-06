@@ -284,10 +284,8 @@ TEXT ·transpose1x4(SB),NOSPLIT,$0-16
 #define loadMatrix(Pre, Post) \
     MOVQ    $PreAffineMatrix<>(SB), R8 \
     MOVQ    $PostAffineMatrix<>(SB), R9 \
-    MOVQ    (R8), X1 \
-    MOVQ    (R9), X2 \
-    VBROADCASTI32X2     X1, Pre \ // latency is 3 for 256/512, 1 otherwise; CPI 1
-    VBROADCASTI32X2     X2, Post \ // 128/256: AVX512DQ+AVX512VL; 512: AVX512DQ
+    VBROADCASTI32X2     (R8), Pre \ // latency is 3 for 256/512, 1 otherwise; CPI 1
+    VBROADCASTI32X2     (R9), Post \ // 128/256: AVX512DQ+AVX512VL; 512: AVX512DQ
 
 #define rev32(Const, R) \
     VPSHUFB     Const, R, R \ // AVX512F(512) or SSE2(128) or AVX2(256), latency 1, CPI 0.5(256)/1(128;512)
