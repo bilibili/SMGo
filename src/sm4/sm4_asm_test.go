@@ -17,6 +17,7 @@ func Test_newCipher(t *testing.T) {
 	fmt.Printf("AVX: %t\n", CPU.Supports(AVX))
 	fmt.Printf("SSE3: %t\n", CPU.Supports(SSE3))
 	fmt.Printf("SSE2: %t\n", CPU.Supports(SSE2))
+	fmt.Printf("VPCLMULQDQ: %t\n", CPU.Supports(VPCLMULQDQ))
 	fmt.Printf("SM3: %t\n", CPU.Supports(SM3))
 	fmt.Printf("SM4: %t\n", CPU.Supports(SM4))
 	fmt.Printf("AESARM: %t\n", CPU.Supports(AESARM))

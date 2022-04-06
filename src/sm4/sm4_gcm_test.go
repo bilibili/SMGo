@@ -43,7 +43,7 @@ func testXor(xorFunc func(*byte, *byte, *byte), count int, t *testing.T) {
 	rand.Read(src1)
 	rand.Read(src2)
 
-	for i:=0; i<count; i++ {
+	for i := 0; i < count; i++ {
 		dstAlternative[i] = src1[i] ^ src2[i]
 	}
 
@@ -56,7 +56,7 @@ func testXor(xorFunc func(*byte, *byte, *byte), count int, t *testing.T) {
 
 var aesGCMTests = []struct {
 	key, nonce, plaintext, aad string
-	tagSize int
+	tagSize                    int
 }{
 	{
 		"0123456789abcdeffedcba9876543210",
@@ -108,8 +108,9 @@ var aesGCMTests = []struct {
 		15,
 	},
 }
+
 func Test_sm4GcmAsm_Seal(t *testing.T) {
-	for i, test := range aesGCMTests{
+	for i, test := range aesGCMTests {
 		key, _ := hex.DecodeString(test.key)
 		nonce, _ := hex.DecodeString(test.nonce)
 		src, _ := hex.DecodeString(test.plaintext)
@@ -137,7 +138,7 @@ func Test_sm4GcmAsm_Seal(t *testing.T) {
 		}
 		dst := gcmAsm.Seal(nil, nonce, src, aad)
 
-		if !reflect.DeepEqual(dst, expected){
+		if !reflect.DeepEqual(dst, expected) {
 			fmt.Printf("failed test case #%d\n%X\n%X\n", i, dst, expected)
 			t.Fail()
 		}
@@ -156,7 +157,7 @@ func Test_sm4GcmAsm_Seal(t *testing.T) {
 }
 
 func Test_sm4GcmAsm_SealXN(t *testing.T) {
-	for blocks := 0; blocks<100; blocks++ {
+	for blocks := 2; blocks < 100; blocks++ {
 		key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 
 		src := make([]byte, 16*blocks)
@@ -205,7 +206,7 @@ func Test_sm4GcmAsm_SealXN(t *testing.T) {
 }
 
 func Test_sm4GcmAsm_Seal_Random(t *testing.T) {
-	for i := 1; i<1000; i++ {
+	for i := 1; i < 1000; i++ {
 		key := make([]byte, 16)
 		src := make([]byte, 16)
 		nonce := make([]byte, 12)
@@ -215,7 +216,6 @@ func Test_sm4GcmAsm_Seal_Random(t *testing.T) {
 		rand.Read(src)
 		rand.Read(nonce)
 		rand.Read(aad)
-
 
 		sm4Go, _ := newCipherGeneric(key)
 		gcmGo, _ := cipher.NewGCM(sm4Go)
@@ -258,6 +258,19 @@ func Test_GcmRevisedSpec(t *testing.T) {
 	}
 }
 
+func Test_MultiplyByUnit(t *testing.T) {
+	H, _ := hex.DecodeString("80000000000000000000000000000000")
+	C, _ := hex.DecodeString("0388dace60b6a392f328c2b971b2fe78")
+	expected, _ := hex.DecodeString("0388dace60b6a392f328c2b971b2fe78") // X1 from test case 2
+	tag := make([]byte, 16)
+
+	gHashBlocks(&H[0], &tag[0], &C[0], 1)
+	fmt.Printf("%X\n%X\n", tag, expected)
+	if !reflect.DeepEqual(expected, tag) {
+		t.Fail()
+	}
+}
+
 func Benchmark_sm4GcmAsm_SealX16(b *testing.B) {
 	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 	src := make([]byte, 256)
@@ -271,7 +284,7 @@ func Benchmark_sm4GcmAsm_SealX16(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	b.SetBytes(256)
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		gcmAsm.Seal(dst, nonce, src, aad)
 	}
 }
@@ -300,7 +313,6 @@ func Benchmark_sm4GcmAsm_Seal_16384(b *testing.B) {
 	benchgcm(16384, b)
 }
 
-
 func benchgcm(count int, b *testing.B) {
 	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 	src := make([]byte, count)
@@ -314,7 +326,7 @@ func benchgcm(count int, b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	b.SetBytes(int64(count))
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		gcmAsm.Seal(dst, nonce, src, aad)
 	}
 }
