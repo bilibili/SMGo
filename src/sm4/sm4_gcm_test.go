@@ -157,7 +157,7 @@ func Test_sm4GcmAsm_Seal(t *testing.T) {
 }
 
 func Test_sm4GcmAsm_SealXN(t *testing.T) {
-	for blocks := 2; blocks < 100; blocks++ {
+	for blocks := 0; blocks < 100; blocks++ {
 		key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 
 		src := make([]byte, 16*blocks)
@@ -195,6 +195,7 @@ func Test_sm4GcmAsm_SealXN(t *testing.T) {
 		if e2 != nil {
 			fmt.Println(blocks)
 			fmt.Println(e2.Error())
+			t.Fail()
 		}
 
 		if !reflect.DeepEqual(go2Asm, src) || !reflect.DeepEqual(asm2Go, src) {
@@ -206,7 +207,7 @@ func Test_sm4GcmAsm_SealXN(t *testing.T) {
 }
 
 func Test_sm4GcmAsm_Seal_Random(t *testing.T) {
-	for i := 1; i < 1000; i++ {
+	for i := 0; i < 1000; i++ {
 		key := make([]byte, 16)
 		src := make([]byte, 16)
 		nonce := make([]byte, 12)

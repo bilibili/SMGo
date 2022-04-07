@@ -1,10 +1,8 @@
 // Copyright 2021 ~ 2022 bilibili. All rights reserved. Author: Guo, Weiji guoweiji@bilibili.com
 // 哔哩哔哩版权所有 2021 ~ 2022。作者：郭伟基 guoweiji@bilibili.com
 
-// optimized based on the Intel document "Optimized Galois-Counter-Mode Implementation on Intel Architecture Processors"
+// optimized partially based on the Intel document "Optimized Galois-Counter-Mode Implementation on Intel Architecture Processors"
 // https://www.intel.com/content/dam/www/public/us/en/documents/white-papers/communications-ia-galois-counter-mode-paper.pdf
-
-// rtdsc() can return clock cycles since last reset
 
 #include "textflag.h"
 
@@ -73,33 +71,63 @@ DATA GCM_POLY<>+0x00(SB)/8, $0x0000000000000087
 DATA GCM_POLY<>+0x08(SB)/8, $0x0000000000000000
 GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
 
+DATA SHUFFLE_X_LANES<>+0x00(SB)/8, $0x06
+DATA SHUFFLE_X_LANES<>+0x08(SB)/8, $0x07
+DATA SHUFFLE_X_LANES<>+0x10(SB)/8, $0x00
+DATA SHUFFLE_X_LANES<>+0x18(SB)/8, $0x01
+DATA SHUFFLE_X_LANES<>+0x20(SB)/8, $0x04
+DATA SHUFFLE_X_LANES<>+0x28(SB)/8, $0x05
+DATA SHUFFLE_X_LANES<>+0x30(SB)/8, $0x06
+DATA SHUFFLE_X_LANES<>+0x38(SB)/8, $0x07
+GLOBL SHUFFLE_X_LANES<>(SB), (NOPTR+RODATA), $64
+
+DATA MERGE_H01<>+0x00(SB)/8, $0x00
+DATA MERGE_H01<>+0x08(SB)/8, $0x00
+DATA MERGE_H01<>+0x10(SB)/8, $0x00
+DATA MERGE_H01<>+0x18(SB)/8, $0x01
+GLOBL MERGE_H01<>(SB), (NOPTR+RODATA), $32
+
+DATA MERGE_H23<>+0x00(SB)/8, $0x00
+DATA MERGE_H23<>+0x08(SB)/8, $0x00
+DATA MERGE_H23<>+0x10(SB)/8, $0x00
+DATA MERGE_H23<>+0x18(SB)/8, $0x00
+DATA MERGE_H23<>+0x20(SB)/8, $0x00
+DATA MERGE_H23<>+0x28(SB)/8, $0x01
+DATA MERGE_H23<>+0x30(SB)/8, $0x02
+DATA MERGE_H23<>+0x38(SB)/8, $0x03
+GLOBL MERGE_H23<>(SB), (NOPTR+RODATA), $64
+
 
 // Register allocation
 
 // R8~15: general purpose drafts
 // AX, BX, CX, DX: parameters
 
-// X/Y/Z 0~5 draft registers
+#define MASK_Mov0_1   K1
+#define MASK_Mov01_23 K2
+
+// X/Y/Z 0~6 draft registers
 #define T0x X0
 #define T1x X1
 #define T2x X2
 #define T3x X3
-#define T4x X4
-#define T5x X5
 
-#define T0y Y0
-#define T1y Y1
-#define T2y Y2
-#define T3y Y3
-#define T4y Y4
-#define T5y Y5
+#define U1x X4
+#define U2x X5
+
+#define U1y Y4
+#define U2y Y5
 
 #define T0z Z0
 #define T1z Z1
 #define T2z Z2
 #define T3z Z3
-#define T4z Z4
-#define T5z Z5
+
+#define U1z Z4
+#define U2z Z5
+
+#define VyIdxH01     Y10
+#define VzIdxH23     Z11
 
 // X/Y/Z 16~19 masks
 #define VxAndMask    X16
@@ -121,42 +149,43 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
 #define VxH          X21
 #define VxHs         X22
 
-#define VyDat        Y20
 #define VyH          Y21
-#define VyHs         Y22
 
 #define VzDat        Z20
 #define VzH          Z21
 #define VzHs         Z22
 
 #define VxReduce     X23
-#define VyReduce     Y23
 #define VzReduce     Z23
 
 #define VxLow        X24
 #define VxMid        X25
 #define VxHigh       X26
 
-#define VyLow        Y24
-#define VyMid        Y25
-#define VyHigh       Y26
-
 #define VzLow        Z24
 #define VzMid        Z25
 #define VzHigh       Z26
 
 #define VxTag        X27
-#define VyTag        Y27
 #define VzTag        Z27
 
-#define DEBUG X31
+#define VxH4         X28
+#define VyH4         Y28
+#define VzH4         Z28
+
+#define VzH4s        Z29
+
+#define VzIdx        Z30
+
+#define DEBUG        X31
+#define DEBUGz       Z31
 
 #define loadMasks() \
     MOVQ                $AND_MASK<>(SB), R8 \
     MOVQ                $LOWER_MASK<>(SB), R9 \
     MOVQ                $HIGHER_MASK<>(SB), R10 \
     \//MOVQ                $BSWAP_MASK<>(SB), R11 \
-    VBROADCASTI32X4     (R8), VzAndMask \
+    VBROADCASTI32X4     (R8), VzAndMask \ // latency 8, CPI 0.5
     VBROADCASTI32X4     (R9), VzLowerMask \
     VBROADCASTI32X4     (R10), VzHigherMask \
     \//VBROADCASTI32X4     (R11), VzBSwapMask \
@@ -168,17 +197,17 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
     VPSHUFB     T1, Higher, T1 \
     VPSHUFB     T0, Lower, T0 \
     VPXORD      T0, T1, V \
-    //VPSHUFB     VxBSwapMask, T0, V \ //not sure if we ever need this, keep it here for now TODO
+    //VPSHUFB     VxBSwapMask, T0, V \
 
 #define mul(Factor, FactorS, Input, Lo, Mid, Hi, T0) \
-    VPSRLDQ     $8, Input, T0 \ // h moved to l
-    VPXORD      Input, T0, T0 \ // h^l in lower 64 bits
     \ //Karatsuba Multiplication
     VPCLMULQDQ  $0x00, Input, Factor, Lo \ // the low 128 bit  VPCLMULQDQ + AVX512VL, latency 6, CPI1
-    VPCLMULQDQ  $0x11, Input, Factor, Hi \ // the high 128 bit
+    VPSRLDQ     $8, Input, T0 \ // h moved to l
+    VPXORD      Input, T0, T0 \ // h^l in lower 64 bits
     VPCLMULQDQ  $0x00, T0, FactorS, Mid \
+    VPCLMULQDQ  $0x11, Input, Factor, Hi \ // the high 128 bit
 
-#define reduce(Output, Lo, Mid, Hi, T0, T1, T2, T3) \
+#define reduce(Output, Reduce, Lo, Mid, Hi, T0, T1, T2, T3) \
     \ // merge Middle 128 bits to High & Low
     VPXORD      Hi, Lo, T1 \
     VPXORD      Mid, T1, Mid \ // the middle 128 bit
@@ -189,62 +218,119 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
     \ // reduce 256 bit (Lo:Hi) to 128 bit (Lo) over g(x) = 1 + x + x^2 + x^7 + x^128
     \ // for this multiplication: (l:h)*(poly:0) = l*poly ^ (h*poly)>>64
     \ // with poly = 1 + x + x^2 + x^7
-    VPCLMULQDQ  $0x00, VxReduce, Hi, T0 \ // the low part
-    VPCLMULQDQ  $0x01, VxReduce, Hi, T1 \ // the high part
+    VPCLMULQDQ  $0x00, Reduce, Hi, T0 \ // the low part
+    VPCLMULQDQ  $0x01, Reduce, Hi, T1 \ // the high part
     VPSLLDQ     $8, T1, T2 \
     VPXORD      T2, T0, T0 \
     VPXORD      T0, Lo, Lo \
     \ // we then repeat the multiplication for the highest-64 bit part of previous multiplication (upper of h*poly).
-    VPCLMULQDQ  $0x01, VxReduce, T1, T3 \
+    VPCLMULQDQ  $0x01, Reduce, T1, T3 \
     VPXORD      T3, Lo, Output \
+
+#define load4X() \
+    VMOVDQU32   (CX), VzDat \
+    ADDQ        $64, CX \
+    reverseBits(VzDat, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
 
 #define load1X() \
     VMOVDQU32   (CX), VxDat \
     ADDQ        $16, CX \
     reverseBits(VxDat, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
 
-
-
 //func gHashBlocks(H *byte, tag *byte, data *byte, count int)
 TEXT ·gHashBlocks(SB),NOSPLIT,$0-32
-
-    loadMasks()
 
 	MOVQ	    h+0(FP), AX
 	MOVQ	    tag+8(FP), BX
 	MOVQ	    data+16(FP), CX
     MOVQ        count+24(FP), DX
 
-	MOVQ	            $GCM_POLY<>(SB), R8
-	VBROADCASTI32X2     (R8), VxReduce
-//VMOVDQU32 VxReduce, DEBUG
+    // carefully hide the latency
+    VMOVDQU32   (AX), VxH // latency 7, CPI 0.5
+    VMOVDQU32   (BX), VxTag // higher lanes will be cleared automatically
 
-    VMOVDQU32   (AX), VxH
-    VMOVDQU32   (BX), VxTag
-    reverseBits(VxH, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x) // hide the latency of braodcasting load
+    loadMasks()
+
+	MOVQ	            $GCM_POLY<>(SB), R8
+	VBROADCASTI32X2     (R8), VzReduce // latency 3, CPI 1
+
+    reverseBits(VxH, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
     reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
 
     VPSRLDQ     $8, VxH, VxHs
     VPXORD      VxH, VxHs, VxHs //h^l in lower Hs
+
+    CMPQ        DX, $8 // this could be fine tuned based on benchmark results
+    JL          loopBy1
+
+    // precompute H^2, H^3 & H^4
+    MOVQ        $SHUFFLE_X_LANES<>(SB), R8
+    VMOVDQU32   (R8), VzIdx
+
+    MOVQ        $MERGE_H01<>(SB), R8
+    MOVQ        $MERGE_H23<>(SB), R9
+    VMOVDQU32   (R8), VyIdxH01
+    VMOVDQU32   (R9), VzIdxH23
+
+    MOVQ        $0b00001100, R8
+    MOVQ        $0b11110000, R9
+    KMOVW       R8, MASK_Mov0_1
+    KMOVW       R9, MASK_Mov01_23
+
+    mul(VxH, VxHs, VxH, VxLow, VxMid, VxHigh, T0x)
+    reduce(U1x, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)
+
+    mul(VxH, VxHs, U1x, VxLow, VxMid, VxHigh, T0x)
+    reduce(U2x, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)
+
+    mul(VxH, VxHs, U2x, VxLow, VxMid, VxHigh, T0x)
+    reduce(VxH4, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)
+
+    // we have H^4 : : :  , we should obtain H^4 : H^3 (U2x) : H^2 (U1x) : H (VxH)
+    VPERMQ      U2y, VyIdxH01, MASK_Mov0_1, VyH4
+    VPERMQ      VyH, VyIdxH01, MASK_Mov0_1, U1y
+    VPERMQ      U1z, VzIdxH23, MASK_Mov01_23, VzH4
+
+    VPSRLDQ     $8, VzH4, VzH4s
+    VPXORD      VzH4, VzH4s, VzH4s //h^l in lower Hs
+
+loopBy4:
+    load4X()
+    VPXORD     VzTag, VzDat, VzDat
+    mul(VzH4, VzH4s, VzDat, VzLow, VzMid, VzHigh, T0z)
+    reduce(VzTag, VzReduce, VzLow, VzMid, VzHigh, T0z, T1z, T2z, T3z)
+
+    // xor 4 parts together
+    // total latency is 8
+    VPERMQ      $0b01001110, VzTag, T0z // begin with 0:1:2:3, then exchange 0 vs 1, 2 vs 3 of the 4 128 bit lanes. latency 3, CPI 1
+    VPXORD      VzTag, T0z, T0z // we have T0z: 0^1 : 0^1 : 2^3 : 2^3
+    VPERMQ      T0z, VzIdx, T1z // we have T1z: 2^3 : 0^1 : 2^3 : 2^3
+    VPXORD      T0x, T1x, VxTag // VzTag: 0^1^2^3 : 0: 0: 0 (the higher lanes are cleared automatically - X version has lower CPI)
+
+    SUBQ        $4, DX
+    CMPQ        DX, $3
+    JG          loopBy4
+
+    CMPQ        DX, $0
+    JE          blocksEnd
 
 loopBy1:
     load1X()
 
     VPXORD     VxTag, VxDat, VxDat
     mul(VxH, VxHs, VxDat, VxLow, VxMid, VxHigh, T0x)
-    reduce(VxTag, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)
-
+    reduce(VxTag, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)
 
     SUBQ        $1, DX
     CMPQ        DX, $0
-    JG         loopBy1
+    JG          loopBy1
 
 blocksEnd:
     reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
     VMOVDQU32   VxTag, (BX)
 
-//reverseBits(DEBUG, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
-//VMOVDQU32   DEBUG, (BX)
+//reverseBits(DEBUGz, VzAndMask, VzHigherMask, VzLowerMask, T1z, T2z)
+//VMOVDQU32   DEBUGz, (BX)
     RET
 
 //func xor256(dst *byte, src1 *byte, src2 *byte)
