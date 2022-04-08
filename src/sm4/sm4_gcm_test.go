@@ -291,30 +291,30 @@ func Benchmark_sm4GcmAsm_SealX16(b *testing.B) {
 }
 
 func Benchmark_sm4GcmAsm_Seal_16(b *testing.B) {
-	benchgcm(16, b)
+	benchSeal(16, b)
 }
 
 func Benchmark_sm4GcmAsm_Seal_64(b *testing.B) {
-	benchgcm(64, b)
+	benchSeal(64, b)
 }
 
 func Benchmark_sm4GcmAsm_Seal_256(b *testing.B) {
-	benchgcm(256, b)
+	benchSeal(256, b)
 }
 
 func Benchmark_sm4GcmAsm_Seal_1024(b *testing.B) {
-	benchgcm(1024, b)
+	benchSeal(1024, b)
 }
 
 func Benchmark_sm4GcmAsm_Seal_8192(b *testing.B) {
-	benchgcm(8192, b)
+	benchSeal(8192, b)
 }
 
 func Benchmark_sm4GcmAsm_Seal_16384(b *testing.B) {
-	benchgcm(16384, b)
+	benchSeal(16384, b)
 }
 
-func benchgcm(count int, b *testing.B) {
+func benchSeal(count int, b *testing.B) {
 	key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 	src := make([]byte, count)
 	nonce, _ := hex.DecodeString("0123456789ab0123456789ab")
@@ -329,5 +329,42 @@ func benchgcm(count int, b *testing.B) {
 	b.SetBytes(int64(count))
 	for i := 0; i < b.N; i++ {
 		gcmAsm.Seal(dst, nonce, src, aad)
+	}
+}
+
+func Benchmark_sm4GcmAsm_gHash_16(b *testing.B) {
+	benchGHash(16, b)
+}
+
+func Benchmark_sm4GcmAsm_gHash_64(b *testing.B) {
+	benchGHash(64, b)
+}
+
+func Benchmark_sm4GcmAsm_gHash_256(b *testing.B) {
+	benchGHash(256, b)
+}
+
+func Benchmark_sm4GcmAsm_gHash_1024(b *testing.B) {
+	benchGHash(1024, b)
+}
+
+func Benchmark_sm4GcmAsm_gHash_8192(b *testing.B) {
+	benchGHash(8192, b)
+}
+
+func Benchmark_sm4GcmAsm_gHash_16384(b *testing.B) {
+	benchGHash(16384, b)
+}
+
+func benchGHash(count int, b *testing.B) {
+	src := make([]byte, count)
+	H, _ := hex.DecodeString("66e94bd4ef8a2c3b884cfa59ca342b2e")
+	tag := make([]byte, 16)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	b.SetBytes(int64(count))
+	for i := 0; i < b.N; i++ {
+		gHashBlocks(&H[0], &tag[0], &src[0], count>>4)
 	}
 }
