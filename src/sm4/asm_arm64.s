@@ -586,10 +586,8 @@ TEXT ·cryptoBlockAsmX16Internal(SB),NOSPLIT,$0-32
 
     #define subRoundX16(A, B, C, D, TBz, E, F, G, H, TBy) \
         getXor(B, C, D, TBz) \
-        stashZ(StashZ) \
         getXor(F, G, H, TBy) \
         \// Zx for 1st 4 blocks and Yx for 2nd 4 blocks swapped out:
-        stashY(StashY) \
         popZ(StashX) \
         getXor(B, C, D, Y0) \ // we are running out of vector registers so let's reuse some
         popZ(StashW) \
@@ -614,6 +612,8 @@ TEXT ·cryptoBlockAsmX16Internal(SB),NOSPLIT,$0-32
         popY(StashY) \
         VEOR V0.B16, A.B16, A.B16 \
         VEOR V1.B16, E.B16, E.B16 \
+        stashZ(StashZ) \
+        stashY(StashY) \
 
     #define roundX16(R) \
         loadRoundKeyX4(R) \
