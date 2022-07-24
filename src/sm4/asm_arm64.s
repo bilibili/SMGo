@@ -111,29 +111,30 @@ GLOBL CK<>(SB), (NOPTR+RODATA), $128
 // When in 16X mode, L1 cache will be used to stash states
 // R13~16  pointers to stack variables (for 16X)
 
-#define     TB0 V0
-#define     TB1 V1
-
 // 1st set of state, naming convension from sm4.go
-#define     Z0  V2
-#define     Z1  V3
-#define     Z2  V4
-#define     Z3  V5
-
-// round key, loaded per round; also used to load CK during key expansion
-#define     RK  V6
+#define     Z0  V0
+#define     Z1  V1
+#define     Z2  V2
+#define     Z3  V3
 
 // 2nd set of state if we are going to do 2X (1X deals with up to 4 blocks in parallel, 2X 8 blocks)
-#define     Y0  V7
-#define     Y1  V8
-#define     Y2  V9
-#define     Y3  V10
+#define     Y0  V4
+#define     Y1  V5
+#define     Y2  V6
+#define     Y3  V7
+
+// to hold the XOR results to be fed into the tau transformation
+#define     U0 V8
+#define     U1 V9
+#define     U2 V10
+#define     U3 V11
+
+// round key, loaded per round; also used to load CK during key expansion
+#define     RK  V12
 
 // draft registers, served as temporal variables
-#define     T0  V11
-#define     T1  V12
-#define     T2  V13
-#define     T3  V14
+#define     T0  V13
+#define     T1  V14
 
 #define     CONST V15
 
@@ -150,15 +151,14 @@ GLOBL CK<>(SB), (NOPTR+RODATA), $128
     VLD1.P  64(Rx), [V28.B16, V29.B16, V30.B16, V31.B16] \
 
 // lookup up to 4 data blcoks (16bytes / block)
-// block1: V0 -> V11 -> V12 -> V13
 #define tableLookupX4() \
-    VSUB    CONST.B16, V0.B16, V11.B16 \
-    VTBL    V0.B16, [V16.B16, V17.B16, V18.B16, V19.B16], V0.B16 \
-    VSUB    CONST.B16, V11.B16, V12.B16 \
-    WORD    $0x4E007000 | 11<<16 | 20<<5 | 0x00 \ //VTBX    V11.B16, [V20.B16, V21.B16, V22.B16, V23.B16], V0.B16 \
-    VSUB    CONST.B16, V12.B16, V13.B16 \
-    WORD    $0x4E007000 | 12<<16 | 24<<5 | 0x00 \ //VTBX    V12.B16, [V24.B16, V25.B16, V26.B16, V27.B16], V0.B16 \
-    WORD    $0x4E007000 | 13<<16 | 28<<5 | 0x00 \ //VTBX    V13.B16, [V28.B16, V29.B16, V30.B16, V31.B16], V0.B16 \
+    VSUB    CONST.B16, U0.B16, Y0.B16 \
+    VTBL    U0.B16, [V16.B16, V17.B16, V18.B16, V19.B16], U0.B16 \
+    VSUB    CONST.B16, Y0.B16, Y1.B16 \
+    WORD    $0x4E007000 | 4<<16 | 20<<5 | 0x08 \
+    VSUB    CONST.B16, Y1.B16, Y2.B16 \
+    WORD    $0x4E007000 | 5<<16 | 24<<5 | 0x08 \
+    WORD    $0x4E007000 | 6<<16 | 28<<5 | 0x08 \
 
 #define swap(A, B) \
     \//VSWP     A, B //unrecognized instruction, TODO
@@ -188,25 +188,25 @@ GLOBL CK<>(SB), (NOPTR+RODATA), $128
 // Note: VMUL & VMULL instructions can perform polynormial multiplication for P8 & P16 data types.
 // But we would need P32.
 // Also, these two intructions are not available in Go arm64 assembly.
-#define transformL(Data) \
+#define transformL(Data, Tx) \
     VSHL    $2,  Data.S4, T0.S4 \
     VSRI    $30, Data.S4, T0.S4 \
     VSHL    $10, Data.S4, T1.S4 \
     VSRI    $22, Data.S4, T1.S4 \
     VEOR    T0.B16, T1.B16, T0.B16 \
-    VSHL    $18, Data.S4, T2.S4 \
-    VSRI    $14, Data.S4, T2.S4 \
+    VSHL    $18, Data.S4, Tx.S4 \
+    VSRI    $14, Data.S4, Tx.S4 \
     VSHL    $24, Data.S4, T1.S4 \
     VSRI    $8,  Data.S4, T1.S4 \
-    VEOR    T2.B16, T1.B16, T2.B16 \
-    VEOR    T0.B16, T2.B16, T0.B16 \
+    VEOR    Tx.B16, T1.B16, Tx.B16 \
+    VEOR    T0.B16, Tx.B16, T0.B16 \
     VEOR    T0.B16, Data.B16, Data.B16 \
 
-#define subRoundX4(A, B, C, D, TB) \
-    getXor(B, C, D, TB) \
+#define subRoundX4(A, B, C, D) \
+    getXor(B, C, D, U0) \
     tableLookupX4() \
-    transformL(TB) \
-    VEOR    TB.B16, A.B16, A.B16 \
+    transformL(U0, Y0) \
+    VEOR    U0.B16, A.B16, A.B16 \
 
 TEXT ·expandKeyAsm(SB),NOSPLIT,$0-24
 
@@ -228,10 +228,10 @@ TEXT ·expandKeyAsm(SB),NOSPLIT,$0-24
 
     #define expandSubRound(A, B, C, D, Renc, Rdec) \
         loadCKey(R13, RK) \
-        getXor(B, C, D, TB0) \
+        getXor(B, C, D, U0) \
         tableLookupX4() \
-        transformLPrime(TB0) \
-        VEOR    TB0.B16, A.B16, A.B16 \
+        transformLPrime(U0) \
+        VEOR    U0.B16, A.B16, A.B16 \
         saveKeys(Renc, Rdec, A) \
 
     #define expandRound(Renc, Rdec) \
@@ -297,13 +297,13 @@ TEXT ·cryptoBlockAsm(SB),NOSPLIT,$0-24
 
     #define round(R) \
         loadRoundKeyX1(R) \
-        subRoundX4(Z0, Z1, Z2, Z3, TB0) \
+        subRoundX4(Z0, Z1, Z2, Z3) \
         loadRoundKeyX1(R) \
-        subRoundX4(Z1, Z2, Z3, Z0, TB0) \
+        subRoundX4(Z1, Z2, Z3, Z0) \
         loadRoundKeyX1(R) \
-        subRoundX4(Z2, Z3, Z0, Z1, TB0) \
+        subRoundX4(Z2, Z3, Z0, Z1) \
         loadRoundKeyX1(R) \
-        subRoundX4(Z3, Z0, Z1, Z2, TB0) \
+        subRoundX4(Z3, Z0, Z1, Z2) \
 
     loadSBox(R0)
 
@@ -357,13 +357,13 @@ TEXT ·cryptoBlockAsmX2(SB),NOSPLIT,$0-24
 
     #define roundX2(R) \
         loadRoundKeyX2(R) \
-        subRoundX4(Z0, Z1, Z2, Z3, TB0) \
+        subRoundX4(Z0, Z1, Z2, Z3) \
         loadRoundKeyX2(R) \
-        subRoundX4(Z1, Z2, Z3, Z0, TB0) \
+        subRoundX4(Z1, Z2, Z3, Z0) \
         loadRoundKeyX2(R) \
-        subRoundX4(Z2, Z3, Z0, Z1, TB0) \
+        subRoundX4(Z2, Z3, Z0, Z1) \
         loadRoundKeyX2(R) \
-        subRoundX4(Z3, Z0, Z1, Z2, TB0) \
+        subRoundX4(Z3, Z0, Z1, Z2) \
 
     loadSBox(R0)
 
@@ -421,13 +421,13 @@ TEXT ·cryptoBlockAsmX4(SB),NOSPLIT,$0-24
 
     #define roundX4(R) \
         loadRoundKeyX4(R) \
-        subRoundX4(Z0, Z1, Z2, Z3, TB0) \
+        subRoundX4(Z0, Z1, Z2, Z3) \
         loadRoundKeyX4(R) \
-        subRoundX4(Z1, Z2, Z3, Z0, TB0) \
+        subRoundX4(Z1, Z2, Z3, Z0) \
         loadRoundKeyX4(R) \
-        subRoundX4(Z2, Z3, Z0, Z1, TB0) \
+        subRoundX4(Z2, Z3, Z0, Z1) \
         loadRoundKeyX4(R) \
-        subRoundX4(Z3, Z0, Z1, Z2, TB0) \
+        subRoundX4(Z3, Z0, Z1, Z2) \
 
     loadSBox(R0)
 
@@ -455,42 +455,40 @@ TEXT ·cryptoBlockAsmX8(SB),NOSPLIT,$0-24
 
     // lookup up to 8 data blocks
     // interleaved to hide the latency of TBL and TBX (partially)
-    // block1: V0 -> V11 -> V13 -> V11
-    // block2: V1 -> V12 -> V14 -> V12
     #define tableLookupX8() \
-        VSUB    CONST.B16, V0.B16, V11.B16 \
-        VTBL    V0.B16, [V16.B16, V17.B16, V18.B16, V19.B16], V0.B16 \
-        VSUB    CONST.B16, V1.B16, V12.B16 \
-        VTBL    V1.B16, [V16.B16, V17.B16, V18.B16, V19.B16], V1.B16 \
-        VSUB    CONST.B16, V11.B16, V13.B16 \
-        WORD    $0x4E007000 | 11<<16 | 20<<5 | 0x00 \
-        VSUB    CONST.B16, V12.B16, V14.B16 \
-        WORD    $0x4E007000 | 12<<16 | 20<<5 | 0x01 \
-        VSUB    CONST.B16, V13.B16, V11.B16 \
-        WORD    $0x4E007000 | 13<<16 | 24<<5 | 0x00 \
-        VSUB    CONST.B16, V14.B16, V12.B16 \
-        WORD    $0x4E007000 | 14<<16 | 24<<5 | 0x01 \
-        WORD    $0x4E007000 | 11<<16 | 28<<5 | 0x00 \
-        WORD    $0x4E007000 | 12<<16 | 28<<5 | 0x01 \
+        VSUB    CONST.B16, U0.B16, U2.B16 \
+        VTBL    U0.B16, [V16.B16, V17.B16, V18.B16, V19.B16], U0.B16 \
+        VSUB    CONST.B16, U1.B16, U3.B16 \
+        VTBL    U1.B16, [V16.B16, V17.B16, V18.B16, V19.B16], U1.B16 \
+        VSUB    CONST.B16, U2.B16, T0.B16 \
+        WORD    $0x4E007000 | 10<<16 | 20<<5 | 0x08 \
+        VSUB    CONST.B16, U3.B16, T1.B16 \
+        WORD    $0x4E007000 | 11<<16 | 20<<5 | 0x09 \
+        VSUB    CONST.B16, T0.B16, U2.B16 \
+        WORD    $0x4E007000 | 13<<16 | 24<<5 | 0x08 \
+        VSUB    CONST.B16, T1.B16, U3.B16 \
+        WORD    $0x4E007000 | 14<<16 | 24<<5 | 0x09 \
+        WORD    $0x4E007000 | 10<<16 | 28<<5 | 0x08 \
+        WORD    $0x4E007000 | 11<<16 | 28<<5 | 0x09 \
 
-    #define subRoundX8(A, B, C, D, TBz, E, F, G, H, TBy) \
-        getXor(B, C, D, TBz) \
-        getXor(F, G, H, TBy) \
+    #define subRoundX8(A, B, C, D, E, F, G, H) \
+        getXor(B, C, D, U0) \
+        getXor(F, G, H, U1) \
         tableLookupX8() \
-        transformL(TBz) \
-        transformL(TBy) \
-        VEOR    TBz.B16, A.B16, A.B16 \
-        VEOR    TBy.B16, E.B16, E.B16 \
+        transformL(U0, U2) \
+        transformL(U1, U3) \
+        VEOR    U0.B16, A.B16, A.B16 \
+        VEOR    U1.B16, E.B16, E.B16 \
 
     #define roundX8(R) \
         loadRoundKeyX4(R) \
-        subRoundX8(Z0, Z1, Z2, Z3, TB0, Y0, Y1, Y2, Y3, TB1) \
+        subRoundX8(Z0, Z1, Z2, Z3, Y0, Y1, Y2, Y3) \
         loadRoundKeyX4(R) \
-        subRoundX8(Z1, Z2, Z3, Z0, TB0, Y1, Y2, Y3, Y0, TB1) \
+        subRoundX8(Z1, Z2, Z3, Z0, Y1, Y2, Y3, Y0) \
         loadRoundKeyX4(R) \
-        subRoundX8(Z2, Z3, Z0, Z1, TB0, Y2, Y3, Y0, Y1, TB1) \
+        subRoundX8(Z2, Z3, Z0, Z1, Y2, Y3, Y0, Y1) \
         loadRoundKeyX4(R) \
-        subRoundX8(Z3, Z0, Z1, Z2, TB0, Y3, Y0, Y1, Y2, TB1) \
+        subRoundX8(Z3, Z0, Z1, Z2, Y3, Y0, Y1, Y2) \
 
     loadSBox(R0)
 
@@ -546,84 +544,76 @@ TEXT ·cryptoBlockAsmX16Internal(SB),NOSPLIT,$0-32
 
     // lookup 16 data blocks
     // interleaved to hide the latency of TBL and TBX
-    // block1: V0 -> V11 -> V13 -> V11
-    // block2: V1 -> V12 -> V14 -> V12
-    // use Z0~Z3(V2~V5) same way as T0~T3(V11~V14), use Y0/V7 as TB0/V0, Y1/V8 as TB1/V1
-    // see tableLookupX8 if confused
     #define tableLookupX16() \
         \// 1st
-        VSUB    CONST.B16, V0.B16, V11.B16 \
-        VTBL    V0.B16, [V16.B16, V17.B16, V18.B16, V19.B16], V0.B16 \
-        VSUB    CONST.B16, V1.B16, V12.B16 \
-        VTBL    V1.B16, [V16.B16, V17.B16, V18.B16, V19.B16], V1.B16 \
-        VSUB    CONST.B16, V7.B16, Z0.B16 \
-        VTBL    V7.B16, [V16.B16, V17.B16, V18.B16, V19.B16], V7.B16 \
-        VSUB    CONST.B16, V8.B16, Z1.B16 \
-        VTBL    V8.B16, [V16.B16, V17.B16, V18.B16, V19.B16], V8.B16 \
+        VSUB    CONST.B16, U0.B16, Z0.B16 \
+        VTBL    U0.B16, [V16.B16, V17.B16, V18.B16, V19.B16], U0.B16 \
+        VSUB    CONST.B16, U1.B16, Z1.B16 \
+        VTBL    U1.B16, [V16.B16, V17.B16, V18.B16, V19.B16], U1.B16 \
+        VSUB    CONST.B16, U2.B16, Y0.B16 \
+        VTBL    U2.B16, [V16.B16, V17.B16, V18.B16, V19.B16], U2.B16 \
+        VSUB    CONST.B16, U3.B16, Y1.B16 \
+        VTBL    U3.B16, [V16.B16, V17.B16, V18.B16, V19.B16], U3.B16 \
         \// 2nd
-        VSUB    CONST.B16, V11.B16, V13.B16 \
-        WORD    $0x4E007000 | 11<<16 | 20<<5 | 0x00 \
-        VSUB    CONST.B16, V12.B16, V14.B16 \
-        WORD    $0x4E007000 | 12<<16 | 20<<5 | 0x01 \
         VSUB    CONST.B16, Z0.B16, Z2.B16 \
-        WORD    $0x4E007000 |  2<<16 | 20<<5 | 0x07 \
+        WORD    $0x4E007000 | 0<<16 | 20<<5 | 0x08 \
         VSUB    CONST.B16, Z1.B16, Z3.B16 \
-        WORD    $0x4E007000 |  3<<16 | 20<<5 | 0x08 \
+        WORD    $0x4E007000 | 1<<16 | 20<<5 | 0x09 \
+        VSUB    CONST.B16, Y0.B16, Y2.B16 \
+        WORD    $0x4E007000 | 4<<16 | 20<<5 | 0x0A \
+        VSUB    CONST.B16, Y1.B16, Y3.B16 \
+        WORD    $0x4E007000 | 5<<16 | 20<<5 | 0x0B \
         \// 3rd
-        VSUB    CONST.B16, V13.B16, V11.B16 \
-        WORD    $0x4E007000 | 13<<16 | 24<<5 | 0x00 \
-        VSUB    CONST.B16, V14.B16, V12.B16 \
-        WORD    $0x4E007000 | 14<<16 | 24<<5 | 0x01 \
         VSUB    CONST.B16, Z2.B16, Z0.B16 \
-        WORD    $0x4E007000 |  4<<16 | 24<<5 | 0x07 \
+        WORD    $0x4E007000 | 2<<16 | 24<<5 | 0x08 \
         VSUB    CONST.B16, Z3.B16, Z1.B16 \
-        WORD    $0x4E007000 |  5<<16 | 24<<5 | 0x08 \
+        WORD    $0x4E007000 | 3<<16 | 24<<5 | 0x09 \
+        VSUB    CONST.B16, Y2.B16, Y0.B16 \
+        WORD    $0x4E007000 | 6<<16 | 24<<5 | 0x0A \
+        VSUB    CONST.B16, Y3.B16, Y1.B16 \
+        WORD    $0x4E007000 | 7<<16 | 24<<5 | 0x0B \
         \// 4th
-        WORD    $0x4E007000 | 11<<16 | 28<<5 | 0x00 \
-        WORD    $0x4E007000 | 12<<16 | 28<<5 | 0x01 \
-        WORD    $0x4E007000 |  2<<16 | 28<<5 | 0x07 \
-        WORD    $0x4E007000 |  3<<16 | 28<<5 | 0x08 \
+        WORD    $0x4E007000 | 0<<16 | 28<<5 | 0x08 \
+        WORD    $0x4E007000 | 1<<16 | 28<<5 | 0x09 \
+        WORD    $0x4E007000 | 4<<16 | 28<<5 | 0x0A \
+        WORD    $0x4E007000 | 5<<16 | 28<<5 | 0x0B \
 
-    #define subRoundX16(A, B, C, D, TBz, E, F, G, H, TBy) \
-        getXor(B, C, D, TBz) \
-        getXor(F, G, H, TBy) \
-        \// Zx for 1st 4 blocks and Yx for 2nd 4 blocks swapped out:
+    #define subRoundX16(A, B, C, D, E, F, G, H) \
+        getXor(B, C, D, U0) \
+        getXor(F, G, H, U1) \
         popZ(StashX) \
-        getXor(B, C, D, Y0) \ // we are running out of vector registers so let's reuse some
-        popZ(StashW) \
-        getXor(B, C, D, Y1) \
+        popY(StashW) \
+        getXor(B, C, D, U2) \
+        getXor(F, G, H, U3) \
         \// Then we can go with table lookup
         tableLookupX16() \
         \// And in-place transformation
-        transformL(TBz) \
-        transformL(TBy) \
-        transformL(Y0) \
-        transformL(Y1) \
-        \// Now we are able to use Tx registers as well
-        VMOV Y0.B16, T0.B16 \
-        VMOV Y1.B16, T1.B16 \
-        popZ(StashX) \
-        popY(StashW) \
-        VEOR T0.B16, A.B16, A.B16 \
-        VEOR T1.B16, E.B16, E.B16 \
-        stashZ(StashX) \
-        stashY(StashW) \
+        transformL(U0, Z0) \
+        transformL(U1, Z1) \
+        transformL(U2, Y0) \
+        transformL(U3, Y1) \
+        popZ(StashX) \ // TODO only load A
+        popY(StashW) \ // TODO only load E
+        VEOR U2.B16, A.B16, A.B16 \
+        VEOR U3.B16, E.B16, E.B16 \
+        stashZ(StashX) \ // TODO only save A
+        stashY(StashW) \ // TODO only save E
         popZ(StashZ) \
         popY(StashY) \
-        VEOR V0.B16, A.B16, A.B16 \
-        VEOR V1.B16, E.B16, E.B16 \
-        stashZ(StashZ) \
-        stashY(StashY) \
+        VEOR U0.B16, A.B16, A.B16 \
+        VEOR U1.B16, E.B16, E.B16 \
+        stashZ(StashZ) \ // TODO only save A
+        stashY(StashY) \ // TODO only save E
 
     #define roundX16(R) \
         loadRoundKeyX4(R) \
-        subRoundX16(Z0, Z1, Z2, Z3, TB0, Y0, Y1, Y2, Y3, TB1) \
+        subRoundX16(Z0, Z1, Z2, Z3, Y0, Y1, Y2, Y3) \
         loadRoundKeyX4(R) \
-        subRoundX16(Z1, Z2, Z3, Z0, TB0, Y1, Y2, Y3, Y0, TB1) \
+        subRoundX16(Z1, Z2, Z3, Z0, Y1, Y2, Y3, Y0) \
         loadRoundKeyX4(R) \
-        subRoundX16(Z2, Z3, Z0, Z1, TB0, Y2, Y3, Y0, Y1, TB1) \
+        subRoundX16(Z2, Z3, Z0, Z1, Y2, Y3, Y0, Y1) \
         loadRoundKeyX4(R) \
-        subRoundX16(Z3, Z0, Z1, Z2, TB0, Y3, Y0, Y1, Y2, TB1) \
+        subRoundX16(Z3, Z0, Z1, Z2, Y3, Y0, Y1, Y2) \
 
     loadSBox(R0)
 
