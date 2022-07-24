@@ -526,15 +526,13 @@ TEXT ·cryptoBlockAsmX16Internal(SB),NOSPLIT,$0-32
     #define popY(R) \
         VLD1    (R), [Y0.B16, Y1.B16, Y2.B16, Y3.B16] \
 
-    #define loadInputX16(R) \
+    #define loadInputX16(R, Rx) \
+        loadInputX8(Rx) \
+        stashZ(StashX) \
+        stashY(StashW) \
         loadInputX8(R) \
         stashZ(StashZ) \
         stashY(StashY) \
-        loadInputX8(R) \
-        stashZ(StashX) \
-        stashY(StashW) \
-        popZ(StashZ) \
-        popY(StashY) \
 
     #define storeOutputX16(R) \
         storeOutputX8(R) \
@@ -623,11 +621,13 @@ TEXT ·cryptoBlockAsmX16Internal(SB),NOSPLIT,$0-32
 
 	MOVD    tmp+24(FP), StashZ
     ADD     $64, StashZ, StashY
-    ADD     $64, StashY, StashX
-    ADD     $64, StashX, StashW
+    ADD     $128, StashZ, StashX
+    ADD     $192, StashZ, StashW
+
+    ADD     $128, R12, R17
 
     VMOVI   $0x40, CONST.B16
-    loadInputX16(R12)
+    loadInputX16(R12, R17)
 
     roundX16(R10)
     roundX16(R10)
