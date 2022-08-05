@@ -6,11 +6,10 @@
 package sm4
 
 func cryptoBlockAsmX16(rk *uint32, dst, src *byte) {
-	var tmp [256]byte
-	cryptoBlockAsmX16Internal(rk, dst, src, &tmp[0])
+	//safe to reuse dst for tmp: 256 byte array
+	cryptoBlockAsmX16Internal(rk, dst, src, dst)
 }
 
 //go:noescape
-func cryptoBlockAsmX16Internal(rk *uint32, dst, src, tmp *byte) // I know it looks ugly, but let's not wrestle with Go stack management logics
-
-
+// tmp should be pointer to 256-byte array
+func cryptoBlockAsmX16Internal(rk *uint32, dst, src, tmp *byte)

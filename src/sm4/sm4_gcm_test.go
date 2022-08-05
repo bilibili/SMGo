@@ -298,6 +298,10 @@ func Benchmark_sm4GcmAsm_Seal_64(b *testing.B) {
 	benchSeal(64, b)
 }
 
+func Benchmark_sm4GcmAsm_Seal_128(b *testing.B) {
+	benchSeal(128, b)
+}
+
 func Benchmark_sm4GcmAsm_Seal_256(b *testing.B) {
 	benchSeal(256, b)
 }
@@ -338,6 +342,10 @@ func Benchmark_sm4GcmAsm_gHash_16(b *testing.B) {
 
 func Benchmark_sm4GcmAsm_gHash_64(b *testing.B) {
 	benchGHash(64, b)
+}
+
+func Benchmark_sm4GcmAsm_gHash_128(b *testing.B) {
+	benchGHash(128, b)
 }
 
 func Benchmark_sm4GcmAsm_gHash_256(b *testing.B) {
