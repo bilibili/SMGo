@@ -13,8 +13,8 @@ package fiat
 import (
 	"crypto/subtle"
 	"errors"
+	"github.com/bilibili/smgo/utils"
 	"math/big"
-	"smgo/utils"
 )
 
 // SM2Element is an integer modulo 2^256 - 2^224 - 2^96 + 2^64 - 1.

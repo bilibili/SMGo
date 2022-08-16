@@ -8,9 +8,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/bilibili/smgo/utils"
 	"math"
 	"math/big"
-	"smgo/utils"
 )
 
 type sm2Curve struct {
@@ -18,6 +18,7 @@ type sm2Curve struct {
 }
 
 var sm2 sm2Curve
+
 func getCurve() sm2Curve {
 	return sm2
 }
@@ -26,17 +27,17 @@ func init() {
 	sm2.params = &elliptic.CurveParams{
 		Name:    "SM2",
 		BitSize: 256,
-		P:  bigFromHex("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFF"),
-		N:  bigFromHex("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54123"),
-		B:  bigFromHex("28E9FA9E9D9F5E344D5A9E4BCF6509A7F39789F515AB8F92DDBCBD414D940E93"),
-		Gx: bigFromHex("32C4AE2C1F1981195F9904466A39C9948FE30BBFF2660BE1715A4589334C74C7"),
-		Gy: bigFromHex("BC3736A2F4F6779C59BDCEE36B692153D0A9877CC62A474002DF32E52139F0A0"),
+		P:       bigFromHex("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFF"),
+		N:       bigFromHex("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54123"),
+		B:       bigFromHex("28E9FA9E9D9F5E344D5A9E4BCF6509A7F39789F515AB8F92DDBCBD414D940E93"),
+		Gx:      bigFromHex("32C4AE2C1F1981195F9904466A39C9948FE30BBFF2660BE1715A4589334C74C7"),
+		Gy:      bigFromHex("BC3736A2F4F6779C59BDCEE36B692153D0A9877CC62A474002DF32E52139F0A0"),
 	}
 	initPoints()
 }
 
 func bigFromHex(s string) *big.Int {
-	ret, _ := new (big.Int).SetString(s, 16)
+	ret, _ := new(big.Int).SetString(s, 16)
 	return ret
 }
 
@@ -59,13 +60,13 @@ func (curve sm2Curve) Params() *elliptic.CurveParams {
 // ***secure implementation***, this could be used for ECDH with unsigned 4-NAF
 func ScalarMult(P *SM2Point, scalar []byte) (*SM2Point, error) {
 	const nafWindowWidth = 4
-	const nafPrecomputes = 1 << nafWindowWidth - 1
+	const nafPrecomputes = 1<<nafWindowWidth - 1
 
 	// P, 2P, ..., 15P
 	var pPrecomputes [nafPrecomputes]*SM2Point
 	pPrecomputes[0] = P
 	pPrecomputes[1] = NewSM2Point().Double(P) //Add is "complete" but let's not rely on it
-	for i:=2; i<len(pPrecomputes); i++ {
+	for i := 2; i < len(pPrecomputes); i++ {
 		pPrecomputes[i] = NewSM2Point().Add(pPrecomputes[i-1], P)
 	}
 
@@ -118,13 +119,13 @@ func ScalarBaseMult(k []byte) (*SM2Point, error) {
 func ScalarMixedMult_Unsafe(gScalar []byte, P *SM2Point, scalar []byte) (*SM2Point, error) {
 	// signed 4-NAF
 	const nafWindowWidth = 4
-	const nafPrecomputes = 1 << (nafWindowWidth -1) // 8
+	const nafPrecomputes = 1 << (nafWindowWidth - 1) // 8
 
 	// P, 3P, 5P, ... [2i+1]P, ... 15P
 	var pPrecomputes [nafPrecomputes]*SM2Point
 	pPrecomputes[0] = P
 	var p2 = NewSM2Point().Double(P)
-	for i:=1; i<len(pPrecomputes); i++ {
+	for i := 1; i < len(pPrecomputes); i++ {
 		pPrecomputes[i] = NewSM2Point().Add(pPrecomputes[i-1], p2)
 	}
 
@@ -138,17 +139,17 @@ func ScalarMixedMult_Unsafe(gScalar []byte, P *SM2Point, scalar []byte) (*SM2Poi
 	const iterations = 14
 	const remainder = 4
 
-	for i:=256; i>=0; i-- {
+	for i := 256; i >= 0; i-- {
 		if !skip {
 			ret.Double(ret)
 		}
 
-		if i<iterations {
+		if i < iterations {
 			// iterate through the sub-tables for 6-3-14 scheme
-			for j:=0; j<subTableCount; j++ {
-				bits := extractHigherBits(gScalar, i + j*iterations + remainder, window, subTableCount * iterations)
+			for j := 0; j < subTableCount; j++ {
+				bits := extractHigherBits(gScalar, i+j*iterations+remainder, window, subTableCount*iterations)
 				if bits > 0 {
-					x, y := sm2Precomputed_6_3_14[j][0][bits - 1], sm2Precomputed_6_3_14[j][1][bits - 1]
+					x, y := sm2Precomputed_6_3_14[j][0][bits-1], sm2Precomputed_6_3_14[j][1][bits-1]
 					tmpPoint := NewFromXY(x, y)
 					ret.Add(ret, tmpPoint)
 					skip = false
@@ -215,15 +216,15 @@ func scalarBaseMult_SkipBitExtraction_6_3_14(k []byte) (*SM2Point, error) {
 // The runtime cost is 16 DOUBLE + 49 ADD, plus, about half caching of static data
 // as compared to 6-3-14 scheme.
 func scalarBaseMult_SkipBitExtraction_5_3_17(k []byte) (*SM2Point, error) {
-	return scalarBaseMult_SkipBitExtration(k, &sm2Precomputed_5_3_17, &sm2Precomputed_5_3_17_Remainder,5, 3, 17, 1)
+	return scalarBaseMult_SkipBitExtration(k, &sm2Precomputed_5_3_17, &sm2Precomputed_5_3_17_Remainder, 5, 3, 17, 1)
 }
 
 func scalarBaseMult_SkipBitExtraction_4_2_32(k []byte) (*SM2Point, error) {
-	return scalarBaseMult_SkipBitExtration(k, &sm2Precomputed_4_2_32, nil,4, 2, 32, 0)
+	return scalarBaseMult_SkipBitExtration(k, &sm2Precomputed_4_2_32, nil, 4, 2, 32, 0)
 }
 
 func scalarBaseMult_SkipBitExtraction_7_3_12(k []byte) (*SM2Point, error) {
-	return scalarBaseMult_SkipBitExtration(k, &sm2Precomputed_7_3_12, &sm2Precomputed_7_3_12_Remainder,7, 3, 12, 4)
+	return scalarBaseMult_SkipBitExtration(k, &sm2Precomputed_7_3_12, &sm2Precomputed_7_3_12_Remainder, 7, 3, 12, 4)
 }
 
 func scalarBaseMult_SkipBitExtration(k []byte, first *[][][]*[4]uint64, second *[][]*[4]uint64,
@@ -233,7 +234,7 @@ func scalarBaseMult_SkipBitExtration(k []byte, first *[][][]*[4]uint64, second *
 		panic("reconsider your choice")
 	}
 
-	if window * subTableCount * iterations + remainder != 256 {
+	if window*subTableCount*iterations+remainder != 256 {
 		panic("invalid scheme")
 	}
 
@@ -251,14 +252,14 @@ func scalarBaseMult_SkipBitExtration(k []byte, first *[][][]*[4]uint64, second *
 
 	// first pre-computed table
 	skip := true
-	for i:=iterations-1; i>=0; i-- {
+	for i := iterations - 1; i >= 0; i-- {
 		if !skip {
 			ret.Double(ret)
 		}
 
 		// iterate through the sub-tables
-		for j:=0; j<subTableCount; j++ {
-			bits := extractHigherBits(k, i + j*iterations + remainder, window, subTableCount * iterations)
+		for j := 0; j < subTableCount; j++ {
+			bits := extractHigherBits(k, i+j*iterations+remainder, window, subTableCount*iterations)
 
 			tmpPoint := NewSM2Point()
 			selectPoints(tmpPoint, &(*first)[j], windowWidth, bits)
@@ -289,8 +290,8 @@ func scalarBaseMult_SkipBitExtration(k []byte, first *[][][]*[4]uint64, second *
 func extractHigherBits(k []byte, idx, window, stepSize int) byte {
 	var bits = byte(0)
 
-	for i:=0; i<window; i++ {
-		bits |= extractBit(k, i*stepSize + idx) << i
+	for i := 0; i < window; i++ {
+		bits |= extractBit(k, i*stepSize+idx) << i
 	}
 
 	return bits
@@ -299,7 +300,7 @@ func extractHigherBits(k []byte, idx, window, stepSize int) byte {
 // extractBit extracts the specified bit from byte array in constant time
 func extractBit(k []byte, idx int) byte {
 	// k is in big endian so higher index means more on the left
-	byteIdx := SM2ElementLength -1 - idx>>3
+	byteIdx := SM2ElementLength - 1 - idx>>3
 	byteValue := k[byteIdx]
 
 	bitIdx := idx & 7
@@ -309,7 +310,7 @@ func extractBit(k []byte, idx int) byte {
 }
 
 func extractLowerBits(k []byte, count int) byte {
-	b := k[SM2ElementLength - 1]
+	b := k[SM2ElementLength-1]
 	return b & (1<<count - 1)
 }
 
@@ -364,4 +365,3 @@ func scalarMult_Unsafe_Ladder(q *SM2Point, scalar []byte) (*SM2Point, error) {
 
 	return out, nil
 }
-

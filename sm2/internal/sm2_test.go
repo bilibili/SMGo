@@ -6,18 +6,19 @@ package internal
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/bilibili/smgo/sm2/internal/fiat"
 	"math/big"
 	"math/rand"
 	"reflect"
-	"smgo/sm2/internal/fiat"
 	"testing"
 )
-func makeElement(s string) (*fiat.SM2Element) {
-	var e, er =hex.DecodeString(s)
+
+func makeElement(s string) *fiat.SM2Element {
+	var e, er = hex.DecodeString(s)
 	if er != nil {
 		panic("cannot decode hex due to " + er.Error())
 	}
-	r, er := new (fiat.SM2Element).SetBytes(e)
+	r, er := new(fiat.SM2Element).SetBytes(e)
 	return r
 }
 
@@ -137,7 +138,6 @@ func TestSM2Point_ScalarMult_4(t *testing.T) {
 		z: new(fiat.SM2Element).One(),
 	}
 
-
 	if !testWithStringsAndPoint("A756E53127F3F43B851C47CFEEFD9E43A2D133CA258EF4EA73FBF4683ACDA13A",
 		"FDAC1EFAA770E4635885CA1BBFB360A584B238FB2902ECF09DDC935F60BF4F9B",
 		"B89AA9263D5632F6EE82222E4D63198E78E095C24042CBE715C23F711422D74C",
@@ -180,11 +180,11 @@ func TestSM2Point_ScalarMult_warparound_inf(t *testing.T) {
 func TestCompleteness(t *testing.T) {
 	var bytes [41]byte
 
-	for i:=0; i<1000; i++ {
+	for i := 0; i < 1000; i++ {
 		rand.Read(bytes[:])
-		raw := new (big.Int).SetBytes(bytes[:])
-		inrange := new (big.Int).Mod(raw, sm2.Params().N)
-		raw = raw.Mul(sm2.Params().N, new (big.Int).SetUint64(rand.Uint64()))
+		raw := new(big.Int).SetBytes(bytes[:])
+		inrange := new(big.Int).Mod(raw, sm2.Params().N)
+		raw = raw.Mul(sm2.Params().N, new(big.Int).SetUint64(rand.Uint64()))
 		raw.Add(raw, inrange)
 
 		inrangeBytes, rawBytes := inrange.Bytes(), raw.Bytes()
@@ -202,8 +202,7 @@ func TestCompleteness(t *testing.T) {
 func TestScalarBaseMult(t *testing.T) {
 	var bytes = make([]byte, 32)
 
-
-	for i:=0; i< 1000; i++ {
+	for i := 0; i < 1000; i++ {
 		rand.Read(bytes)
 
 		res1, _ := scalarMult_Unsafe_DaA(NewSM2Generator(), bytes)
@@ -268,7 +267,7 @@ func TestScalarMixedMult_Unsafe(t *testing.T) {
 	var gScalar = make([]byte, 32)
 	var scalar = make([]byte, 32)
 
-	for i:=0; i< 1000; i++ {
+	for i := 0; i < 1000; i++ {
 		rand.Read(gScalar)
 		rand.Read(scalar)
 
@@ -285,7 +284,7 @@ func TestScalarMixedMult_Unsafe(t *testing.T) {
 func TestScalarMult(t *testing.T) {
 	var scalar = make([]byte, 32)
 
-	for i:=0; i< 1000; i++ {
+	for i := 0; i < 1000; i++ {
 		rand.Read(scalar)
 
 		res1, _ := ScalarMult(NewSM2Generator(), scalar)
@@ -301,7 +300,7 @@ func BenchmarkScalarNult(b *testing.B) {
 	rand.Read(scalar)
 	p := NewSM2Generator()
 
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		ScalarMult(p, scalar)
 	}
 }
@@ -310,7 +309,7 @@ func BenchmarkScalarMixedMult_Unsafe(b *testing.B) {
 	var gScalar = make([]byte, 32)
 	var scalar = make([]byte, 32)
 
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		rand.Read(gScalar)
 		//rand.Read(scalar)
 		scalar[0] = 0xf2
@@ -326,7 +325,7 @@ func BenchmarkSM2Point_ScalarMult_Unsafe_DaA(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		rand.Read(bytes[:])
 		scalarMult_Unsafe_DaA(g, bytes)
 	}
@@ -337,7 +336,7 @@ func BenchmarkScalarBaseMult(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		rand.Read(bytes[:])
 		ScalarBaseMult(bytes)
 	}
@@ -348,7 +347,7 @@ func Benchmark_scalarBaseMult_SkipBitExtraction_6_3_14(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		rand.Read(bytes[:])
 		scalarBaseMult_SkipBitExtraction_6_3_14(bytes)
 	}
@@ -359,7 +358,7 @@ func Benchmark_scalarBaseMult_SkipBitExtraction_5_3_17(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		rand.Read(bytes[:])
 		scalarBaseMult_SkipBitExtraction_5_3_17(bytes)
 	}
@@ -370,7 +369,7 @@ func Benchmark_scalarBaseMult_SkipBitExtraction_4_2_32(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		rand.Read(bytes[:])
 		scalarBaseMult_SkipBitExtraction_4_2_32(bytes)
 	}
@@ -381,7 +380,7 @@ func Benchmark_scalarBaseMult_SkipBitExtraction_7_3_12(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		rand.Read(bytes[:])
 		scalarBaseMult_SkipBitExtraction_7_3_12(bytes)
 	}
@@ -394,7 +393,7 @@ func BenchmarkSM2Point_Select(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		r.Select(p, q, 1)
 	}
 }
@@ -406,7 +405,7 @@ func BenchmarkSM2Point_Add(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		r.Add(p, q)
 	}
 }
@@ -417,7 +416,7 @@ func BenchmarkSM2Point_Double(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		r.Double(p)
 	}
 }
@@ -433,7 +432,7 @@ func BenchmarkSM2Point_GetAffineX(b *testing.B) {
 	p := genRandomPoint() // random point to avoid certain z with fast calculation, for example, z == 1
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		p.GetAffineX()
 	}
 }
@@ -442,7 +441,7 @@ func BenchmarkSM2Point_GetAffineX_Unsafe(b *testing.B) {
 	p := genRandomPoint()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		p.GetAffineX_Unsafe()
 	}
 }
@@ -451,7 +450,7 @@ func BenchmarkSM2Point_Bytes(b *testing.B) {
 	p := genRandomPoint()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		p.Bytes()
 	}
 }
@@ -460,13 +459,13 @@ func BenchmarkSM2Point_Bytes_Unsafe(b *testing.B) {
 	p := genRandomPoint()
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		p.Bytes_Unsafe()
 	}
 }
 
 func TestSM2Point_Bytes(t *testing.T) {
-	for i:=0; i<100000; i++ {
+	for i := 0; i < 100000; i++ {
 		p := genRandomPoint()
 		safe := p.Bytes()
 		unsafe := p.Bytes_Unsafe()
@@ -507,8 +506,8 @@ func testWithStringsAndPoint(p, x, y string, point *SM2Point) bool {
 }
 
 func Test_MontgomeryFriendlity(t *testing.T) {
-	SM2p :=  bigFromHex("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFF")
-	SM2n :=  bigFromHex("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54123")
+	SM2p := bigFromHex("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF00000000FFFFFFFFFFFFFFFF")
+	SM2n := bigFromHex("FFFFFFFEFFFFFFFFFFFFFFFFFFFFFFFF7203DF6B21C6052B53BBF40939D54123")
 
 	tellMontgomeryFriendility(SM2p, 64)
 	tellMontgomeryFriendility(SM2p, 32)
@@ -533,7 +532,7 @@ func tellMontgomeryFriendility(p *big.Int, s uint) {
 func Test_extractHigherBits(t *testing.T) {
 	bytes := make([]byte, 32)
 	//0x[0ff0]...
-	for i:=0; i< 16; i++ {
+	for i := 0; i < 16; i++ {
 		bytes[2*i] = 0x0f
 		bytes[2*i+1] = 0xf0
 	}
@@ -550,26 +549,26 @@ func Test_extractBit(t *testing.T) {
 	bytes := make([]byte, 32)
 	bytes[0] = 0b00001111
 	bytes[31] = 0xf0
-	for i:=0; i<4; i++ {
+	for i := 0; i < 4; i++ {
 		//last 4 bits, which means bytes[31] should be all 0 here
 		bits := extractBit(bytes, i)
 		if bits != 0 {
 			t.Fail()
 		}
 	}
-	for i:=4; i<8; i++ {
+	for i := 4; i < 8; i++ {
 		bits := extractBit(bytes, i)
 		if bits != 1 {
 			t.Fail()
 		}
 	}
-	for i:=248; i<252; i++ {
+	for i := 248; i < 252; i++ {
 		bits := extractBit(bytes, i)
 		if bits != 1 {
 			t.Fail()
 		}
 	}
-	for i:=252; i<256; i++ {
+	for i := 252; i < 256; i++ {
 		bits := extractBit(bytes, i)
 		if bits != 0 {
 			t.Fail()
@@ -580,15 +579,20 @@ func Test_extractBit(t *testing.T) {
 func Test_extractLowerBits(t *testing.T) {
 	bytes := make([]byte, 32)
 	bytes[31] = 0x1f
-	for i:=1; i<8; i++ {
+	for i := 1; i < 8; i++ {
 		bits := extractLowerBits(bytes, i)
 		var passed bool
 		switch i {
-		case 1: passed = bits == 1
-		case 2: passed = bits == 3
-		case 3: passed = bits == 7
-		case 4: passed = bits == 15
-		case 5, 6, 7: passed = bits == 31
+		case 1:
+			passed = bits == 1
+		case 2:
+			passed = bits == 3
+		case 3:
+			passed = bits == 7
+		case 4:
+			passed = bits == 15
+		case 5, 6, 7:
+			passed = bits == 31
 		}
 		if !passed {
 			t.Fail()
@@ -606,4 +610,3 @@ func Test_MontgomeryLadder(t *testing.T) {
 		t.Fail()
 	}
 }
-

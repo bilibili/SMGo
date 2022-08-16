@@ -6,9 +6,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"github.com/bilibili/smgo/sm3"
 	"math/big"
 	"reflect"
-	"smgo/sm3"
 	"testing"
 )
 
@@ -18,7 +18,7 @@ func BenchmarkSignHashed(b *testing.B) {
 	e := make([]byte, 32)
 	rand.Read(e)
 
-	b.SetBytes(1000*1000) // hacking to report ops/s, it will be the number leading MB/s
+	b.SetBytes(1000 * 1000) // hacking to report ops/s, it will be the number leading MB/s
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -35,7 +35,7 @@ func BenchmarkSignZa(b *testing.B) {
 	msg := make([]byte, 32)
 	rand.Read(msg)
 
-	b.SetBytes(1000*1000) // hacking to report ops/s, it will be the number leading MB/s
+	b.SetBytes(1000 * 1000) // hacking to report ops/s, it will be the number leading MB/s
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -51,7 +51,7 @@ func BenchmarkSign(b *testing.B) {
 
 	id, _ := hex.DecodeString("12345678")
 
-	b.SetBytes(1000*1000) // hacking to report ops/s, it will be the number leading MB/s
+	b.SetBytes(1000 * 1000) // hacking to report ops/s, it will be the number leading MB/s
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -70,7 +70,7 @@ func BenchmarkVerifyHashed(b *testing.B) {
 		b.Fail()
 	}
 
-	b.SetBytes(1000*1000) // hacking to report ops/s, it will be the number leading MB/s
+	b.SetBytes(1000 * 1000) // hacking to report ops/s, it will be the number leading MB/s
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -93,13 +93,12 @@ func BenchmarkVerifyZa(b *testing.B) {
 	msg := make([]byte, 32)
 	rand.Read(msg)
 
-
 	r, s, err := SignZa(rand.Reader, priv, za, msg)
 	if err != nil {
 		b.Fail()
 	}
 
-	b.SetBytes(1000*1000) // hacking to report ops/s, it will be the number leading MB/s
+	b.SetBytes(1000 * 1000) // hacking to report ops/s, it will be the number leading MB/s
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -121,13 +120,12 @@ func BenchmarkVerify(b *testing.B) {
 
 	id, _ := hex.DecodeString("12345678")
 
-
 	r, s, err := Sign(id, x, y, rand.Reader, priv, msg)
 	if err != nil {
 		b.Fail()
 	}
 
-	b.SetBytes(1000*1000) // hacking to report ops/s, it will be the number leading MB/s
+	b.SetBytes(1000 * 1000) // hacking to report ops/s, it will be the number leading MB/s
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -145,7 +143,7 @@ func BenchmarkVerify(b *testing.B) {
 // actual API function takes in actual SM2 parameters
 func za(id, a, b, Gx, Gy, pubx, puby []byte) ([]byte, error) {
 	entl := len(id) << 3
-	if entl > 1 << 16 {
+	if entl > 1<<16 {
 		return []byte{}, errors.New("entity ID too long")
 	}
 
@@ -203,7 +201,9 @@ func TestDerivePublic(t *testing.T) {
 }
 
 type myRand struct{}
+
 var myRandVar myRand
+
 func (myRand) Read(b []byte) (n int, err error) {
 	k, _ := hex.DecodeString("59276E27D506861A16680F3AD9C02DCCEF3CC1FA3CDBE4CE6D54B80DEAC1BC21")
 	copy(b, k)
@@ -212,7 +212,7 @@ func (myRand) Read(b []byte) (n int, err error) {
 }
 
 func TestGenerateKey(t *testing.T) {
-	for i:=0; i<100000; i++ { // with 100,000 count of random generation, it is expected random numbers larger than n will be generated
+	for i := 0; i < 100000; i++ { // with 100,000 count of random generation, it is expected random numbers larger than n will be generated
 		priv, x, y, err := GenerateKey(rand.Reader)
 
 		if err != nil {
@@ -261,7 +261,6 @@ func Test_Sign(t *testing.T) {
 	e, _ := hex.DecodeString("F0B43E94BA45ACCAACE692ED534382EB17E6AB5A19CE7B31F4486FDFC0D28640")
 	r, _ := hex.DecodeString("F5A03B0648D2C4630EEAC513E1BB81A15944DA3827D5B74143AC7EACEEE720B3")
 	s, _ := hex.DecodeString("B1B6AA29DF212FD8763182BC0D421CA1BB9038FD1F7F42D4840B69C485BBC1AA")
-
 
 	R, S, err := SignHashed(myRandVar, priv, e)
 
@@ -344,7 +343,7 @@ func Test_Verify(t *testing.T) {
 
 func Test_RejectNminus1(t *testing.T) {
 
-	for i:=1; i<1000; i++ {
+	for i := 1; i < 1000; i++ {
 		k := new(big.Int).Mul(n, big.NewInt(int64(i)))
 		k.Sub(k, big.NewInt(1))
 		bytes := nMinus1.Bytes()
@@ -356,13 +355,13 @@ func Test_RejectNminus1(t *testing.T) {
 
 	var bytes []byte
 
-	bytes =	make([]byte, 40)
+	bytes = make([]byte, 40)
 	a := TestPrivateKey(bytes)
 	if a != 8 {
 		t.Fail()
 	}
 
-	bytes =	make([]byte, 32)
+	bytes = make([]byte, 32)
 	rand.Read(bytes[:30])
 	a = TestPrivateKey(bytes)
 	if a != 0 {

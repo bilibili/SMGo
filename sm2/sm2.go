@@ -7,12 +7,12 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/bilibili/smgo/sm2/internal"
+	"github.com/bilibili/smgo/sm2/internal/fiat"
+	"github.com/bilibili/smgo/sm3"
+	"github.com/bilibili/smgo/utils"
 	"io"
 	"math/big"
-	"smgo/sm2/internal"
-	"smgo/sm2/internal/fiat"
-	"smgo/sm3"
-	"smgo/utils"
 )
 
 // DerivePublic takes private key and return the X and Y coordinates of the corresponding public key.
@@ -120,7 +120,7 @@ func TestPrivateKey(priv []byte) int {
 // The spec does not tell what to do about empty user ID. So it is accepted as well.
 func ZA(id, pubx, puby []byte) (za []byte, err error) {
 	entl := len(id) << 3
-	if entl > 1 << 16 {
+	if entl > 1<<16 {
 		err = errors.New("entity ID too long")
 		return
 	}
@@ -172,7 +172,7 @@ func SignZa(rand io.Reader, priv, za, msg []byte) (r, s []byte, err error) {
 // Standard demands that priv should lie in [1, n-2], SignHashed only accepts private key in that range.
 func SignHashed(rand io.Reader, priv, e []byte) (r, s []byte, err error) {
 	test := TestPrivateKey(priv)
-	if  test != 0 {
+	if test != 0 {
 		err = errors.New(fmt.Sprintf("invalid private key, reason code: %d.", test))
 		return
 	}
@@ -226,10 +226,10 @@ func SignHashed(rand io.Reader, priv, e []byte) (r, s []byte, err error) {
 		//SM2ScalarElement.SetBytes要求长度为32，因此，如果私钥实际长度短于32字节（标准不排除此种情形），左边补零（标准规定使用大端字节序）
 		d1Bytes := d1Int.Bytes()
 		var buf [32]byte
-		copy(buf[32-len(d1Bytes) : ], d1Bytes)
+		copy(buf[32-len(d1Bytes):], d1Bytes)
 
 		d1.SetBytes(buf[:]) // priv = n - 1 已经被排除，因此不会导致 d1 = 0. 编译器告警此处可忽略，因私钥的范围已经在一开始就检查过了
-		d1Inv.Invert(&d1) // **常数时间**算法 constant time inversion here, about 10% performance hit
+		d1Inv.Invert(&d1)   // **常数时间**算法 constant time inversion here, about 10% performance hit
 
 		// 标准要求计算  (k - r * priv) / (1 + priv)
 		// 这等价于 (k + r) / (1 + priv) - r
@@ -250,7 +250,7 @@ func SignHashed(rand io.Reader, priv, e []byte) (r, s []byte, err error) {
 func ensure32Bytes(i *big.Int) []byte {
 	bytes := i.Bytes()
 	var buf [32]byte
-	copy(buf[32 - len(bytes) : ], bytes)
+	copy(buf[32-len(bytes):], bytes)
 	return buf[:]
 }
 
@@ -330,4 +330,3 @@ func VerifyHashed(pubx, puby, e, r, s []byte) (bool, error) {
 
 	return R.Cmp(&rInt) == 0, nil
 }
-

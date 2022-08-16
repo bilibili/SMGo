@@ -12,8 +12,8 @@ package internal
 import (
 	"crypto/subtle"
 	"errors"
+	"github.com/bilibili/smgo/sm2/internal/fiat"
 	"math/big"
-	"smgo/sm2/internal/fiat"
 )
 
 const SM2ElementLength = 32
@@ -30,13 +30,13 @@ var sm2B *fiat.SM2Element
 var sm2G *SM2Point
 
 func initPoints() {
-	sm2B, _ = new (fiat.SM2Element).SetBytes(sm2.Params().B.Bytes())
-	xEle, _ := new (fiat.SM2Element).SetBytes(sm2.Params().Gx.Bytes())
-	yEle, _ := new (fiat.SM2Element).SetBytes(sm2.Params().Gy.Bytes())
- 	sm2G = &SM2Point{
+	sm2B, _ = new(fiat.SM2Element).SetBytes(sm2.Params().B.Bytes())
+	xEle, _ := new(fiat.SM2Element).SetBytes(sm2.Params().Gx.Bytes())
+	yEle, _ := new(fiat.SM2Element).SetBytes(sm2.Params().Gy.Bytes())
+	sm2G = &SM2Point{
 		x: xEle,
 		y: yEle,
-		z: new (fiat.SM2Element).One(),
+		z: new(fiat.SM2Element).One(),
 	}
 }
 
@@ -85,7 +85,7 @@ func (p *SM2Point) SetBytes(b []byte) (*SM2Point, error) {
 		return p.Set(NewSM2Point()), nil
 
 	// Uncompressed form.
-	case len(b) == 1 + 2*SM2ElementLength && b[0] == 4:
+	case len(b) == 1+2*SM2ElementLength && b[0] == 4:
 		x, err := new(fiat.SM2Element).SetBytes(b[1 : 1+SM2ElementLength])
 		if err != nil {
 			return nil, err
@@ -180,12 +180,12 @@ func (p *SM2Point) bytes(out *[SM2BytesLengthUncompressed]byte, safe bool) []byt
 
 		buf := append(out[:0], 4)
 		xxBytes, yyBytes := xx.Bytes(), yy.Bytes()
-		padx, pady := SM2ElementLength - len(xxBytes), SM2ElementLength - len(yyBytes)
-		for i:=0; i<padx; i++ {
+		padx, pady := SM2ElementLength-len(xxBytes), SM2ElementLength-len(yyBytes)
+		for i := 0; i < padx; i++ {
 			buf = append(buf, 0)
 		}
 		buf = append(buf, xxBytes...)
-		for i:=0; i<pady; i++ {
+		for i := 0; i < pady; i++ {
 			buf = append(buf, 0)
 		}
 		buf = append(buf, yyBytes...)
