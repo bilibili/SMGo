@@ -59,3 +59,15 @@ To follow the convention of Golang standard library, we implement the sm4.NewCip
 为了实现常数时间算法，我们在arm64平台上使用NEON指令集完成了SM4的密钥扩展和加解密计算，并使性能进一步提升。在amd64平台上，我们使用了AVX512F和GFNI扩展，大部分较新的Intel处理器都应该支持。不支持的CPU将自动运行Go语言版本，其并非常数时间实现。
 
 To facilitate constant time implementation, we use NEON instructions in arm64 for key expansion and encryption/decryption. The performance is also improved. With amd64, we use the AVX512F and GFNI extention, which should be available in most recent Intel CPUs. For those amd64 CPUs without the said GFNI feature, the Golang implementation will run, and it is NOT constant time.
+
+<h3>GCM</h3>
+我们为SM4实现了优化的GCM模式。
+
+We implemented optimized Galois Counter Mode for SM4.
+
+<h3>GF256</h3>
+
+<h3>TODO list</h3>
+GF256
+
+通过为X16函数引入block count参数，还可以平摊一次性开销，得到进一步优化。但不需要单独实施，意义不大，应该结合GCM模式做。 目前SM4和GCM是分开实现的，未来可以通过将它们"缝合"在一起而得到进一步的优化，即中间数据不写入内存而是在寄存器中直接再进行GCM计算，同时完成上述多块连续计算优化。
