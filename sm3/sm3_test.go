@@ -97,7 +97,7 @@ func Test_data60(t *testing.T) {
 	}
 }
 
-func Test_coverage(t *testing.T){
+func Test_coverage(t *testing.T) {
 	data, _ := hex.DecodeString("616263")
 	out := SumSM3(data)
 	expected, _ := hex.DecodeString("66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a2297da02b8f4ba8e0")
@@ -116,13 +116,13 @@ func Test_coverage(t *testing.T){
 }
 
 func Test_DeriveTTs(t *testing.T) {
-	for i:=0; i<16; i++ {
+	for i := 0; i < 16; i++ {
 		fmt.Printf("0x%08x,\t", bits.RotateLeft32(t0, i))
 		if (i+1)&0x07 == 0 {
 			fmt.Println()
 		}
 	}
-	for i:=16; i<64; i++ {
+	for i := 16; i < 64; i++ {
 		fmt.Printf("0x%08x,\t", bits.RotateLeft32(t1, i%32))
 		if (i+1)&0x07 == 0 {
 			fmt.Println()
@@ -157,11 +157,11 @@ func BenchmarkSum_16384(b *testing.B) {
 func bench(b *testing.B, n int) {
 	sm3 := New()
 	data := make([]byte, n)
-	var out [hashSize]byte
+	var out [Size]byte
 	b.SetBytes(int64(n))
 	b.ResetTimer()
 	b.ReportAllocs()
-	for i:=0; i<b.N; i++ {
+	for i := 0; i < b.N; i++ {
 		sm3.Write(data[:])
 		sm3.Sum(out[:0])
 	}
