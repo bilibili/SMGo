@@ -27,7 +27,7 @@ func newCipher(key []byte) (cipher.Block, error) {
 	return &sm4, nil
 }
 
-func (sm4 *sm4CipherAsm) BlockSize() int { return blockSize }
+func (sm4 *sm4CipherAsm) BlockSize() int { return BlockSize }
 
 //go:noescape
 func expandKeyAsm(key *byte, enc, dec *uint32)
@@ -50,24 +50,4 @@ func (sm4 *sm4CipherAsm) Encrypt(dst, src []byte) {
 
 func (sm4 *sm4CipherAsm) Decrypt(dst, src []byte) {
 	cryptoBlockAsm(&sm4.dec[0], &dst[0], &src[0])
-}
-
-func (sm4 *sm4CipherAsm) encryptX4(dst, src []byte) {
-	if len(src) < blockSize<<2 {
-		panic("sm4: input not 4 full blocks")
-	}
-	if len(dst) < blockSize<<2 {
-		panic("sm4: output not 4 full blocks")
-	}
-	cryptoBlockAsmX4(&sm4.enc[0], &dst[0], &src[0])
-}
-
-func (sm4 *sm4CipherAsm) decryptX4(dst, src []byte) {
-	if len(src) < blockSize<<2 {
-		panic("sm4: input not 4 full blocks")
-	}
-	if len(dst) < blockSize<<2 {
-		panic("sm4: output not 4 full blocks")
-	}
-	cryptoBlockAsmX4(&sm4.dec[0], &dst[0], &src[0])
 }

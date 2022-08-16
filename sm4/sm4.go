@@ -15,11 +15,12 @@ type sm4Cipher struct {
 }
 
 type KeySizeError int
+
 func (k KeySizeError) Error() string {
 	return "crypto/sm4: invalid key size " + strconv.Itoa(int(k))
 }
 
-func (sm4 *sm4Cipher) BlockSize() int {return blockSize}
+func (sm4 *sm4Cipher) BlockSize() int { return BlockSize }
 
 // NewCipher security warning: this function is provided as part of cipher.Block spec.
 // The expanded key could be left in heap memory after use, or copied around by GC or OS.
@@ -28,7 +29,7 @@ func (sm4 *sm4Cipher) BlockSize() int {return blockSize}
 // Also see https://github.com/awnumar/memguard
 func NewCipher(key []byte) (cipher.Block, error) {
 	k := len(key)
-	if k != blockSize {
+	if k != BlockSize {
 		return nil, KeySizeError(k)
 	}
 
@@ -42,19 +43,19 @@ func newCipherGeneric(key []byte) (cipher.Block, error) {
 }
 
 func (sm4 *sm4Cipher) Encrypt(dst, src []byte) {
-	cryptoBlock(src[:blockSize], dst[:blockSize], &sm4.enc)
+	cryptoBlock(src[:BlockSize], dst[:BlockSize], &sm4.enc)
 }
 
 func (sm4 *sm4Cipher) Decrypt(dst, src []byte) {
-	cryptoBlock(src[:blockSize], dst[:blockSize], &sm4.dec)
+	cryptoBlock(src[:BlockSize], dst[:BlockSize], &sm4.dec)
 }
 
 func encryptX2(sm4 *sm4Cipher, dst, src []byte) {
-	cryptoBlockX2(src[:blockSize<<1], dst[:blockSize<<1], &sm4.enc)
+	cryptoBlockX2(src[:BlockSize<<1], dst[:BlockSize<<1], &sm4.enc)
 }
 
 func decryptX2(sm4 *sm4Cipher, dst, src []byte) {
-	cryptoBlockX2(src[:blockSize<<1], dst[:blockSize<<1], &sm4.dec)
+	cryptoBlockX2(src[:BlockSize<<1], dst[:BlockSize<<1], &sm4.dec)
 }
 
 //func transT(a uint32) uint32 {
@@ -86,45 +87,77 @@ func cryptoBlock(x, y []byte, rk *[32]uint32) {
 	//	t = rk[i<<2+3] ^ z0 ^ z1 ^ z2; z3 ^= ss(t)
 	//}
 
-	t = z1 ^ z2 ^ z3 ^ rk[0]; z0 ^= ss(t)
-	t = z2 ^ z3 ^ rk[1] ^ z0; z1 ^= ss(t)
-	t = z3 ^ rk[2] ^ z0 ^ z1; z2 ^= ss(t)
-	t = rk[3] ^ z0 ^ z1 ^ z2; z3 ^= ss(t)
+	t = z1 ^ z2 ^ z3 ^ rk[0]
+	z0 ^= ss(t)
+	t = z2 ^ z3 ^ rk[1] ^ z0
+	z1 ^= ss(t)
+	t = z3 ^ rk[2] ^ z0 ^ z1
+	z2 ^= ss(t)
+	t = rk[3] ^ z0 ^ z1 ^ z2
+	z3 ^= ss(t)
 
-	t = z1 ^ z2 ^ z3 ^ rk[4]; z0 ^= ss(t)
-	t = z2 ^ z3 ^ rk[5] ^ z0; z1 ^= ss(t)
-	t = z3 ^ rk[6] ^ z0 ^ z1; z2 ^= ss(t)
-	t = rk[7] ^ z0 ^ z1 ^ z2; z3 ^= ss(t)
+	t = z1 ^ z2 ^ z3 ^ rk[4]
+	z0 ^= ss(t)
+	t = z2 ^ z3 ^ rk[5] ^ z0
+	z1 ^= ss(t)
+	t = z3 ^ rk[6] ^ z0 ^ z1
+	z2 ^= ss(t)
+	t = rk[7] ^ z0 ^ z1 ^ z2
+	z3 ^= ss(t)
 
-	t = z1 ^ z2 ^ z3 ^ rk[8]; z0 ^= ss(t)
-	t = z2 ^ z3 ^ rk[9] ^ z0; z1 ^= ss(t)
-	t = z3 ^ rk[10] ^ z0 ^ z1; z2 ^= ss(t)
-	t = rk[11] ^ z0 ^ z1 ^ z2; z3 ^= ss(t)
+	t = z1 ^ z2 ^ z3 ^ rk[8]
+	z0 ^= ss(t)
+	t = z2 ^ z3 ^ rk[9] ^ z0
+	z1 ^= ss(t)
+	t = z3 ^ rk[10] ^ z0 ^ z1
+	z2 ^= ss(t)
+	t = rk[11] ^ z0 ^ z1 ^ z2
+	z3 ^= ss(t)
 
-	t = z1 ^ z2 ^ z3 ^ rk[12]; z0 ^= ss(t)
-	t = z2 ^ z3 ^ rk[13] ^ z0; z1 ^= ss(t)
-	t = z3 ^ rk[14] ^ z0 ^ z1; z2 ^= ss(t)
-	t = rk[15] ^ z0 ^ z1 ^ z2; z3 ^= ss(t)
+	t = z1 ^ z2 ^ z3 ^ rk[12]
+	z0 ^= ss(t)
+	t = z2 ^ z3 ^ rk[13] ^ z0
+	z1 ^= ss(t)
+	t = z3 ^ rk[14] ^ z0 ^ z1
+	z2 ^= ss(t)
+	t = rk[15] ^ z0 ^ z1 ^ z2
+	z3 ^= ss(t)
 
-	t = z1 ^ z2 ^ z3 ^ rk[16]; z0 ^= ss(t)
-	t = z2 ^ z3 ^ rk[17] ^ z0; z1 ^= ss(t)
-	t = z3 ^ rk[18] ^ z0 ^ z1; z2 ^= ss(t)
-	t = rk[19] ^ z0 ^ z1 ^ z2; z3 ^= ss(t)
+	t = z1 ^ z2 ^ z3 ^ rk[16]
+	z0 ^= ss(t)
+	t = z2 ^ z3 ^ rk[17] ^ z0
+	z1 ^= ss(t)
+	t = z3 ^ rk[18] ^ z0 ^ z1
+	z2 ^= ss(t)
+	t = rk[19] ^ z0 ^ z1 ^ z2
+	z3 ^= ss(t)
 
-	t = z1 ^ z2 ^ z3 ^ rk[20]; z0 ^= ss(t)
-	t = z2 ^ z3 ^ rk[21] ^ z0; z1 ^= ss(t)
-	t = z3 ^ rk[22] ^ z0 ^ z1; z2 ^= ss(t)
-	t = rk[23] ^ z0 ^ z1 ^ z2; z3 ^= ss(t)
+	t = z1 ^ z2 ^ z3 ^ rk[20]
+	z0 ^= ss(t)
+	t = z2 ^ z3 ^ rk[21] ^ z0
+	z1 ^= ss(t)
+	t = z3 ^ rk[22] ^ z0 ^ z1
+	z2 ^= ss(t)
+	t = rk[23] ^ z0 ^ z1 ^ z2
+	z3 ^= ss(t)
 
-	t = z1 ^ z2 ^ z3 ^ rk[24]; z0 ^= ss(t)
-	t = z2 ^ z3 ^ rk[25] ^ z0; z1 ^= ss(t)
-	t = z3 ^ rk[26] ^ z0 ^ z1; z2 ^= ss(t)
-	t = rk[27] ^ z0 ^ z1 ^ z2; z3 ^= ss(t)
+	t = z1 ^ z2 ^ z3 ^ rk[24]
+	z0 ^= ss(t)
+	t = z2 ^ z3 ^ rk[25] ^ z0
+	z1 ^= ss(t)
+	t = z3 ^ rk[26] ^ z0 ^ z1
+	z2 ^= ss(t)
+	t = rk[27] ^ z0 ^ z1 ^ z2
+	z3 ^= ss(t)
 
-	t = z1 ^ z2 ^ z3 ^ rk[28]; z0 ^= ss(t)
-	t = z2 ^ z3 ^ rk[29] ^ z0; z1 ^= ss(t)
-	t = z3 ^ rk[30] ^ z0 ^ z1; z2 ^= ss(t)
-	t = rk[31] ^ z0 ^ z1 ^ z2; z3 ^= ss(t)
+	t = z1 ^ z2 ^ z3 ^ rk[28]
+	z0 ^= ss(t)
+	t = z2 ^ z3 ^ rk[29] ^ z0
+	z1 ^= ss(t)
+	t = z3 ^ rk[30] ^ z0 ^ z1
+	z2 ^= ss(t)
+	t = rk[31] ^ z0 ^ z1 ^ z2
+	z3 ^= ss(t)
 
 	binary.BigEndian.PutUint32(y[0:4], z3)
 	binary.BigEndian.PutUint32(y[4:8], z2)
@@ -140,10 +173,10 @@ func cryptoBlockX2(x, y []byte, rk *[32]uint32) {
 	z2 = uint64(binary.BigEndian.Uint32(x[8:12]))
 	z3 = uint64(binary.BigEndian.Uint32(x[12:16]))
 
-	z0 |= uint64(binary.BigEndian.Uint32(x[16:20]))<<32
-	z1 |= uint64(binary.BigEndian.Uint32(x[20:24]))<<32
-	z2 |= uint64(binary.BigEndian.Uint32(x[24:28]))<<32
-	z3 |= uint64(binary.BigEndian.Uint32(x[28:32]))<<32
+	z0 |= uint64(binary.BigEndian.Uint32(x[16:20])) << 32
+	z1 |= uint64(binary.BigEndian.Uint32(x[20:24])) << 32
+	z2 |= uint64(binary.BigEndian.Uint32(x[24:28])) << 32
+	z3 |= uint64(binary.BigEndian.Uint32(x[28:32])) << 32
 
 	//for i:=0; i<8; i++ {
 	//	k = uint64(rk[i<<2  ]); k |= k<<32; t = z1 ^ z2 ^ z3 ^ k; z0 ^= ssX2(t)
@@ -152,45 +185,141 @@ func cryptoBlockX2(x, y []byte, rk *[32]uint32) {
 	//	k = uint64(rk[i<<2+3]); k |= k<<32; t = k ^ z0 ^ z1 ^ z2; z3 ^= ssX2(t)
 	//}
 
-	k = uint64(rk[0]); k |= k<<32; t = z1 ^ z2 ^ z3 ^ k; z0 ^= ssX2(t)
-	k = uint64(rk[1]); k |= k<<32; t = z2 ^ z3 ^ k ^ z0; z1 ^= ssX2(t)
-	k = uint64(rk[2]); k |= k<<32; t = z3 ^ k ^ z0 ^ z1; z2 ^= ssX2(t)
-	k = uint64(rk[3]); k |= k<<32; t = k ^ z0 ^ z1 ^ z2; z3 ^= ssX2(t)
+	k = uint64(rk[0])
+	k |= k << 32
+	t = z1 ^ z2 ^ z3 ^ k
+	z0 ^= ssX2(t)
+	k = uint64(rk[1])
+	k |= k << 32
+	t = z2 ^ z3 ^ k ^ z0
+	z1 ^= ssX2(t)
+	k = uint64(rk[2])
+	k |= k << 32
+	t = z3 ^ k ^ z0 ^ z1
+	z2 ^= ssX2(t)
+	k = uint64(rk[3])
+	k |= k << 32
+	t = k ^ z0 ^ z1 ^ z2
+	z3 ^= ssX2(t)
 
-	k = uint64(rk[4]); k |= k<<32; t = z1 ^ z2 ^ z3 ^ k; z0 ^= ssX2(t)
-	k = uint64(rk[5]); k |= k<<32; t = z2 ^ z3 ^ k ^ z0; z1 ^= ssX2(t)
-	k = uint64(rk[6]); k |= k<<32; t = z3 ^ k ^ z0 ^ z1; z2 ^= ssX2(t)
-	k = uint64(rk[7]); k |= k<<32; t = k ^ z0 ^ z1 ^ z2; z3 ^= ssX2(t)
+	k = uint64(rk[4])
+	k |= k << 32
+	t = z1 ^ z2 ^ z3 ^ k
+	z0 ^= ssX2(t)
+	k = uint64(rk[5])
+	k |= k << 32
+	t = z2 ^ z3 ^ k ^ z0
+	z1 ^= ssX2(t)
+	k = uint64(rk[6])
+	k |= k << 32
+	t = z3 ^ k ^ z0 ^ z1
+	z2 ^= ssX2(t)
+	k = uint64(rk[7])
+	k |= k << 32
+	t = k ^ z0 ^ z1 ^ z2
+	z3 ^= ssX2(t)
 
-	k = uint64(rk[8]); k |= k<<32; t = z1 ^ z2 ^ z3 ^ k; z0 ^= ssX2(t)
-	k = uint64(rk[9]); k |= k<<32; t = z2 ^ z3 ^ k ^ z0; z1 ^= ssX2(t)
-	k = uint64(rk[10]); k |= k<<32; t = z3 ^ k ^ z0 ^ z1; z2 ^= ssX2(t)
-	k = uint64(rk[11]); k |= k<<32; t = k ^ z0 ^ z1 ^ z2; z3 ^= ssX2(t)
+	k = uint64(rk[8])
+	k |= k << 32
+	t = z1 ^ z2 ^ z3 ^ k
+	z0 ^= ssX2(t)
+	k = uint64(rk[9])
+	k |= k << 32
+	t = z2 ^ z3 ^ k ^ z0
+	z1 ^= ssX2(t)
+	k = uint64(rk[10])
+	k |= k << 32
+	t = z3 ^ k ^ z0 ^ z1
+	z2 ^= ssX2(t)
+	k = uint64(rk[11])
+	k |= k << 32
+	t = k ^ z0 ^ z1 ^ z2
+	z3 ^= ssX2(t)
 
-	k = uint64(rk[12]); k |= k<<32; t = z1 ^ z2 ^ z3 ^ k; z0 ^= ssX2(t)
-	k = uint64(rk[13]); k |= k<<32; t = z2 ^ z3 ^ k ^ z0; z1 ^= ssX2(t)
-	k = uint64(rk[14]); k |= k<<32; t = z3 ^ k ^ z0 ^ z1; z2 ^= ssX2(t)
-	k = uint64(rk[15]); k |= k<<32; t = k ^ z0 ^ z1 ^ z2; z3 ^= ssX2(t)
+	k = uint64(rk[12])
+	k |= k << 32
+	t = z1 ^ z2 ^ z3 ^ k
+	z0 ^= ssX2(t)
+	k = uint64(rk[13])
+	k |= k << 32
+	t = z2 ^ z3 ^ k ^ z0
+	z1 ^= ssX2(t)
+	k = uint64(rk[14])
+	k |= k << 32
+	t = z3 ^ k ^ z0 ^ z1
+	z2 ^= ssX2(t)
+	k = uint64(rk[15])
+	k |= k << 32
+	t = k ^ z0 ^ z1 ^ z2
+	z3 ^= ssX2(t)
 
-	k = uint64(rk[16]); k |= k<<32; t = z1 ^ z2 ^ z3 ^ k; z0 ^= ssX2(t)
-	k = uint64(rk[17]); k |= k<<32; t = z2 ^ z3 ^ k ^ z0; z1 ^= ssX2(t)
-	k = uint64(rk[18]); k |= k<<32; t = z3 ^ k ^ z0 ^ z1; z2 ^= ssX2(t)
-	k = uint64(rk[19]); k |= k<<32; t = k ^ z0 ^ z1 ^ z2; z3 ^= ssX2(t)
+	k = uint64(rk[16])
+	k |= k << 32
+	t = z1 ^ z2 ^ z3 ^ k
+	z0 ^= ssX2(t)
+	k = uint64(rk[17])
+	k |= k << 32
+	t = z2 ^ z3 ^ k ^ z0
+	z1 ^= ssX2(t)
+	k = uint64(rk[18])
+	k |= k << 32
+	t = z3 ^ k ^ z0 ^ z1
+	z2 ^= ssX2(t)
+	k = uint64(rk[19])
+	k |= k << 32
+	t = k ^ z0 ^ z1 ^ z2
+	z3 ^= ssX2(t)
 
-	k = uint64(rk[20]); k |= k<<32; t = z1 ^ z2 ^ z3 ^ k; z0 ^= ssX2(t)
-	k = uint64(rk[21]); k |= k<<32; t = z2 ^ z3 ^ k ^ z0; z1 ^= ssX2(t)
-	k = uint64(rk[22]); k |= k<<32; t = z3 ^ k ^ z0 ^ z1; z2 ^= ssX2(t)
-	k = uint64(rk[23]); k |= k<<32; t = k ^ z0 ^ z1 ^ z2; z3 ^= ssX2(t)
+	k = uint64(rk[20])
+	k |= k << 32
+	t = z1 ^ z2 ^ z3 ^ k
+	z0 ^= ssX2(t)
+	k = uint64(rk[21])
+	k |= k << 32
+	t = z2 ^ z3 ^ k ^ z0
+	z1 ^= ssX2(t)
+	k = uint64(rk[22])
+	k |= k << 32
+	t = z3 ^ k ^ z0 ^ z1
+	z2 ^= ssX2(t)
+	k = uint64(rk[23])
+	k |= k << 32
+	t = k ^ z0 ^ z1 ^ z2
+	z3 ^= ssX2(t)
 
-	k = uint64(rk[24]); k |= k<<32; t = z1 ^ z2 ^ z3 ^ k; z0 ^= ssX2(t)
-	k = uint64(rk[25]); k |= k<<32; t = z2 ^ z3 ^ k ^ z0; z1 ^= ssX2(t)
-	k = uint64(rk[26]); k |= k<<32; t = z3 ^ k ^ z0 ^ z1; z2 ^= ssX2(t)
-	k = uint64(rk[27]); k |= k<<32; t = k ^ z0 ^ z1 ^ z2; z3 ^= ssX2(t)
+	k = uint64(rk[24])
+	k |= k << 32
+	t = z1 ^ z2 ^ z3 ^ k
+	z0 ^= ssX2(t)
+	k = uint64(rk[25])
+	k |= k << 32
+	t = z2 ^ z3 ^ k ^ z0
+	z1 ^= ssX2(t)
+	k = uint64(rk[26])
+	k |= k << 32
+	t = z3 ^ k ^ z0 ^ z1
+	z2 ^= ssX2(t)
+	k = uint64(rk[27])
+	k |= k << 32
+	t = k ^ z0 ^ z1 ^ z2
+	z3 ^= ssX2(t)
 
-	k = uint64(rk[28]); k |= k<<32; t = z1 ^ z2 ^ z3 ^ k; z0 ^= ssX2(t)
-	k = uint64(rk[29]); k |= k<<32; t = z2 ^ z3 ^ k ^ z0; z1 ^= ssX2(t)
-	k = uint64(rk[30]); k |= k<<32; t = z3 ^ k ^ z0 ^ z1; z2 ^= ssX2(t)
-	k = uint64(rk[31]); k |= k<<32; t = k ^ z0 ^ z1 ^ z2; z3 ^= ssX2(t)
+	k = uint64(rk[28])
+	k |= k << 32
+	t = z1 ^ z2 ^ z3 ^ k
+	z0 ^= ssX2(t)
+	k = uint64(rk[29])
+	k |= k << 32
+	t = z2 ^ z3 ^ k ^ z0
+	z1 ^= ssX2(t)
+	k = uint64(rk[30])
+	k |= k << 32
+	t = z3 ^ k ^ z0 ^ z1
+	z2 ^= ssX2(t)
+	k = uint64(rk[31])
+	k |= k << 32
+	t = k ^ z0 ^ z1 ^ z2
+	z3 ^= ssX2(t)
 
 	binary.BigEndian.PutUint32(y[0:4], uint32(z3&0xffffffff))
 	binary.BigEndian.PutUint32(y[4:8], uint32(z2&0xffffffff))
@@ -223,14 +352,26 @@ func ssX2(t uint64) uint64 {
 
 func expandKey(mk []byte, enc, dec *[32]uint32) {
 	var k0, k1, k2, k3 uint32
-	var mks [4] uint32
+	var mks [4]uint32
 	byte16ToUint32(mk[:], mks[:])
 	k0, k1, k2, k3 = mks[0]^fk0, mks[1]^fk1, mks[2]^fk2, mks[3]^fk3
-	for i := 0; i < 32;  {
-		k0 ^= transTPrime(k1^k2^k3^ck[i]); enc[i] = k0; dec[31-i] = k0; i++
-		k1 ^= transTPrime(k2^k3^k0^ck[i]); enc[i] = k1; dec[31-i] = k1; i++
-		k2 ^= transTPrime(k3^k0^k1^ck[i]); enc[i] = k2; dec[31-i] = k2; i++
-		k3 ^= transTPrime(k0^k1^k2^ck[i]); enc[i] = k3; dec[31-i] = k3; i++
+	for i := 0; i < 32; {
+		k0 ^= transTPrime(k1 ^ k2 ^ k3 ^ ck[i])
+		enc[i] = k0
+		dec[31-i] = k0
+		i++
+		k1 ^= transTPrime(k2 ^ k3 ^ k0 ^ ck[i])
+		enc[i] = k1
+		dec[31-i] = k1
+		i++
+		k2 ^= transTPrime(k3 ^ k0 ^ k1 ^ ck[i])
+		enc[i] = k2
+		dec[31-i] = k2
+		i++
+		k3 ^= transTPrime(k0 ^ k1 ^ k2 ^ ck[i])
+		enc[i] = k3
+		dec[31-i] = k3
+		i++
 	}
 }
 func byte16ToUint32(bytes []byte, uints []uint32) {

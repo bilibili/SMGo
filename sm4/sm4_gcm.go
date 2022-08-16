@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	gcmMinimumTagSize = 12
+	gcmMinimumTagSize    = 12
 	gcmStandardNonceSize = 12
 )
 
@@ -23,31 +23,31 @@ type gcmAble interface {
 
 func (sm4 *sm4CipherAsm) NewGCM(nonceSize, tagSize int) (cipher.AEAD, error) {
 	g := &sm4GcmAsm{
-		cipher: sm4,
+		cipher:    sm4,
 		roundKeys: sm4.enc[:],
 		nonceSize: nonceSize,
-		tagSize: tagSize,
+		tagSize:   tagSize,
 	}
 	return g, nil
 }
 
 type sm4GcmAsm struct {
-	cipher cipher.Block
+	cipher    cipher.Block
 	roundKeys []uint32
 	nonceSize int
-	tagSize int
+	tagSize   int
 }
 
 func (g *sm4GcmAsm) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 	if len(nonce) != g.nonceSize {
 		panic("crypto/cipher: incorrect nonce length given to GCM")
 	}
-	if uint64(len(plaintext)) > ((1<<32)-2)*blockSize {
+	if uint64(len(plaintext)) > ((1<<32)-2)*BlockSize {
 		panic("crypto/cipher: message too large for GCM")
 	}
 
 	// using notations from NIST SP 800-38D, section 7.1
-	var H, TMask, J0, tag [blockSize]byte
+	var H, TMask, J0, tag [BlockSize]byte
 	g.cipher.Encrypt(H[:], H[:])
 	g.calculateFirstCounter(nonce, J0[:], H[:])
 	g.cipher.Encrypt(TMask[:], J0[:])
@@ -78,19 +78,19 @@ func (g *sm4GcmAsm) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte,
 	if len(ciphertext) < g.tagSize {
 		return nil, errOpen
 	}
-	if uint64(len(ciphertext)) > ((1<<32)-2)*blockSize+uint64(g.tagSize) {
+	if uint64(len(ciphertext)) > ((1<<32)-2)*BlockSize+uint64(g.tagSize) {
 		return nil, errOpen
 	}
 
 	tag := ciphertext[len(ciphertext)-g.tagSize:]
 	ciphertext = ciphertext[:len(ciphertext)-g.tagSize]
 
-	var H, J0, TMask [blockSize]byte
+	var H, J0, TMask [BlockSize]byte
 	g.cipher.Encrypt(H[:], H[:])
 	g.calculateFirstCounter(nonce, J0[:], H[:])
 	g.cipher.Encrypt(TMask[:], J0[:])
 
-	var expectedTag [blockSize]byte
+	var expectedTag [BlockSize]byte
 	g.gHashUpdate(H[:], expectedTag[:], additionalData)
 	g.gHashUpdate(H[:], expectedTag[:], ciphertext)
 	g.gHashFinish(H[:], expectedTag[:], uint64(len(additionalData)), uint64(len(ciphertext)))
@@ -117,7 +117,7 @@ func (g *sm4GcmAsm) Overhead() int {
 func (g *sm4GcmAsm) calculateFirstCounter(nonce []byte, counter []byte, H []byte) {
 	if len(nonce) == gcmStandardNonceSize {
 		copy(counter[:], nonce)
-		counter[blockSize-1] = 1
+		counter[BlockSize-1] = 1
 	} else {
 		g.gHashUpdate(H[:], counter[:], nonce)
 		g.gHashFinish(H[:], counter[:], uint64(0), uint64(len(nonce)))
@@ -129,7 +129,7 @@ func ensureCapacity(array []byte, asked int) (head, tail []byte) {
 	if remaining >= asked {
 		head = array
 	} else {
-		head = make([]byte, len(array) + asked)
+		head = make([]byte, len(array)+asked)
 		copy(head, array)
 	}
 	tail = head[len(array):]
@@ -138,20 +138,20 @@ func ensureCapacity(array []byte, asked int) (head, tail []byte) {
 
 func (g *sm4GcmAsm) gHashUpdate(H, tag, in []byte) {
 	l := len(in)
-	if l >= blockSize {
+	if l >= BlockSize {
 		gHashBlocks(&H[0], &tag[0], &in[0], l>>4)
 	}
 
 	r := l & 15
 	if r != 0 {
-		var tmp [blockSize]byte
+		var tmp [BlockSize]byte
 		copy(tmp[:], in[l-r:]) // zero padding from right
 		gHashBlocks(&H[0], &tag[0], &tmp[0], 1)
 	}
 }
 
 func (g *sm4GcmAsm) gHashFinish(H, tag []byte, aadLen, plainLen uint64) { // length in bytes
-	var tmp [blockSize]byte
+	var tmp [BlockSize]byte
 	binary.BigEndian.PutUint64(tmp[:8], aadLen<<3)
 	binary.BigEndian.PutUint64(tmp[8:], plainLen<<3)
 
@@ -165,7 +165,7 @@ func (g *sm4GcmAsm) cryptoBlocks(roundKeys []uint32, out, in, preCounter []byte)
 
 	blocks256 := blocks >> 4
 	var blockCount uint32 = 0
-	for i:=0; i< blocks256; i++ {
+	for i := 0; i < blocks256; i++ {
 		var counter, tmp [256]byte
 		fillCounter256(counter[:], preCounter, blockCount)
 		//out may overlap or reuse plaintext so use tmp here
@@ -225,7 +225,7 @@ func (g *sm4GcmAsm) cryptoBlocks(roundKeys []uint32, out, in, preCounter []byte)
 		var counter, tmp [16]byte
 		fillCounter16(counter[:], preCounter, blockCount)
 		cryptoBlockAsm(&roundKeys[0], &tmp[0], &counter[0])
-		for i:=0; i<remainder; i++ {
+		for i := 0; i < remainder; i++ {
 			out[i] = tmp[i] ^ in[i]
 		}
 	}
@@ -234,47 +234,47 @@ func (g *sm4GcmAsm) cryptoBlocks(roundKeys []uint32, out, in, preCounter []byte)
 func fillCounter256(dst, src []byte, count uint32) {
 	c := binary.BigEndian.Uint32(src[12:]) + count + 1
 	fillSingleBlock(dst, src, c)
-	fillSingleBlock(dst[16:], src, c + 1)
-	fillSingleBlock(dst[32:], src, c + 2)
-	fillSingleBlock(dst[48:], src, c + 3)
-	fillSingleBlock(dst[64:], src, c + 4)
-	fillSingleBlock(dst[80:], src, c + 5)
-	fillSingleBlock(dst[96:], src, c + 6)
-	fillSingleBlock(dst[112:], src, c + 7)
-	fillSingleBlock(dst[128:], src, c + 8)
-	fillSingleBlock(dst[144:], src, c + 9)
-	fillSingleBlock(dst[160:], src, c + 10)
-	fillSingleBlock(dst[176:], src, c + 11)
-	fillSingleBlock(dst[192:], src, c + 12)
-	fillSingleBlock(dst[208:], src, c + 13)
-	fillSingleBlock(dst[224:], src, c + 14)
-	fillSingleBlock(dst[240:], src, c + 15)
+	fillSingleBlock(dst[16:], src, c+1)
+	fillSingleBlock(dst[32:], src, c+2)
+	fillSingleBlock(dst[48:], src, c+3)
+	fillSingleBlock(dst[64:], src, c+4)
+	fillSingleBlock(dst[80:], src, c+5)
+	fillSingleBlock(dst[96:], src, c+6)
+	fillSingleBlock(dst[112:], src, c+7)
+	fillSingleBlock(dst[128:], src, c+8)
+	fillSingleBlock(dst[144:], src, c+9)
+	fillSingleBlock(dst[160:], src, c+10)
+	fillSingleBlock(dst[176:], src, c+11)
+	fillSingleBlock(dst[192:], src, c+12)
+	fillSingleBlock(dst[208:], src, c+13)
+	fillSingleBlock(dst[224:], src, c+14)
+	fillSingleBlock(dst[240:], src, c+15)
 }
 
 func fillCounter128(dst, src []byte, count uint32) {
 	c := binary.BigEndian.Uint32(src[12:]) + count + 1
 	fillSingleBlock(dst, src, c)
-	fillSingleBlock(dst[16:], src, c + 1)
-	fillSingleBlock(dst[32:], src, c + 2)
-	fillSingleBlock(dst[48:], src, c + 3)
-	fillSingleBlock(dst[64:], src, c + 4)
-	fillSingleBlock(dst[80:], src, c + 5)
-	fillSingleBlock(dst[96:], src, c + 6)
-	fillSingleBlock(dst[112:], src, c + 7)
+	fillSingleBlock(dst[16:], src, c+1)
+	fillSingleBlock(dst[32:], src, c+2)
+	fillSingleBlock(dst[48:], src, c+3)
+	fillSingleBlock(dst[64:], src, c+4)
+	fillSingleBlock(dst[80:], src, c+5)
+	fillSingleBlock(dst[96:], src, c+6)
+	fillSingleBlock(dst[112:], src, c+7)
 }
 
 func fillCounter64(dst, src []byte, count uint32) {
 	c := binary.BigEndian.Uint32(src[12:]) + count + 1
 	fillSingleBlock(dst, src, c)
-	fillSingleBlock(dst[16:], src, c + 1)
-	fillSingleBlock(dst[32:], src, c + 2)
-	fillSingleBlock(dst[48:], src, c + 3)
+	fillSingleBlock(dst[16:], src, c+1)
+	fillSingleBlock(dst[32:], src, c+2)
+	fillSingleBlock(dst[48:], src, c+3)
 }
 
 func fillCounter32(dst, src []byte, count uint32) {
 	c := binary.BigEndian.Uint32(src[12:]) + count + 1
 	fillSingleBlock(dst, src, c)
-	fillSingleBlock(dst[16:], src, c + 1)
+	fillSingleBlock(dst[16:], src, c+1)
 }
 
 func fillCounter16(dst, src []byte, count uint32) {
@@ -292,11 +292,15 @@ func gHashBlocks(H *byte, tag *byte, data *byte, count int)
 
 //go:noescape
 func xor256(dst *byte, src1 *byte, src2 *byte)
+
 //go:noescape
 func xor128(dst *byte, src1 *byte, src2 *byte)
+
 //go:noescape
 func xor64(dst *byte, src1 *byte, src2 *byte)
+
 //go:noescape
 func xor32(dst *byte, src1 *byte, src2 *byte)
+
 //go:noescape
 func xor16(dst *byte, src1 *byte, src2 *byte)
