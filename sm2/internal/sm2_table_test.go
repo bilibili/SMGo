@@ -6,8 +6,8 @@
 package internal
 
 import (
+	"github.com/bilibili/smgo/sm2/internal/fiat"
 	"reflect"
-	"smgo/sm2/internal/fiat"
 	"testing"
 )
 
@@ -51,9 +51,9 @@ func Test_6_3_14(t *testing.T) {
 }
 
 func makePoint(xx, yy *[4]uint64) *SM2Point {
-	return &SM2Point {
-		x: new (fiat.SM2Element).SetRaw(*xx),
-		y: new (fiat.SM2Element).SetRaw(*yy),
+	return &SM2Point{
+		x: new(fiat.SM2Element).SetRaw(*xx),
+		y: new(fiat.SM2Element).SetRaw(*yy),
 		z: new(fiat.SM2Element).One(),
 	}
 }
@@ -69,14 +69,14 @@ func makeBigInt(setBits []int64) []byte {
 	bytes := make([]byte, 32)
 
 	for _, bit := range setBits {
-		bytes[31 - bit>>3] |= 1<<(bit&7)
+		bytes[31-bit>>3] |= 1 << (bit & 7)
 	}
 
 	return bytes
 }
 
 func Test_selectPoints(t *testing.T) {
-	for i:=1; i<=len(sm2Precomputed_6_3_14_Remainder[0]); i++ {
+	for i := 1; i <= len(sm2Precomputed_6_3_14_Remainder[0]); i++ {
 		p := NewSM2Point()
 		selectPoints(p, &sm2Precomputed_6_3_14_Remainder, 15, byte(i))
 		q := makePoint(sm2Precomputed_6_3_14_Remainder[0][i-1], sm2Precomputed_6_3_14_Remainder[1][i-1])
@@ -85,4 +85,3 @@ func Test_selectPoints(t *testing.T) {
 		}
 	}
 }
-

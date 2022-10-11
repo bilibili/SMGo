@@ -5,7 +5,7 @@
 
 package internal
 
-import "smgo/sm2/internal/fiat"
+import "github.com/bilibili/smgo/sm2/internal/fiat"
 
 func (p *SM2Point) ToMontgomeryAffineX() *fiat.SM2Element {
 	if p.z.IsZero() == 1 {
