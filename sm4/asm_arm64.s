@@ -1,7 +1,5 @@
 // Copyright 2021 ~ 2022 bilibili. All rights reserved. Author: Guo, Weiji guoweiji@bilibili.com
-// This source file contains patented technique. A written permission must be obtained from bilibili prior to commercial use.
 // 哔哩哔哩版权所有 2021 ~ 2022。作者：郭伟基 guoweiji@bilibili.com
-// 本源程序文件含有专利技术实现。如用于商业目的，须事先取得B站的书面许可。
 
 // "table lookup in NEON" method credited to Ard Biesheuve from Linaro, see https://www.linaro.org/blog/accelerated-aes-for-the-arm64-linux-kernel/
 

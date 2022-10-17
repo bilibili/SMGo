@@ -1,4 +1,4 @@
-smgo is developed by bilibili, with codes generated with fiat and addchain, and
+SMGo is developed by bilibili, with codes generated with fiat and addchain, and
 some codes from Go. bilibili codes carry BSD 3-Clause License, which is provided
 below.
 
@@ -8,7 +8,7 @@ copyright statement.
 Codes generated with addchain carry BSD 3-Clause License, which is provided below
 along with copyright statement.
 
-Some sm2 codes are modified from some Go source code, for which the original
+Some SM2 codes are modified from some Go source code, for which the original
 license statement of that file has been retained, and the Go license (3-Clause BSD)
 along with copyright statement has been provided below. These files are dual-licensed
 under both bilibili license and Go license.
@@ -30,7 +30,7 @@ are permitted provided that the following conditions are met:
     * Redistributions in binary form must reproduce the above copyright notice,
       this list of conditions and the following disclaimer in the documentation
       and/or other materials provided with the distribution.
-    * Neither the name of {{ project }} nor the names of its contributors
+    * Neither the name of SMGo nor the names of its contributors
       may be used to endorse or promote products derived from this software
       without specific prior written permission.
 

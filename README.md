@@ -69,9 +69,10 @@ For those amd64 CPUs without the said GFNI feature, the Golang implementation wi
 
 We implemented optimized Galois Counter Mode for SM4.
 
-<h3>GF256</h3>
-
 <h3>TODO list</h3>
-GF256
-
 通过为X16函数引入block count参数，还可以平摊一次性开销，得到进一步优化。但不需要单独实施，意义不大，应该结合GCM模式做。 目前SM4和GCM是分开实现的，未来可以通过将它们"缝合"在一起而得到进一步的优化，即中间数据不写入内存而是在寄存器中直接再进行GCM计算，同时完成上述多块连续计算优化。
+
+<h3>授权协议 License</h3>
+SMGo通过BSD 3-Clause 版权协议授权，详情请参见[LICENSE](LICENSE)文件。该文件包括SMGo内部所使用第三方工具或代码所遵循的版权声明以及授权条款。
+
+SMGo is licensed under BSD 3-Clause. Please refer to [LICENSE](LICENSE) for details, which also includes copyright statements and license terms & conditions for the third party tools and codes used by SMGo.
