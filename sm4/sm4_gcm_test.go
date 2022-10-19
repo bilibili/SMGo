@@ -110,6 +110,11 @@ var aesGCMTests = []struct {
 }
 
 func Test_sm4GcmAsm_Seal(t *testing.T) {
+	a:=[]byte{0x9, 0x7}
+	b:=[]byte{0xc, 0x5}
+	xorAsm(&a[0],&b[0], 2, &a[0])
+	fmt.Println(a)
+
 	for i, test := range aesGCMTests {
 		key, _ := hex.DecodeString(test.key)
 		nonce, _ := hex.DecodeString(test.nonce)
@@ -137,6 +142,8 @@ func Test_sm4GcmAsm_Seal(t *testing.T) {
 			gcmAsm, _ = cipher.NewGCM(sm4Asm)
 		}
 		dst := gcmAsm.Seal(nil, nonce, src, aad)
+
+		fmt.Printf("test case #%d\n%X\n", i, expected)
 
 		if !reflect.DeepEqual(dst, expected) {
 			fmt.Printf("failed test case #%d\n%X\n%X\n", i, dst, expected)

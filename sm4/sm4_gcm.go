@@ -114,7 +114,7 @@ func (g *sm4GcmAsm) Overhead() int {
 	return g.tagSize
 }
 
-func (g *sm4GcmAsm) calculateFirstCounter(nonce []byte, counter []byte, H []byte) {
+/*func (g *sm4GcmAsm) calculateFirstCounter(nonce []byte, counter []byte, H []byte) {
 	if len(nonce) == gcmStandardNonceSize {
 		copy(counter[:], nonce)
 		counter[BlockSize-1] = 1
@@ -122,9 +122,18 @@ func (g *sm4GcmAsm) calculateFirstCounter(nonce []byte, counter []byte, H []byte
 		g.gHashUpdate(H[:], counter[:], nonce)
 		g.gHashFinish(H[:], counter[:], uint64(0), uint64(len(nonce)))
 	}
+}*/
+
+func (g *sm4GcmAsm) calculateFirstCounter(nonce []byte, counter []byte, H []byte){
+	if len(nonce) == gcmStandardNonceSize {
+		makeCounter(&counter[0], &nonce[0])
+	} else {
+		g.gHashUpdate(H[:], counter[:], nonce)
+		g.gHashFinish(H[:], counter[:], uint64(0), uint64(len(nonce)))
+	}
 }
 
-func ensureCapacity(array []byte, asked int) (head, tail []byte) {
+/*func ensureCapacity(array []byte, asked int) (head, tail []byte) {
 	remaining := cap(array) - len(array)
 	if remaining >= asked {
 		head = array
@@ -133,6 +142,19 @@ func ensureCapacity(array []byte, asked int) (head, tail []byte) {
 		copy(head, array)
 	}
 	tail = head[len(array):]
+	return
+}*/
+
+func ensureCapacity(array []byte, asked int) (head, tail []byte) {
+	arrayLen := len(array)
+	remaining := cap(array) - arrayLen
+	if remaining >= asked {
+		head = array
+	} else {
+		head = make([]byte, arrayLen+asked)
+		copy(head, array)
+	}
+	tail = head[arrayLen:]
 	return
 }
 
@@ -159,132 +181,142 @@ func (g *sm4GcmAsm) gHashFinish(H, tag []byte, aadLen, plainLen uint64) { // len
 }
 
 func (g *sm4GcmAsm) cryptoBlocks(roundKeys []uint32, out, in, preCounter []byte) {
-	l := len(in)
-	remainder := l & 0x0f // if plaintext length is not of multiples of 16 bytes
-	blocks := l >> 4
+	var counter, tmp [256]byte
+	cryptoBlocksAsm(&roundKeys[0], &out[0], in, &preCounter[0], &counter[0], &tmp[0])
 
-	blocks256 := blocks >> 4
-	var blockCount uint32 = 0
-	for i := 0; i < blocks256; i++ {
-		var counter, tmp [256]byte
-		fillCounter256(counter[:], preCounter, blockCount)
-		//out may overlap or reuse plaintext so use tmp here
-		cryptoBlockAsmX16(&roundKeys[0], &tmp[0], &counter[0])
-		xor256(&out[0], &tmp[0], &in[0])
-		out = out[256:]
-		in = in[256:]
-		blockCount += 16
-	}
-	blocks -= int(blockCount)
-
-	if blocks&8 != 0 {
-		var counter, tmp [128]byte
-		fillCounter128(counter[:], preCounter, blockCount)
-		cryptoBlockAsmX8(&roundKeys[0], &tmp[0], &counter[0])
-		xor128(&out[0], &tmp[0], &in[0])
-		out = out[128:]
-		in = in[128:]
-		blockCount += 8
-		blocks -= 8
-	}
-
-	if blocks&4 != 0 {
-		var counter, tmp [64]byte
-		fillCounter64(counter[:], preCounter, blockCount)
-		cryptoBlockAsmX4(&roundKeys[0], &tmp[0], &counter[0])
-		xor64(&out[0], &tmp[0], &in[0])
-		out = out[64:]
-		in = in[64:]
-		blockCount += 4
-		blocks -= 4
-	}
-
-	if blocks&2 != 0 {
-		var counter, tmp [32]byte
-		fillCounter32(counter[:], preCounter, blockCount)
-		cryptoBlockAsmX2(&roundKeys[0], &tmp[0], &counter[0])
-		xor32(&out[0], &tmp[0], &in[0])
-		out = out[32:]
-		in = in[32:]
-		blockCount += 2
-		blocks -= 2
-	}
-
-	if blocks&1 != 0 {
-		var counter, tmp [16]byte
-		fillCounter16(counter[:], preCounter, blockCount)
-		cryptoBlockAsm(&roundKeys[0], &tmp[0], &counter[0])
-		xor16(&out[0], &tmp[0], &in[0])
-		out = out[16:]
-		in = in[16:]
-		blockCount += 1
-		blocks -= 1
-	}
-
-	if remainder > 0 {
-		var counter, tmp [16]byte
-		fillCounter16(counter[:], preCounter, blockCount)
-		cryptoBlockAsm(&roundKeys[0], &tmp[0], &counter[0])
-		for i := 0; i < remainder; i++ {
-			out[i] = tmp[i] ^ in[i]
-		}
-	}
+	//l := len(in)
+	//remainder := l & 0x0f // if plaintext length is not of multiples of 16 bytes
+	//blocks := l >> 4
+	//
+	//blocks256 := blocks >> 4
+	//var blockCount uint32 = 0
+	//for i := 0; i < blocks256; i++ {
+	//	var counter, tmp [256]byte
+	//	fillCounter256(counter[:], preCounter, blockCount)
+	//	//out may overlap or reuse plaintext so use tmp here
+	//	cryptoBlockAsmX16(&roundKeys[0], &tmp[0], &counter[0])
+	//	xor256(&out[0], &tmp[0], &in[0])
+	//	out = out[256:]
+	//	in = in[256:]
+	//	blockCount += 16
+	//}
+	//blocks -= int(blockCount)
+	//
+	//if blocks&8 != 0 {
+	//	var counter, tmp [128]byte
+	//	fillCounter128(counter[:], preCounter, blockCount)
+	//	cryptoBlockAsmX8(&roundKeys[0], &tmp[0], &counter[0])
+	//	xor128(&out[0], &tmp[0], &in[0])
+	//	out = out[128:]
+	//	in = in[128:]
+	//	blockCount += 8
+	//	blocks -= 8
+	//}
+	//
+	//if blocks&4 != 0 {
+	//	var counter, tmp [64]byte
+	//	fillCounter64(counter[:], preCounter, blockCount)
+	//	cryptoBlockAsmX4(&roundKeys[0], &tmp[0], &counter[0])
+	//	xor64(&out[0], &tmp[0], &in[0])
+	//	out = out[64:]
+	//	in = in[64:]
+	//	blockCount += 4
+	//	blocks -= 4
+	//}
+	//
+	//if blocks&2 != 0 {
+	//	var counter, tmp [32]byte
+	//	fillCounter32(counter[:], preCounter, blockCount)
+	//	cryptoBlockAsmX2(&roundKeys[0], &tmp[0], &counter[0])
+	//	xor32(&out[0], &tmp[0], &in[0])
+	//	out = out[32:]
+	//	in = in[32:]
+	//	blockCount += 2
+	//	blocks -= 2
+	//}
+	//
+	//if blocks&1 != 0 {
+	//	var counter, tmp [16]byte
+	//	fillCounter16(counter[:], preCounter, blockCount)
+	//	cryptoBlockAsm(&roundKeys[0], &tmp[0], &counter[0])
+	//	xor16(&out[0], &tmp[0], &in[0])
+	//	out = out[16:]
+	//	in = in[16:]
+	//	blockCount += 1
+	//	blocks -= 1
+	//}
+	//
+	//if remainder > 0 {
+	//	var counter, tmp [16]byte
+	//	fillCounter16(counter[:], preCounter, blockCount)
+	//	cryptoBlockAsm(&roundKeys[0], &tmp[0], &counter[0])
+	//	for i := 0; i < remainder; i++ {
+	//		out[i] = tmp[i] ^ in[i]
+	//	}
+	//}
 }
 
 func fillCounter256(dst, src []byte, count uint32) {
-	c := binary.BigEndian.Uint32(src[12:]) + count + 1
-	fillSingleBlock(dst, src, c)
-	fillSingleBlock(dst[16:], src, c+1)
-	fillSingleBlock(dst[32:], src, c+2)
-	fillSingleBlock(dst[48:], src, c+3)
-	fillSingleBlock(dst[64:], src, c+4)
-	fillSingleBlock(dst[80:], src, c+5)
-	fillSingleBlock(dst[96:], src, c+6)
-	fillSingleBlock(dst[112:], src, c+7)
-	fillSingleBlock(dst[128:], src, c+8)
-	fillSingleBlock(dst[144:], src, c+9)
-	fillSingleBlock(dst[160:], src, c+10)
-	fillSingleBlock(dst[176:], src, c+11)
-	fillSingleBlock(dst[192:], src, c+12)
-	fillSingleBlock(dst[208:], src, c+13)
-	fillSingleBlock(dst[224:], src, c+14)
-	fillSingleBlock(dst[240:], src, c+15)
+	//c := binary.BigEndian.Uint32(src[12:]) + count + 1
+	//fillSingleBlock(dst, src, c)
+	//fillSingleBlock(dst[16:], src, c+1)
+	//fillSingleBlock(dst[32:], src, c+2)
+	//fillSingleBlock(dst[48:], src, c+3)
+	//fillSingleBlock(dst[64:], src, c+4)
+	//fillSingleBlock(dst[80:], src, c+5)
+	//fillSingleBlock(dst[96:], src, c+6)
+	//fillSingleBlock(dst[112:], src, c+7)
+	//fillSingleBlock(dst[128:], src, c+8)
+	//fillSingleBlock(dst[144:], src, c+9)
+	//fillSingleBlock(dst[160:], src, c+10)
+	//fillSingleBlock(dst[176:], src, c+11)
+	//fillSingleBlock(dst[192:], src, c+12)
+	//fillSingleBlock(dst[208:], src, c+13)
+	//fillSingleBlock(dst[224:], src, c+14)
+	//fillSingleBlock(dst[240:], src, c+15)
+	fillCounterX(&dst[0], &src[0], count, 16)
 }
 
 func fillCounter128(dst, src []byte, count uint32) {
-	c := binary.BigEndian.Uint32(src[12:]) + count + 1
-	fillSingleBlock(dst, src, c)
-	fillSingleBlock(dst[16:], src, c+1)
-	fillSingleBlock(dst[32:], src, c+2)
-	fillSingleBlock(dst[48:], src, c+3)
-	fillSingleBlock(dst[64:], src, c+4)
-	fillSingleBlock(dst[80:], src, c+5)
-	fillSingleBlock(dst[96:], src, c+6)
-	fillSingleBlock(dst[112:], src, c+7)
+	//c := binary.BigEndian.Uint32(src[12:]) + count + 1
+	//fillSingleBlock(dst, src, c)
+	//fillSingleBlock(dst[16:], src, c+1)
+	//fillSingleBlock(dst[32:], src, c+2)
+	//fillSingleBlock(dst[48:], src, c+3)
+	//fillSingleBlock(dst[64:], src, c+4)
+	//fillSingleBlock(dst[80:], src, c+5)
+	//fillSingleBlock(dst[96:], src, c+6)
+	//fillSingleBlock(dst[112:], src, c+7)
+	fillCounterX(&dst[0], &src[0], count, 8)
 }
 
 func fillCounter64(dst, src []byte, count uint32) {
-	c := binary.BigEndian.Uint32(src[12:]) + count + 1
+	/*c := binary.BigEndian.Uint32(src[12:]) + count + 1
 	fillSingleBlock(dst, src, c)
 	fillSingleBlock(dst[16:], src, c+1)
 	fillSingleBlock(dst[32:], src, c+2)
-	fillSingleBlock(dst[48:], src, c+3)
+	fillSingleBlock(dst[48:], src, c+3)*/
+	fillCounterX(&dst[0], &src[0], count, 4)
 }
 
 func fillCounter32(dst, src []byte, count uint32) {
-	c := binary.BigEndian.Uint32(src[12:]) + count + 1
-	fillSingleBlock(dst, src, c)
-	fillSingleBlock(dst[16:], src, c+1)
+	//c := binary.BigEndian.Uint32(src[12:]) + count + 1
+	//fillSingleBlock(dst, src, c)
+	//fillSingleBlock(dst[16:], src, c+1)
+	fillCounterX(&dst[0], &src[0], count, 2)
 }
 
 func fillCounter16(dst, src []byte, count uint32) {
-	c := binary.BigEndian.Uint32(src[12:]) + count + 1
-	fillSingleBlock(dst, src, c)
+	///*c := binary.BigEndian.Uint32(src[12:]) + count + 1*/
+	//c := makeUint32(&src[12]) + count + 1
+	//fillSingleBlock(dst, src, c)
+	fillCounterX(&dst[0], &src[0], count, 1)
 }
 
 func fillSingleBlock(dst, src []byte, count uint32) {
-	copy(dst, src[:12])
-	binary.BigEndian.PutUint32(dst[12:], count)
+	/*copy12(&dst[0],&src[0])
+	putUint32(&dst[12],count)*/
+	fillSingleBlockAsm(&dst[0],&src[0],count)
 }
 
 //go:noescape
@@ -304,3 +336,27 @@ func xor32(dst *byte, src1 *byte, src2 *byte)
 
 //go:noescape
 func xor16(dst *byte, src1 *byte, src2 *byte)
+
+//go:noescape
+func makeCounter(dst *byte, src *byte)
+
+//go:noescape
+func copy12(dst *byte, src *byte)
+
+//go:noescape
+func putUint32(b *byte, v uint32)
+
+//go:noescape
+func makeUint32(b *byte) uint32
+
+//go:noescape
+func fillSingleBlockAsm(dst *byte, src *byte, count uint32)
+
+//go:noescape
+func fillCounterX(dst *byte, src *byte, count uint32, blockNum uint32)
+
+//go:noescape
+func cryptoBlocksAsm(roundKeys *uint32, out *byte, in []byte, preCounter *byte, counter *byte, tmp *byte)
+
+//go:noescape
+func xorAsm(src1 *byte, src2 *byte, len int32, dst *byte) int32

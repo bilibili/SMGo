@@ -180,6 +180,15 @@ GLOBL MERGE_H23<>(SB), (NOPTR+RODATA), $64
 #define DEBUG        X31
 #define DEBUGz       Z31
 
+#define RoundKeys R10
+#define Out R14
+#define In R13
+#define InLen R12
+#define PreCounter R11
+#define Counter R8
+#define Tmp R9
+#define BlockCount R15
+
 #define loadMasks() \
     MOVQ                $AND_MASK<>(SB), R8 \
     MOVQ                $LOWER_MASK<>(SB), R9 \
@@ -427,3 +436,327 @@ TEXT ·xor16(SB),NOSPLIT,$0-24
     VMOVDQU32   X0, (AX)
 
     RET
+
+//func makeCounter(dst *byte, src *byte) --- used registers: DI, SI, AX
+TEXT ·makeCounter(SB),NOSPLIT,$0-16
+
+    MOVQ   dst+0(FP), DI
+    MOVQ   src+8(FP), SI
+    MOVQ   0(SI),     AX
+    MOVQ   AX,        0(DI)
+    MOVL   8(SI),     AX
+    MOVL   AX,         8(DI)
+    MOVB   $1,        15(DI)
+    RET
+
+//func copy12(dst *byte, src *byte)     --- used registers: DI, SI, AX
+TEXT ·copy12(SB),NOSPLIT,$0-16
+    MOVQ   dst+0(FP), DI
+    MOVQ   src+8(FP), SI
+    MOVQ   0(SI),     AX
+    MOVQ   AX,        0(DI)
+    MOVL   8(SI),     AX
+    MOVL   AX,        8(DI)
+    RET
+
+//func putUint32(b *byte, v uint32)    --- used registers: DI, SI
+TEXT ·putUint32(SB),NOSPLIT,$0-16
+    MOVQ b+0(FP), DI
+    MOVL v+8(FP), SI
+    MOVB SIB, 3(DI)
+    SHRL $8, SI
+    MOVB SIB, 2(DI)
+    SHRL $8, SI
+    MOVB SIB, 1(DI)
+    SHRL $8, SI
+    MOVB SIB, (DI)
+    RET
+
+//func makeUint32(b *byte) uint32  --- used registers: DI, SI
+TEXT ·makeUint32(SB),NOSPLIT,$0-16
+    MOVQ b+0(FP), DI
+    MOVB (DI), SIB
+    SHLL $8, SI
+    MOVB 1(DI), SIB
+    SHLL $8, SI
+    MOVB 2(DI), SIB
+    SHLL $8, SI
+    MOVB 3(DI), SIB
+    MOVL SI, ret+8(FP)
+    RET
+
+//func fillSingleBlockAsm(dst *byte, src *byte, count uint32)  --- used registers: DI, SI,AX
+TEXT ·fillSingleBlockAsm(SB),NOSPLIT,$16-24
+    MOVQ dst+0(FP), DI
+    MOVQ src+8(FP), SI
+
+    MOVQ DI, 0(SP)
+    MOVQ SI, 0x8(SP)
+    CALL ·copy12(SB)
+
+    MOVQ 0(SP), DI
+    MOVQ 0x8(SP), SI
+    ADDQ $12, DI
+    MOVQ DI, 0(SP)
+    MOVL count+16(FP), AX
+    MOVL AX, 0x8(SP)
+    CALL ·putUint32(SB)
+    RET
+
+//func fillCounterX(dst *byte, src *byte, count uint32, blockNum uint32)    --- used registers: DI, SI, AX, BX, CX
+TEXT ·fillCounterX(SB), NOSPLIT, $40-24
+    MOVQ src+8(FP), DI
+    ADDQ $12, DI
+    MOVQ DI, 0(SP)
+    CALL ·makeUint32(SB)
+    MOVQ 0(SP), DI
+    SUBQ $12, DI
+    MOVQ 0x8(SP), SI
+    MOVL count+16(FP), AX
+    ADDL SI, AX
+    ADDL $1, AX
+    MOVL blockNum+20(FP), BX
+    MOVQ dst+0(FP), CX
+    INCL BX
+
+start:
+    DECL BX
+    JZ done
+    MOVQ CX, 0(SP)
+    MOVQ DI, 8(SP)
+    MOVL AX, 16(SP)
+    CALL ·fillSingleBlockAsm(SB)
+    MOVQ 0(SP), CX
+    MOVQ 8(SP), DI
+    MOVL 16(SP), AX
+    ADDQ $16, CX
+    ADDL $1, AX
+    JMP start
+
+done:
+    RET
+
+TEXT ·xorAsm(SB),NOSPLIT,$0-16
+    MOVQ src1+0(FP), AX
+    MOVQ src2+8(FP), BX
+    MOVQ len+16(FP), CX
+    MOVQ dst+24(FP), DX
+loop:
+    CMPQ CX, $0
+    JLE done
+    SUBQ $1, CX
+    MOVB (AX), SIB
+    MOVB (BX), DIB
+    XORB DIB, SIB
+    MOVB SIB, (DX)
+    ADDQ $1, AX
+    ADDQ $1, BX
+    ADDQ $1, DX
+    JMP loop
+done:
+    RET
+
+//cryptoBlocksAsm(roundKeys *uint32, out *byte, in []byte, preCounter *byte, counter *byte, tmp *byte) something happend between uint and int,need check again
+TEXT ·cryptoBlocksAsm(SB),NOSPLIT,$40-64
+    MOVQ roundKeys+0(FP), RoundKeys
+    MOVQ out+8(FP), Out
+    MOVQ in+16(FP), In
+    MOVQ inLen+24(FP), InLen //InLen
+    MOVQ preCount+40(FP), PreCounter
+    MOVQ count+48(FP), Counter
+    MOVQ tmp+56(FP), Tmp
+    MOVL $0, BlockCount  //BlockCount
+    
+loopX16:
+    CMPQ InLen, $256
+    JL loopX8
+    MOVQ Counter, 0(SP)
+    MOVQ PreCounter, 8(SP)
+    MOVL BlockCount, 16(SP)
+    MOVL $16, 20(SP)
+    CALL ·fillCounterX(SB)
+    MOVQ RoundKeys, 0(SP)
+    MOVQ Tmp, 8(SP)
+    MOVQ Counter, 16(SP)
+    CALL ·cryptoBlockAsmX16(SB)
+    MOVQ 0(SP), RoundKeys
+    MOVQ 8(SP), Tmp
+    MOVQ 16(SP), Counter
+    MOVQ Out, 0(SP)
+    MOVQ Tmp, 8(SP)
+    MOVQ In, 16(SP)
+    CALL ·xor256(SB)
+    ADDQ $256, Out
+    ADDQ $256, In
+    ADDQ $16, BlockCount
+    SUBQ $256, InLen
+    JMP loopX16
+
+loopX8:
+    CMPQ InLen, $128
+    JL loopX4
+    MOVQ Counter, 0(SP)
+    MOVQ PreCounter, 8(SP)
+    MOVL BlockCount, 16(SP)
+    MOVL $8, 20(SP)
+    CALL ·fillCounterX(SB)
+    MOVQ RoundKeys, 0(SP)
+    MOVQ Tmp, 8(SP)
+    MOVQ Counter, 16(SP)
+    CALL ·cryptoBlockAsmX8(SB)
+    MOVQ 0(SP), RoundKeys
+    MOVQ 8(SP), Tmp
+    MOVQ 16(SP), Counter
+    MOVQ Out, 0(SP)
+    MOVQ Tmp, 8(SP)
+    MOVQ In, 16(SP)
+    CALL ·xor128(SB)
+    ADDQ $128, Out
+    ADDQ $128, In
+    ADDQ $8, BlockCount
+    SUBQ $128, InLen
+    JMP loopX8
+
+loopX4:
+    CMPQ InLen, $64
+    JL loopX2
+    MOVQ Counter, 0(SP)
+    MOVQ PreCounter, 8(SP)
+    MOVL BlockCount, 16(SP)
+    MOVL $4, 20(SP)
+    CALL ·fillCounterX(SB)
+    MOVQ RoundKeys, 0(SP)
+    MOVQ Tmp, 8(SP)
+    MOVQ Counter, 16(SP)
+    CALL ·cryptoBlockAsmX4(SB)
+    MOVQ 0(SP), RoundKeys
+    MOVQ 8(SP), Tmp
+    MOVQ 16(SP), Counter
+    MOVQ Out, 0(SP)
+    MOVQ Tmp, 8(SP)
+    MOVQ In, 16(SP)
+    CALL ·xor64(SB)
+    ADDQ $64, Out
+    ADDQ $64, In
+    ADDQ $4, BlockCount
+    SUBQ $64, InLen
+    JMP loopX4
+
+loopX2:
+    CMPQ InLen, $32
+    JL loopX1
+    MOVQ Counter, 0(SP)
+    MOVQ PreCounter, 8(SP)
+    MOVL BlockCount, 16(SP)
+    MOVL $2, 20(SP)
+    CALL ·fillCounterX(SB)
+    MOVQ RoundKeys, 0(SP)
+    MOVQ Tmp, 8(SP)
+    MOVQ Counter, 16(SP)
+    CALL ·cryptoBlockAsmX2(SB)
+    MOVQ 0(SP), RoundKeys
+    MOVQ 8(SP), Tmp
+    MOVQ 16(SP), Counter
+    MOVQ Out, 0(SP)
+    MOVQ Tmp, 8(SP)
+    MOVQ In, 16(SP)
+    CALL ·xor32(SB)
+    ADDQ $32, Out
+    ADDQ $32, In
+    ADDQ $2, BlockCount
+    SUBQ $32, InLen
+    JMP loopX2
+
+loopX1:
+    CMPQ InLen, $16
+    JL loopX0
+    MOVQ Counter, 0(SP)
+    MOVQ PreCounter, 8(SP)
+    MOVL BlockCount, 16(SP)
+    MOVL $1, 20(SP)
+    CALL ·fillCounterX(SB)
+    MOVQ RoundKeys, 0(SP)
+    MOVQ Tmp, 8(SP)
+    MOVQ Counter, 16(SP)
+    CALL ·cryptoBlockAsm(SB)
+    MOVQ 0(SP), RoundKeys
+    MOVQ 8(SP), Tmp
+    MOVQ 16(SP), Counter
+    MOVQ Out, 0(SP)
+    MOVQ Tmp, 8(SP)
+    MOVQ In, 16(SP)
+    CALL ·xor16(SB)
+    ADDQ $16, Out
+    ADDQ $16, In
+    ADDQ $1, BlockCount
+    SUBQ $16, InLen
+    JMP loopX1
+
+loopX0:
+    CMPQ InLen, $0
+    JLE done
+    MOVQ Counter, 0(SP)
+    MOVQ PreCounter, 8(SP)
+    MOVL BlockCount, 16(SP)
+    MOVL $1, 20(SP)
+    CALL ·fillCounterX(SB)
+    MOVQ RoundKeys, 0(SP)
+    MOVQ Tmp, 8(SP)
+    MOVQ Counter, 16(SP)
+    CALL ·cryptoBlockAsm(SB)
+    MOVQ 0(SP), RoundKeys
+    MOVQ 8(SP), Tmp
+    MOVQ 16(SP), Counter
+
+final:
+    MOVQ Tmp, 0(SP)
+    MOVQ In, 8(SP)
+    MOVQ InLen, 16(SP)
+    MOVQ Out, 24(SP)
+    CALL ·xorAsm(SB)
+
+done:
+    RET
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
