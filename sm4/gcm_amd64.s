@@ -459,6 +459,51 @@ TEXT ·copy12(SB),NOSPLIT,$0-16
     MOVL   AX,        8(DI)
     RET
 
+//func copy(dst *byte, src *byte, len int)
+TEXT ·copyAsm(SB),NOSPLIT,$0-24
+    MOVQ dst+0(FP), DI
+    MOVQ src+8(FP), SI
+    MOVQ len+16(FP), AX
+copyQ:
+    CMPQ AX, $8
+    JL copyL
+    MOVQ 0(SI), BX
+    MOVQ BX, 0(DI)
+    ADDQ $8, SI
+    ADDQ $8, DI
+    SUBQ $8, AX
+    JMP copyQ
+copyL:
+    CMPQ AX, $4
+    JL copyW
+    MOVL 0(SI), BX
+    MOVL BX, 0(DI)
+    ADDQ $4, SI
+    ADDQ $4, DI
+    SUBQ $4, AX
+    JMP copyL
+copyW:
+    CMPQ AX, $2
+    JL copyB
+    MOVW 0(SI), BX
+    MOVW BX, 0(DI)
+    ADDQ $2, SI
+    ADDQ $2, DI
+    SUBQ $2, AX
+    JMP copyW
+copyB:
+    CMPQ AX, $1
+    JL done
+    MOVB 0(SI), BX
+    MOVB BX, 0(DI)
+    ADDQ $1, SI
+    ADDQ $1, DI
+    SUBQ $1, AX
+    JMP copyB
+done:
+    RET
+
+
 //func putUint32(b *byte, v uint32)    --- used registers: DI, SI
 TEXT ·putUint32(SB),NOSPLIT,$0-16
     MOVQ b+0(FP), DI
@@ -470,6 +515,52 @@ TEXT ·putUint32(SB),NOSPLIT,$0-16
     MOVB SIB, 1(DI)
     SHRL $8, SI
     MOVB SIB, (DI)
+    RET
+
+//func putUint64(b *byte, v uint64)  --- used registers: SI, DI
+TEXT ·putUint64(SB),NOSPLIT,$0-16
+    MOVQ b+0(FP), DI
+    MOVQ v+8(FP), SI
+    MOVB SIB, 7(DI)
+    SHRL $8, SI
+    MOVB SIB, 6(DI)
+    SHRL $8, SI
+    MOVB SIB, 5(DI)
+    SHRL $8, SI
+    MOVB SIB, 4(DI)
+    SHRL $8, SI
+    MOVB SIB, 3(DI)
+    SHRL $8, SI
+    MOVB SIB, 2(DI)
+    SHRL $8, SI
+    MOVB SIB, 1(DI)
+    SHRL $8, SI
+    MOVB SIB, (DI)
+    RET
+
+
+//func gHashFinishAsm(H *byte, tag *byte,tmp *byte, aadLen uint64, plainLen uint64)
+TEXT ·gHashFinishAsm(SB),NOSPLIT,$32-40
+    MOVQ tmp+16(FP), AX
+    MOVQ aadLen+24(FP), BX
+    MOVQ plainLen+32(FP), CX
+    SHLQ $3, BX
+    SHLQ $3, CX
+    MOVQ AX, 0(SP)
+    MOVQ BX, 8(SP)
+    CALL ·putUint64(SB)
+    ADDQ $8, AX
+    MOVQ AX, 0(SP)
+    MOVQ CX, 8(SP)
+    CALL ·putUint64(SB)
+    SUBQ $8, AX
+    MOVQ AX, 16(SP)
+    MOVQ H+0(FP), AX
+    MOVQ AX, 0(SP)
+    MOVQ tag+8(FP), AX
+    MOVQ AX, 8(SP)
+    MOVQ $1, 24(SP)
+    CALL ·gHashBlocks(SB)
     RET
 
 //func makeUint32(b *byte) uint32  --- used registers: DI, SI
@@ -556,7 +647,7 @@ loop:
 done:
     RET
 
-//cryptoBlocksAsm(roundKeys *uint32, out []byte, in []byte, preCounter *byte, counter *byte, tmp *byte) something happend between uint and int,need check again
+//cryptoBlocksAsm(roundKeys *uint32, out []byte, in []byte, preCounter *byte, counter *byte, tmp *byte) --- used registers: R8-R15, SI,DI,AX-DX  something happend between uint and int,need check again
 TEXT ·cryptoBlocksAsm(SB),NOSPLIT,$40-80
     MOVQ roundKeys+0(FP), RoundKeys
     MOVQ out+8(FP), Out

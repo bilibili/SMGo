@@ -8,7 +8,6 @@ package sm4
 import (
 	"crypto/cipher"
 	"crypto/subtle"
-	"encoding/binary"
 	"errors"
 )
 
@@ -167,17 +166,19 @@ func (g *sm4GcmAsm) gHashUpdate(H, tag, in []byte) {
 	r := l & 15
 	if r != 0 {
 		var tmp [BlockSize]byte
-		copy(tmp[:], in[l-r:]) // zero padding from right
+		//copy(tmp[:], in[l-r:]) // zero padding from right
+		copyAsm(&tmp[0],&in[l-r],r)
 		gHashBlocks(&H[0], &tag[0], &tmp[0], 1)
 	}
 }
 
 func (g *sm4GcmAsm) gHashFinish(H, tag []byte, aadLen, plainLen uint64) { // length in bytes
 	var tmp [BlockSize]byte
-	binary.BigEndian.PutUint64(tmp[:8], aadLen<<3)
-	binary.BigEndian.PutUint64(tmp[8:], plainLen<<3)
+	//binary.BigEndian.PutUint64(tmp[:8], aadLen<<3)
+	//binary.BigEndian.PutUint64(tmp[8:], plainLen<<3)
+	//gHashBlocks(&H[0], &tag[0], &tmp[0], 1) // length in bits
+	gHashFinishAsm(&H[0], &tag[0], &tmp[0], aadLen, plainLen)
 
-	gHashBlocks(&H[0], &tag[0], &tmp[0], 1) // length in bits
 }
 
 func (g *sm4GcmAsm) cryptoBlocks(roundKeys []uint32, out, in, preCounter []byte) {
@@ -347,6 +348,9 @@ func copy12(dst *byte, src *byte)
 func putUint32(b *byte, v uint32)
 
 //go:noescape
+func putUint64(b *byte, v uint64)
+
+//go:noescape
 func makeUint32(b *byte) uint32
 
 //go:noescape
@@ -359,4 +363,10 @@ func fillCounterX(dst *byte, src *byte, count uint32, blockNum uint32)
 func cryptoBlocksAsm(roundKeys *uint32, out []byte, in []byte, preCounter *byte, counter *byte, tmp *byte)
 
 //go:noescape
-func xorAsm(src1 *byte, src2 *byte, len int32, dst *byte) int32
+func xorAsm(src1 *byte, src2 *byte, len int32, dst *byte)
+
+//go:noescape
+func gHashFinishAsm(H *byte, tag *byte, tmp *byte, aadLen uint64, plainLen uint64)
+
+//go:noescape
+func copyAsm(dst *byte, src *byte, len int)
