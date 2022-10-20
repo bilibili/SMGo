@@ -182,7 +182,7 @@ func (g *sm4GcmAsm) gHashFinish(H, tag []byte, aadLen, plainLen uint64) { // len
 
 func (g *sm4GcmAsm) cryptoBlocks(roundKeys []uint32, out, in, preCounter []byte) {
 	var counter, tmp [256]byte
-	cryptoBlocksAsm(&roundKeys[0], &out[0], in, &preCounter[0], &counter[0], &tmp[0])
+	cryptoBlocksAsm(&roundKeys[0], out, in, &preCounter[0], &counter[0], &tmp[0])
 
 	//l := len(in)
 	//remainder := l & 0x0f // if plaintext length is not of multiples of 16 bytes
@@ -356,7 +356,7 @@ func fillSingleBlockAsm(dst *byte, src *byte, count uint32)
 func fillCounterX(dst *byte, src *byte, count uint32, blockNum uint32)
 
 //go:noescape
-func cryptoBlocksAsm(roundKeys *uint32, out *byte, in []byte, preCounter *byte, counter *byte, tmp *byte)
+func cryptoBlocksAsm(roundKeys *uint32, out []byte, in []byte, preCounter *byte, counter *byte, tmp *byte)
 
 //go:noescape
 func xorAsm(src1 *byte, src2 *byte, len int32, dst *byte) int32

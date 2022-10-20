@@ -556,15 +556,15 @@ loop:
 done:
     RET
 
-//cryptoBlocksAsm(roundKeys *uint32, out *byte, in []byte, preCounter *byte, counter *byte, tmp *byte) something happend between uint and int,need check again
-TEXT ·cryptoBlocksAsm(SB),NOSPLIT,$40-64
+//cryptoBlocksAsm(roundKeys *uint32, out []byte, in []byte, preCounter *byte, counter *byte, tmp *byte) something happend between uint and int,need check again
+TEXT ·cryptoBlocksAsm(SB),NOSPLIT,$40-80
     MOVQ roundKeys+0(FP), RoundKeys
     MOVQ out+8(FP), Out
-    MOVQ in+16(FP), In
-    MOVQ inLen+24(FP), InLen //InLen
-    MOVQ preCount+40(FP), PreCounter
-    MOVQ count+48(FP), Counter
-    MOVQ tmp+56(FP), Tmp
+    MOVQ in+32(FP), In
+    MOVQ inLen+40(FP), InLen //InLen
+    MOVQ preCount+56(FP), PreCounter
+    MOVQ count+64(FP), Counter
+    MOVQ tmp+72(FP), Tmp
     MOVL $0, BlockCount  //BlockCount
     
 loopX16:
