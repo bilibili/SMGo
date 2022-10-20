@@ -158,18 +158,21 @@ func ensureCapacity(array []byte, asked int) (head, tail []byte) {
 }
 
 func (g *sm4GcmAsm) gHashUpdate(H, tag, in []byte) {
-	l := len(in)
-	if l >= BlockSize {
-		gHashBlocks(&H[0], &tag[0], &in[0], l>>4)
-	}
+	var tmp [BlockSize]byte
+	gHashUpdateAsm(&H[0], &tag[0], in, &tmp[0])
 
-	r := l & 15
-	if r != 0 {
-		var tmp [BlockSize]byte
-		//copy(tmp[:], in[l-r:]) // zero padding from right
-		copyAsm(&tmp[0],&in[l-r],r)
-		gHashBlocks(&H[0], &tag[0], &tmp[0], 1)
-	}
+	//l := len(in)
+	//var tmp [BlockSize]byte
+	//if l >= BlockSize {
+	//	gHashBlocks(&H[0], &tag[0], &in[0], l>>4)
+	//}
+	//
+	//r := l & 15
+	//if r != 0 {
+	//	//copy(tmp[:], in[l-r:]) // zero padding from right
+	//	copyAsm(&tmp[0],&in[l-r],r)
+	//	gHashBlocks(&H[0], &tag[0], &tmp[0], 1)
+	//}
 }
 
 func (g *sm4GcmAsm) gHashFinish(H, tag []byte, aadLen, plainLen uint64) { // length in bytes
@@ -364,6 +367,9 @@ func cryptoBlocksAsm(roundKeys *uint32, out []byte, in []byte, preCounter *byte,
 
 //go:noescape
 func xorAsm(src1 *byte, src2 *byte, len int32, dst *byte)
+
+//go:noescape
+func gHashUpdateAsm(H *byte, tag *byte, in []byte, tmp *byte)
 
 //go:noescape
 func gHashFinishAsm(H *byte, tag *byte, tmp *byte, aadLen uint64, plainLen uint64)

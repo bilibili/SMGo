@@ -459,7 +459,7 @@ TEXT ·copy12(SB),NOSPLIT,$0-16
     MOVL   AX,        8(DI)
     RET
 
-//func copy(dst *byte, src *byte, len int)
+//func copy(dst *byte, src *byte, len int)  ---used registers: DI, SI, AX, BX,
 TEXT ·copyAsm(SB),NOSPLIT,$0-24
     MOVQ dst+0(FP), DI
     MOVQ src+8(FP), SI
@@ -536,31 +536,6 @@ TEXT ·putUint64(SB),NOSPLIT,$0-16
     MOVB SIB, 1(DI)
     SHRL $8, SI
     MOVB SIB, (DI)
-    RET
-
-
-//func gHashFinishAsm(H *byte, tag *byte,tmp *byte, aadLen uint64, plainLen uint64)
-TEXT ·gHashFinishAsm(SB),NOSPLIT,$32-40
-    MOVQ tmp+16(FP), AX
-    MOVQ aadLen+24(FP), BX
-    MOVQ plainLen+32(FP), CX
-    SHLQ $3, BX
-    SHLQ $3, CX
-    MOVQ AX, 0(SP)
-    MOVQ BX, 8(SP)
-    CALL ·putUint64(SB)
-    ADDQ $8, AX
-    MOVQ AX, 0(SP)
-    MOVQ CX, 8(SP)
-    CALL ·putUint64(SB)
-    SUBQ $8, AX
-    MOVQ AX, 16(SP)
-    MOVQ H+0(FP), AX
-    MOVQ AX, 0(SP)
-    MOVQ tag+8(FP), AX
-    MOVQ AX, 8(SP)
-    MOVQ $1, 24(SP)
-    CALL ·gHashBlocks(SB)
     RET
 
 //func makeUint32(b *byte) uint32  --- used registers: DI, SI
@@ -808,6 +783,69 @@ final:
 
 done:
     RET
+
+//func gHashUpdateAsm(H *byte, tag *byte, in []byte, tmp *byte)
+TEXT ·gHashUpdateAsm(SB),NOSPLIT,$32-48
+    MOVQ H+0(FP), DI
+    MOVQ tag+8(FP), SI
+    MOVQ in+16(FP), AX
+    MOVQ l+24(FP), BX
+    MOVQ BX, R13
+    MOVQ BX, R15
+    ANDQ $15, R13
+    CMPQ BX, $16
+    JL last
+    MOVQ DI, 0(SP)
+    MOVQ SI, 8(SP)
+    MOVQ AX, 16(SP)
+    SHRQ $4, BX
+    MOVQ BX, 24(SP)
+    CALL ·gHashBlocks(SB)
+    MOVQ 16(SP), AX
+last:
+    CMPQ R13, $0
+    JE done
+    MOVQ tmp+40(FP), CX
+    SUBQ R13, R15
+    ADDQ R15, AX
+    MOVQ DI, R15
+    MOVQ SI, R14
+    MOVQ CX, 0(SP)
+    MOVQ AX, 8(SP)
+    MOVQ R13, 16(SP)
+    CALL ·copyAsm(SB)
+    MOVQ R15, 0(SP)
+    MOVQ R14, 8(SP)
+    MOVQ CX, 16(SP)
+    MOVQ $1, 24(SP)
+    CALL ·gHashBlocks(SB)
+done:
+    RET
+
+//func gHashFinishAsm(H *byte, tag *byte,tmp *byte, aadLen uint64, plainLen uint64)
+TEXT ·gHashFinishAsm(SB),NOSPLIT,$32-40
+    MOVQ tmp+16(FP), AX
+    MOVQ aadLen+24(FP), BX
+    MOVQ plainLen+32(FP), CX
+    SHLQ $3, BX
+    SHLQ $3, CX
+    MOVQ AX, 0(SP)
+    MOVQ BX, 8(SP)
+    CALL ·putUint64(SB)
+    ADDQ $8, AX
+    MOVQ AX, 0(SP)
+    MOVQ CX, 8(SP)
+    CALL ·putUint64(SB)
+    SUBQ $8, AX
+    MOVQ AX, 16(SP)
+    MOVQ H+0(FP), AX
+    MOVQ AX, 0(SP)
+    MOVQ tag+8(FP), AX
+    MOVQ AX, 8(SP)
+    MOVQ $1, 24(SP)
+    CALL ·gHashBlocks(SB)
+    RET
+
 
 
 
