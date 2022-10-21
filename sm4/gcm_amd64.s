@@ -846,10 +846,72 @@ TEXT ·gHashFinishAsm(SB),NOSPLIT,$32-40
     CALL ·gHashBlocks(SB)
     RET
 
+//func calculateFirstCounterAsm(nonce []byte, counter *byte, H *byte, tmp *byte)
+TEXT ·calculateFirstCounterAsm(SB),NOSPLIT,$48-48
+    MOVQ nonce+0(FP), DI
+    MOVQ nonceLen+8(FP), SI
+    MOVQ nonceCap+16(FP), DX
+    MOVQ counter+24(FP), AX
+    MOVQ H+32(FP), BX
+    MOVQ tmp+40(FP), CX
+    CMPQ SI, $12
+    JE branch1
+    MOVQ BX, 0(SP)
+    MOVQ AX, 8(SP)
+    MOVQ DI, 16(SP)
+    MOVQ SI, 24(SP)
+    MOVQ DX, 32(SP)
+    MOVQ CX, 40(SP)
+    CALL ·gHashUpdateAsm(SB)
+    MOVQ 24(SP), SI
+    MOVQ 40(SP), CX
+    MOVQ CX, 16(SP)
+    MOVQ $0, 24(SP)
+    MOVQ SI, 32(SP)
+    CALL ·gHashFinishAsm(SB)
+    JMP done
 
+branch1:
+    MOVQ AX, 0(SP)
+    MOVQ DI, 8(SP)
+    CALL ·makeCounter(SB)
 
+done:
+    RET
 
-
+//TEXT ·ensureCapacityAsm(SB), $32-56
+//MOVQ array+0(FP), DI
+//MOVQ arrayLen+8(FP), SI
+//MOVQ arrayCap+16(FP), AX
+//MOVQ asked+24(FP), BX
+//SUBQ SI, AX
+//CMPQ AX, BX
+//JGE enough
+//ADDQ SI, BX
+//MOVQ BX, 8(SP)
+//MOVQ BX, 16(SP)
+//LEAQ type·uint8(SB), CX
+//MOVQ CX, 0(SP)
+//CALL runtime·makeslice(SB)
+//MOVQ 24(SP), DX
+////MOVQ DX, 0(SP)
+//MOVQ DX, ret1+32(SP)
+////MOVQ DI, 8(SP)
+////MOVQ SI, 16(SP)
+////CALL ·copyAsm(SB)
+////MOVQ $32, ret2+40(SP)
+////MOVQ $32, ret3+48(SP)
+//JMP done
+//
+//enough:
+//MOVQ DI, ret1+32(FP)
+//ADDQ SI, AX
+//MOVQ AX, ret2+40(FP)
+//MOVQ AX, ret3+48(FP)
+//
+//done:
+//RET
+//
 
 
 

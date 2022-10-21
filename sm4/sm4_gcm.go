@@ -9,7 +9,11 @@ import (
 	"crypto/cipher"
 	"crypto/subtle"
 	"errors"
+	"unsafe"
 )
+
+//go:linkname makeslice runtime.makeslice
+func makeslice(et unsafe.Pointer, len, cap int) unsafe.Pointer
 
 const (
 	gcmMinimumTagSize    = 12
@@ -124,12 +128,15 @@ func (g *sm4GcmAsm) Overhead() int {
 }*/
 
 func (g *sm4GcmAsm) calculateFirstCounter(nonce []byte, counter []byte, H []byte){
-	if len(nonce) == gcmStandardNonceSize {
-		makeCounter(&counter[0], &nonce[0])
-	} else {
-		g.gHashUpdate(H[:], counter[:], nonce)
-		g.gHashFinish(H[:], counter[:], uint64(0), uint64(len(nonce)))
-	}
+	var tmp [BlockSize]byte
+	calculateFirstCounterAsm(nonce,&counter[0],&H[0],&tmp[0])
+
+	//if len(nonce) == gcmStandardNonceSize {
+	//	makeCounter(&counter[0], &nonce[0])
+	//} else {
+	//	g.gHashUpdate(H[:], counter[:], nonce)
+	//	g.gHashFinish(H[:], counter[:], uint64(0), uint64(len(nonce)))
+	//}
 }
 
 /*func ensureCapacity(array []byte, asked int) (head, tail []byte) {
@@ -369,6 +376,9 @@ func cryptoBlocksAsm(roundKeys *uint32, out []byte, in []byte, preCounter *byte,
 func xorAsm(src1 *byte, src2 *byte, len int32, dst *byte)
 
 //go:noescape
+func calculateFirstCounterAsm(nonce []byte, counter *byte, H *byte, tmp *byte)
+
+//go:noescape
 func gHashUpdateAsm(H *byte, tag *byte, in []byte, tmp *byte)
 
 //go:noescape
@@ -376,3 +386,19 @@ func gHashFinishAsm(H *byte, tag *byte, tmp *byte, aadLen uint64, plainLen uint6
 
 //go:noescape
 func copyAsm(dst *byte, src *byte, len int)
+
+//go:noescape
+func ensureCapacityAsm(array []byte, asked int) []byte
+
+
+
+
+
+
+
+
+
+
+
+
+
