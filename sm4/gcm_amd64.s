@@ -631,6 +631,9 @@ TEXT ·cryptoBlocksAsm(SB),NOSPLIT,$40-80
     MOVQ preCount+56(FP), PreCounter
     MOVQ count+64(FP), Counter
     MOVQ tmp+72(FP), Tmp
+    //clear zero for Tmp and Counter
+
+
     MOVL $0, BlockCount  //BlockCount
     
 loopX16:
@@ -786,7 +789,7 @@ done:
 
 //func gHashUpdateAsm(H *byte, tag *byte, in []byte, tmp *byte)
 TEXT ·gHashUpdateAsm(SB),NOSPLIT,$32-48
-    MOVQ H+0(FP), DI
+    MOVQ h+0(FP), DI
     MOVQ tag+8(FP), SI
     MOVQ in+16(FP), AX
     MOVQ l+24(FP), BX
@@ -806,6 +809,9 @@ last:
     CMPQ R13, $0
     JE done
     MOVQ tmp+40(FP), CX
+    //clear zero for tmp
+    MOVQ $0, (CX)
+    MOVQ $0, 8(CX)
     SUBQ R13, R15
     ADDQ R15, AX
     MOVQ DI, R15
@@ -838,7 +844,7 @@ TEXT ·gHashFinishAsm(SB),NOSPLIT,$32-40
     CALL ·putUint64(SB)
     SUBQ $8, AX
     MOVQ AX, 16(SP)
-    MOVQ H+0(FP), AX
+    MOVQ h+0(FP), AX
     MOVQ AX, 0(SP)
     MOVQ tag+8(FP), AX
     MOVQ AX, 8(SP)
@@ -852,7 +858,7 @@ TEXT ·calculateFirstCounterAsm(SB),NOSPLIT,$48-48
     MOVQ nonceLen+8(FP), SI
     MOVQ nonceCap+16(FP), DX
     MOVQ counter+24(FP), AX
-    MOVQ H+32(FP), BX
+    MOVQ h+32(FP), BX
     MOVQ tmp+40(FP), CX
     CMPQ SI, $12
     JE branch1
@@ -879,39 +885,226 @@ branch1:
 done:
     RET
 
-//TEXT ·ensureCapacityAsm(SB), $32-56
-//MOVQ array+0(FP), DI
-//MOVQ arrayLen+8(FP), SI
-//MOVQ arrayCap+16(FP), AX
-//MOVQ asked+24(FP), BX
-//SUBQ SI, AX
-//CMPQ AX, BX
-//JGE enough
-//ADDQ SI, BX
-//MOVQ BX, 8(SP)
-//MOVQ BX, 16(SP)
-//LEAQ type·uint8(SB), CX
-//MOVQ CX, 0(SP)
-//CALL runtime·makeslice(SB)
-//MOVQ 24(SP), DX
-////MOVQ DX, 0(SP)
-//MOVQ DX, ret1+32(SP)
-////MOVQ DI, 8(SP)
-////MOVQ SI, 16(SP)
-////CALL ·copyAsm(SB)
-////MOVQ $32, ret2+40(SP)
-////MOVQ $32, ret3+48(SP)
-//JMP done
-//
-//enough:
-//MOVQ DI, ret1+32(FP)
-//ADDQ SI, AX
-//MOVQ AX, ret2+40(FP)
-//MOVQ AX, ret3+48(FP)
-//
-//done:
-//RET
-//
+TEXT ·ensureCapacityAsm(SB), $32-56
+    MOVQ array+0(FP), DI
+    MOVQ arrayLen+8(FP), SI
+    MOVQ arrayCap+16(FP), AX
+    MOVQ asked+24(FP), BX
+    SUBQ SI, AX
+    CMPQ AX, BX
+    JGE keepBranch
+    ADDQ SI, BX
+    MOVQ BX, 0(SP)
+    CALL ·makeArray(SB)
+    MOVQ 8(SP),CX
+    MOVQ 16(SP),DX
+    MOVQ CX, ret1+32(FP)
+    MOVQ DX, ret2+40(FP)
+    MOVQ DX, ret3+48(FP)
+    MOVQ CX, 0(SP)
+    MOVQ array+0(FP), DI
+    MOVQ arrayLen+8(FP), SI
+    MOVQ DI, 8(SP)
+    MOVQ SI, 16(SP)
+    CALL ·copyAsm(SB)
+    JMP done
+keepBranch:
+    MOVQ DI, ret1+32(FP)
+    MOVQ SI, ret2+40(FP)
+    ADDQ SI, AX
+    MOVQ AX, ret3+48(FP)
+done:
+    RET
+
+
+#define Enc AX
+#define Dec BX
+#define Dst CX
+#define Nonce DX
+#define Plaintext DI
+#define AdditionalData SI
+#define H R10
+#define TMask R11
+#define J0 R12
+#define Tag R13
+#define TagSize R14
+#define RetLen R14
+#define RetCap DX
+#define Ret R15
+
+
+//func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte) []byte, readArg
+//temp:  H, TMask, J0, tag, counter, tmp, CNT-256, TMP-256
+//cryptoBlockAsm: 24, calculateFirstCounterAsm:48, ensureCapacityAsm:32  cryptoBlocksAsm:80  gHashUpdateAsm:48 gHashFinishAsm:40
+TEXT ·sealAsm(SB), NOSPLIT, $80-152
+
+    //used registers: AX, R10 (not include the function used)
+    MOVQ roundKeys+0(FP), Enc
+    MOVQ h+112(FP), H
+    MOVQ Enc, 0(SP)
+    MOVQ H, 8(SP)
+    MOVQ H, 16(SP)
+    CALL ·cryptoBlockAsm(SB)
+    MOVQ 8(SP), H
+
+    //used registers: DX, R9, R12, R11
+    MOVQ nonce+40(FP), Nonce
+    MOVQ Nonce, 0(SP)
+    MOVQ nonceLen+48(FP), Nonce
+    MOVQ Nonce, 8(SP)
+    MOVQ nonceCap+56(FP), Nonce
+    MOVQ Nonce, 16(SP)
+    MOVQ temp+112(FP), Tmp
+    MOVQ Tmp, J0
+    ADDQ $32, J0
+    MOVQ J0, 24(SP)
+    MOVQ H, 32(SP)
+    ADDQ $80, Tmp
+    MOVQ Tmp, 40(SP)
+    CALL ·calculateFirstCounterAsm(SB)
+    MOVQ 24(SP), J0
+    MOVQ 40(SP), TMask
+
+    //used registers: R11, AX, R12
+    SUBQ $64, TMask
+    MOVQ roundKeys+0(FP), Enc
+    MOVQ Enc, 0(SP)
+    MOVQ TMask, 8(SP)
+    MOVQ J0, 16(SP)
+    CALL ·cryptoBlockAsm(SB)
+
+    //used registers: R14, DI, CX (before call) --- DX, R14, R15, CX(after call)
+    MOVQ tagSize+8(FP), TagSize
+    MOVQ plaintextLen+72(FP), Plaintext
+    ADDQ Plaintext, TagSize
+    MOVQ dst+16(FP), Dst
+    MOVQ Dst, 0(SP)
+    MOVQ dstlen+24(FP), Dst
+    MOVQ Dst, 8(SP)
+    MOVQ dstCap+32(FP), Dst
+    MOVQ Dst, 16(SP)
+    MOVQ TagSize, 24(SP)
+    CALL ·ensureCapacityAsm(SB)
+    MOVQ 32(SP), Ret
+    MOVQ 40(SP), RetLen
+    MOVQ 48(SP), RetCap
+    MOVQ 8(SP), Dst
+    MOVQ Ret, ret1+120(FP)
+    MOVQ RetLen, ret2+128(FP)
+    MOVQ RetCap, ret3+136(FP)
+
+    //used registers: AX, R15, R14, DX, DI, R12  ---- R9
+
+    MOVQ roundKeys+0(FP), Enc
+    MOVQ Enc, 0(SP)
+    ADDQ Dst, Ret
+    MOVQ Ret, 8(SP)
+    SUBQ Dst, RetLen
+    MOVQ RetLen, 16(SP)
+    SUBQ Dst, RetCap
+    MOVQ RetCap, 24(SP)
+    MOVQ plaintext+64(FP), Plaintext
+    MOVQ Plaintext, 32(SP)
+    MOVQ plaintextLen+72(FP), Plaintext
+    MOVQ Plaintext, 40(SP)
+    MOVQ plaintextCap+80(FP), Plaintext
+    MOVQ Plaintext, 48(SP)
+    MOVQ temp+112(FP), J0
+    ADDQ $32, J0
+    MOVQ J0, 56(SP)
+    ADDQ $48, J0
+    MOVQ J0, 64(SP)
+    ADDQ $256, J0
+    MOVQ J0, 72(SP)
+    CALL ·cryptoBlocksAsm(SB)
+
+    MOVQ h+112(FP), H
+    MOVQ H, 0(SP)
+    ADDQ $48, H
+    MOVQ H, 8(SP)
+    MOVQ additionalData+88(FP), AdditionalData
+    MOVQ AdditionalData, 16(SP)
+    MOVQ additionalDataLen+96(FP), AdditionalData
+    MOVQ AdditionalData, 24(SP)
+    MOVQ additionalDataCap+104(FP), AdditionalData
+    MOVQ AdditionalData, 32(SP)
+    MOVQ temp+112(FP), Tmp
+    ADDQ $80, Tmp
+    MOVQ Tmp, 40(SP)
+    CALL ·gHashUpdateAsm(SB)
+
+    MOVQ 0(SP), H
+    MOVQ 8(SP), Tag
+    MOVQ 40(SP), Tmp
+
+    //used registers: R15, CX, DI --- R9, DI
+    MOVQ H, 0(SP)
+    MOVQ Tag, 8(SP)
+    MOVQ Tmp, 40(SP)
+
+    MOVQ ret1+120(FP), Ret
+    MOVQ dstLen+24(FP), Dst
+    ADDQ Dst, Ret
+    MOVQ Ret, 16(SP)
+    MOVQ plaintextLen+72(FP), Plaintext
+    MOVQ Plaintext, 24(SP)
+    MOVQ retCap+136(FP), Plaintext
+    SUBQ Dst, Plaintext
+    MOVQ Plaintext, 32(SP)
+    CALL ·gHashUpdateAsm(SB)
+
+    MOVQ 0(SP), H
+    MOVQ 8(SP), Tag
+
+    MOVQ 40(SP), Tmp
+    MOVQ 24(SP), Plaintext
+
+    //used registers: R9, SI, DI
+    MOVQ H, 0(SP)
+    MOVQ Tag, 8(SP)
+
+    MOVQ Tmp, 16(SP)
+    MOVQ additionalDataLen+96(FP), AdditionalData
+    MOVQ AdditionalData, 24(SP)
+    MOVQ Plaintext, 32(SP)
+    CALL ·gHashFinishAsm(SB)
+
+    //used registers: R13
+    MOVQ temp+112(FP),Tag
+    ADDQ $48, Tag
+    MOVQ Tag, 0(SP)
+    MOVQ Tag, 8(SP)
+    SUBQ $32, Tag
+    MOVQ Tag, 16(SP)
+    CALL ·xor16(SB)
+    MOVQ 8(SP), Tag
+
+    //used registers: R15, CX, DI, R13, R14
+    MOVQ ret1+120(FP), Ret
+    MOVQ dstLen+24(FP), Dst
+    ADDQ Dst, Ret
+    MOVQ plaintextLen+72(FP), Plaintext
+    ADDQ Plaintext, Ret
+    MOVQ Ret, 0(SP)
+    MOVQ Tag, 8(SP)
+    MOVQ tagSize+8(FP), TagSize
+    MOVQ TagSize, 16(SP)
+    MOVQ TagSize, ret4+144(FP)
+    CALL ·copyAsm(SB)
+
+    RET
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

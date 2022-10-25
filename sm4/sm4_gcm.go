@@ -49,21 +49,46 @@ func (g *sm4GcmAsm) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 		panic("crypto/cipher: message too large for GCM")
 	}
 
-	// using notations from NIST SP 800-38D, section 7.1
-	var H, TMask, J0, tag [BlockSize]byte
-	g.cipher.Encrypt(H[:], H[:])
-	g.calculateFirstCounter(nonce, J0[:], H[:])
-	g.cipher.Encrypt(TMask[:], J0[:])
+	var temp [6*BlockSize+512] byte
+	//temp:  H, TMask, J0, tag, counter, tmp, CNT-256, tmp-256
+	ret, _:=sealAsm(&g.roundKeys[0], g.tagSize, dst, nonce, plaintext, additionalData, &temp[0])
+	//fmt.Println(readArg)
 
-	ret, out := ensureCapacity(dst, len(plaintext)+g.tagSize)
-	g.cryptoBlocks(g.roundKeys, out, plaintext, J0[:])
-	g.gHashUpdate(H[:], tag[:], additionalData)
-	g.gHashUpdate(H[:], tag[:], out[:len(plaintext)])
-	g.gHashFinish(H[:], tag[:], uint64(len(additionalData)), uint64(len(plaintext)))
-	xor16(&tag[0], &tag[0], &TMask[0])
-	copy(out[len(plaintext):], tag[:g.tagSize])
+	//out := ret[len(dst):]
+
+	//g.cipher.Encrypt(H[:], H[:])
+	//g.calculateFirstCounter(nonce, temp[32:48],temp[0:16])
+	//g.cipher.Encrypt(temp[16:32], temp[32:48])
+
+	//ret, out := ensureCapacity(dst, len(plaintext)+g.tagSize)
+	//g.cryptoBlocks(g.roundKeys, out, plaintext, temp[32:48])
+	//cryptoBlocksAsm(&g.roundKeys[0], out, plaintext, &temp[32], &temp[96], &temp[352])
+
+	//gHashUpdateAsm(&temp[0], &temp[48], additionalData, &temp[80])
+	//g.gHashUpdate(temp[0:16], temp[48:64], out[:len(plaintext)])
+	//g.gHashFinish(temp[0:16], temp[48:64], uint64(len(additionalData)), uint64(len(plaintext)))
+	//xor16(&temp[48], &temp[48], &temp[16])
+
+	//copyAsm(&out[len(plaintext)], &temp[48], g.tagSize)
+	//copy(out[len(plaintext):], temp[48:48+g.tagSize])
 
 	return ret
+
+	//// using notations from NIST SP 800-38D, section 7.1
+	//var H, TMask, J0, tag [BlockSize]byte
+	//g.cipher.Encrypt(H[:], H[:])
+	//g.calculateFirstCounter(nonce, J0[:], H[:])
+	//g.cipher.Encrypt(TMask[:], J0[:])
+	//
+	//ret, out := ensureCapacity(dst, len(plaintext)+g.tagSize)
+	//g.cryptoBlocks(g.roundKeys, out, plaintext, J0[:])
+	//g.gHashUpdate(H[:], tag[:], additionalData)
+	//g.gHashUpdate(H[:], tag[:], out[:len(plaintext)])
+	//g.gHashFinish(H[:], tag[:], uint64(len(additionalData)), uint64(len(plaintext)))
+	//xor16(&tag[0], &tag[0], &TMask[0])
+	//copy(out[len(plaintext):], tag[:g.tagSize])
+	//
+	//return ret
 }
 
 var errOpen = errors.New("cipher: message authentication failed")
@@ -84,7 +109,6 @@ func (g *sm4GcmAsm) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte,
 	if uint64(len(ciphertext)) > ((1<<32)-2)*BlockSize+uint64(g.tagSize) {
 		return nil, errOpen
 	}
-
 	tag := ciphertext[len(ciphertext)-g.tagSize:]
 	ciphertext = ciphertext[:len(ciphertext)-g.tagSize]
 
@@ -151,18 +175,41 @@ func (g *sm4GcmAsm) calculateFirstCounter(nonce []byte, counter []byte, H []byte
 	return
 }*/
 
+func makeArray(arrayLen int) (array []byte){
+	array=make([]byte, arrayLen)
+	return array
+}
+
 func ensureCapacity(array []byte, asked int) (head, tail []byte) {
-	arrayLen := len(array)
-	remaining := cap(array) - arrayLen
-	if remaining >= asked {
-		head = array
-	} else {
-		head = make([]byte, arrayLen+asked)
-		copy(head, array)
-	}
-	tail = head[arrayLen:]
+	//arrayLen := len(array)
+	//remaining := cap(array) - arrayLen
+	//if remaining >= asked {
+	//	head = array
+	//} else {
+	//	head = makeArray(arrayLen+asked)
+	//	copy(head, array)
+	//}
+	//tail = head[arrayLen:]
+	//return
+
+	head = ensureCapacityAsm(array, asked)
+	tail = head[len(array):]
 	return
 }
+
+
+//func ensureCapacity(array []byte, asked int) (head, tail []byte) {
+//	arrayLen := len(array)
+//	remaining := cap(array) - arrayLen
+//	if remaining >= asked {
+//		head = array
+//	} else {
+//		head = make([]byte, arrayLen+asked)
+//		copy(head, array)
+//	}
+//	tail = head[arrayLen:]
+//	return
+//}
 
 func (g *sm4GcmAsm) gHashUpdate(H, tag, in []byte) {
 	var tmp [BlockSize]byte
@@ -389,6 +436,33 @@ func copyAsm(dst *byte, src *byte, len int)
 
 //go:noescape
 func ensureCapacityAsm(array []byte, asked int) []byte
+
+//go:noescape
+func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte) ([]byte,int)
+
+
+
+
+
+
+
+
+
+
+//MOVQ tagSize+8(FP), TagSize
+//MOVQ dst+16(FP), Dst
+////dstlen+24(FP), dstCap+32(FP)
+//MOVQ nonce+40(FP), Nonce
+////nonceLen+48(FP), nonceCap+56(FP)
+//MOVQ plaintext+64(FP), Plaintext
+////plaintextLen+72(FP), plaintextCap+80(FP)
+//MOVQ additionalData+88(FP), AdditionalData
+////addionalDataLen+96(FP), additionalDataCap+104(FP)
+//MOVQ temp+112(FP), Tmp
+
+
+
+
 
 
 
