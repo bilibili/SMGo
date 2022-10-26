@@ -51,7 +51,8 @@ func (g *sm4GcmAsm) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 
 	var temp [6*BlockSize+512] byte
 	//temp:  H, TMask, J0, tag, counter, tmp, CNT-256, tmp-256
-	ret, _:=sealAsm(&g.roundKeys[0], g.tagSize, dst, nonce, plaintext, additionalData, &temp[0])
+	ret, _ := ensureCapacity(dst, len(plaintext)+g.tagSize)
+	ret = sealAsm(&g.roundKeys[0], g.tagSize, ret, nonce, plaintext, additionalData, &temp[0])
 	//fmt.Println(readArg)
 
 	//out := ret[len(dst):]
@@ -127,7 +128,10 @@ func (g *sm4GcmAsm) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte,
 		return nil, errOpen
 	}
 
-	ret, out := ensureCapacity(dst, len(ciphertext))
+	//ret, out := ensureCapacity(dst, len(ciphertext))
+
+	ret := make([]byte,len(dst)+len(ciphertext))  //consider 0 block later
+	out := ret[len(dst):]
 	g.cryptoBlocks(g.roundKeys, out, ciphertext, J0[:])
 
 	return ret, nil
@@ -181,6 +185,21 @@ func makeArray(arrayLen int) (array []byte){
 }
 
 func ensureCapacity(array []byte, asked int) (head, tail []byte) {
+	res := needExpandAsm(array, asked)
+	arrayLen := len(array)
+	if res == 0{
+		head = array
+	}else{
+		head = make([]byte,arrayLen,arrayLen+asked)
+		//head = make([]byte, arrayLen+asked)
+		if arrayLen!=0 {
+			copyAsm(&head[0], &array[0], arrayLen)
+		}
+	}
+	tail = head[arrayLen:]
+	return
+
+
 	//arrayLen := len(array)
 	//remaining := cap(array) - arrayLen
 	//if remaining >= asked {
@@ -192,9 +211,9 @@ func ensureCapacity(array []byte, asked int) (head, tail []byte) {
 	//tail = head[arrayLen:]
 	//return
 
-	head = ensureCapacityAsm(array, asked)
-	tail = head[len(array):]
-	return
+	//head = ensureCapacityAsm(array, asked)
+	//tail = head[len(array):]
+	//return
 }
 
 
@@ -435,11 +454,10 @@ func gHashFinishAsm(H *byte, tag *byte, tmp *byte, aadLen uint64, plainLen uint6
 func copyAsm(dst *byte, src *byte, len int)
 
 //go:noescape
-func ensureCapacityAsm(array []byte, asked int) []byte
+func needExpandAsm(array []byte, asked int) int
 
 //go:noescape
-func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte) ([]byte,int)
-
+func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte) []byte
 
 
 
@@ -463,8 +481,19 @@ func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext
 
 
 
-
-
+////used registers: R14, DI, CX (before call) --- DX, R14, R15, CX(after call)
+//MOVQ tagSize+8(FP), TagSize
+//MOVQ plaintextLen+72(FP), Plaintext
+//ADDQ Plaintext, TagSize
+//MOVQ dst+16(FP), Dst
+//MOVQ Dst, 0(SP)
+//MOVQ dstlen+24(FP), Dst
+//MOVQ Dst, 8(SP)
+//MOVQ dstCap+32(FP), Dst
+//MOVQ Dst, 16(SP)
+//MOVQ TagSize, 24(SP)
+//CALL ·ensureCapacityAsm(SB)
+//
 
 
 

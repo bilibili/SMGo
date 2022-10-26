@@ -885,7 +885,7 @@ branch1:
 done:
     RET
 
-TEXT ·ensureCapacityAsm(SB), $32-56
+TEXT ·needExpandAsm(SB), $0-40
     MOVQ array+0(FP), DI
     MOVQ arrayLen+8(FP), SI
     MOVQ arrayCap+16(FP), AX
@@ -893,33 +893,36 @@ TEXT ·ensureCapacityAsm(SB), $32-56
     SUBQ SI, AX
     CMPQ AX, BX
     JGE keepBranch
+    MOVQ $1, ret1+32(FP)
+    JMP done
+
+
     ADDQ SI, BX
     MOVQ BX, 0(SP)
     CALL ·makeArray(SB)
     MOVQ 8(SP),CX
-    MOVQ 16(SP),DX
+    MOVQ 24(SP),DX
     MOVQ CX, ret1+32(FP)
-    MOVQ DX, ret2+40(FP)
     MOVQ DX, ret3+48(FP)
     MOVQ CX, 0(SP)
     MOVQ array+0(FP), DI
     MOVQ arrayLen+8(FP), SI
     MOVQ DI, 8(SP)
     MOVQ SI, 16(SP)
+    MOVQ SI, ret2+40(FP)
     CALL ·copyAsm(SB)
     JMP done
 keepBranch:
-    MOVQ DI, ret1+32(FP)
-    MOVQ SI, ret2+40(FP)
-    ADDQ SI, AX
-    MOVQ AX, ret3+48(FP)
+    MOVQ $0, ret1+32(FP)
 done:
     RET
 
 
+
+
+
 #define Enc AX
 #define Dec BX
-#define Dst CX
 #define Nonce DX
 #define Plaintext DI
 #define AdditionalData SI
@@ -927,16 +930,16 @@ done:
 #define TMask R11
 #define J0 R12
 #define Tag R13
-#define TagSize R14
+#define TagSize CX
 #define RetLen R14
 #define RetCap DX
 #define Ret R15
 
 
-//func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte) []byte, readArg
+//func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte) []byte
 //temp:  H, TMask, J0, tag, counter, tmp, CNT-256, TMP-256
 //cryptoBlockAsm: 24, calculateFirstCounterAsm:48, ensureCapacityAsm:32  cryptoBlocksAsm:80  gHashUpdateAsm:48 gHashFinishAsm:40
-TEXT ·sealAsm(SB), NOSPLIT, $80-152
+TEXT ·sealAsm(SB), NOSPLIT, $80-144
 
     //used registers: AX, R10 (not include the function used)
     MOVQ roundKeys+0(FP), Enc
@@ -973,35 +976,19 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-152
     MOVQ J0, 16(SP)
     CALL ·cryptoBlockAsm(SB)
 
-    //used registers: R14, DI, CX (before call) --- DX, R14, R15, CX(after call)
-    MOVQ tagSize+8(FP), TagSize
-    MOVQ plaintextLen+72(FP), Plaintext
-    ADDQ Plaintext, TagSize
-    MOVQ dst+16(FP), Dst
-    MOVQ Dst, 0(SP)
-    MOVQ dstlen+24(FP), Dst
-    MOVQ Dst, 8(SP)
-    MOVQ dstCap+32(FP), Dst
-    MOVQ Dst, 16(SP)
-    MOVQ TagSize, 24(SP)
-    CALL ·ensureCapacityAsm(SB)
-    MOVQ 32(SP), Ret
-    MOVQ 40(SP), RetLen
-    MOVQ 48(SP), RetCap
-    MOVQ 8(SP), Dst
-    MOVQ Ret, ret1+120(FP)
-    MOVQ RetLen, ret2+128(FP)
-    MOVQ RetCap, ret3+136(FP)
+
+    MOVQ dst+16(FP), Ret
+    MOVQ dstLen+24(FP), RetLen
+    MOVQ dstCap+32(FP), RetCap
 
     //used registers: AX, R15, R14, DX, DI, R12  ---- R9
 
     MOVQ roundKeys+0(FP), Enc
     MOVQ Enc, 0(SP)
-    ADDQ Dst, Ret
+    ADDQ RetLen, Ret
     MOVQ Ret, 8(SP)
-    SUBQ Dst, RetLen
-    MOVQ RetLen, 16(SP)
-    SUBQ Dst, RetCap
+    SUBQ RetLen, RetCap
+    MOVQ RetCap, 16(SP)
     MOVQ RetCap, 24(SP)
     MOVQ plaintext+64(FP), Plaintext
     MOVQ Plaintext, 32(SP)
@@ -1042,15 +1029,15 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-152
     MOVQ Tag, 8(SP)
     MOVQ Tmp, 40(SP)
 
-    MOVQ ret1+120(FP), Ret
-    MOVQ dstLen+24(FP), Dst
-    ADDQ Dst, Ret
+    MOVQ dst+16(FP), Ret
+    MOVQ dstLen+24(FP), RetLen
+    ADDQ RetLen, Ret
     MOVQ Ret, 16(SP)
     MOVQ plaintextLen+72(FP), Plaintext
     MOVQ Plaintext, 24(SP)
-    MOVQ retCap+136(FP), Plaintext
-    SUBQ Dst, Plaintext
-    MOVQ Plaintext, 32(SP)
+    MOVQ dstCap+32(FP), RetCap
+    SUBQ RetLen, RetCap
+    MOVQ RetCap, 32(SP)
     CALL ·gHashUpdateAsm(SB)
 
     MOVQ 0(SP), H
@@ -1080,17 +1067,24 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-152
     MOVQ 8(SP), Tag
 
     //used registers: R15, CX, DI, R13, R14
-    MOVQ ret1+120(FP), Ret
-    MOVQ dstLen+24(FP), Dst
-    ADDQ Dst, Ret
+    MOVQ dst+16(FP), Ret
+    MOVQ dstLen+24(FP), RetLen
+    ADDQ RetLen, Ret
     MOVQ plaintextLen+72(FP), Plaintext
     ADDQ Plaintext, Ret
     MOVQ Ret, 0(SP)
+    ADDQ Plaintext, RetLen
     MOVQ Tag, 8(SP)
     MOVQ tagSize+8(FP), TagSize
     MOVQ TagSize, 16(SP)
-    MOVQ TagSize, ret4+144(FP)
+    ADDQ TagSize, RetLen
+    MOVQ RetLen, ret2+128(FP)
     CALL ·copyAsm(SB)
+
+    MOVQ dst+16(FP), Ret
+    MOVQ Ret, ret1+120(FP)
+    MOVQ dstCap+32(FP), RetCap
+    MOVQ RetCap, ret3+136(FP)
 
     RET
 
