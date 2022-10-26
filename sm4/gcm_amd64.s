@@ -895,23 +895,6 @@ TEXT ·needExpandAsm(SB), $0-40
     JGE keepBranch
     MOVQ $1, ret1+32(FP)
     JMP done
-
-
-    ADDQ SI, BX
-    MOVQ BX, 0(SP)
-    CALL ·makeArray(SB)
-    MOVQ 8(SP),CX
-    MOVQ 24(SP),DX
-    MOVQ CX, ret1+32(FP)
-    MOVQ DX, ret3+48(FP)
-    MOVQ CX, 0(SP)
-    MOVQ array+0(FP), DI
-    MOVQ arrayLen+8(FP), SI
-    MOVQ DI, 8(SP)
-    MOVQ SI, 16(SP)
-    MOVQ SI, ret2+40(FP)
-    CALL ·copyAsm(SB)
-    JMP done
 keepBranch:
     MOVQ $0, ret1+32(FP)
 done:
@@ -976,13 +959,10 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-144
     MOVQ J0, 16(SP)
     CALL ·cryptoBlockAsm(SB)
 
-
+    //used registers: AX, R15, R14, DX, DI, R12  ---- R9
     MOVQ dst+16(FP), Ret
     MOVQ dstLen+24(FP), RetLen
     MOVQ dstCap+32(FP), RetCap
-
-    //used registers: AX, R15, R14, DX, DI, R12  ---- R9
-
     MOVQ roundKeys+0(FP), Enc
     MOVQ Enc, 0(SP)
     ADDQ RetLen, Ret
@@ -1020,14 +1000,7 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-144
     MOVQ Tmp, 40(SP)
     CALL ·gHashUpdateAsm(SB)
 
-    MOVQ 0(SP), H
-    MOVQ 8(SP), Tag
-    MOVQ 40(SP), Tmp
-
     //used registers: R15, CX, DI --- R9, DI
-    MOVQ H, 0(SP)
-    MOVQ Tag, 8(SP)
-    MOVQ Tmp, 40(SP)
 
     MOVQ dst+16(FP), Ret
     MOVQ dstLen+24(FP), RetLen
@@ -1039,16 +1012,10 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-144
     SUBQ RetLen, RetCap
     MOVQ RetCap, 32(SP)
     CALL ·gHashUpdateAsm(SB)
-
-    MOVQ 0(SP), H
-    MOVQ 8(SP), Tag
-
     MOVQ 40(SP), Tmp
     MOVQ 24(SP), Plaintext
 
     //used registers: R9, SI, DI
-    MOVQ H, 0(SP)
-    MOVQ Tag, 8(SP)
 
     MOVQ Tmp, 16(SP)
     MOVQ additionalDataLen+96(FP), AdditionalData
@@ -1064,7 +1031,6 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-144
     SUBQ $32, Tag
     MOVQ Tag, 16(SP)
     CALL ·xor16(SB)
-    MOVQ 8(SP), Tag
 
     //used registers: R15, CX, DI, R13, R14
     MOVQ dst+16(FP), Ret
@@ -1074,7 +1040,6 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-144
     ADDQ Plaintext, Ret
     MOVQ Ret, 0(SP)
     ADDQ Plaintext, RetLen
-    MOVQ Tag, 8(SP)
     MOVQ tagSize+8(FP), TagSize
     MOVQ TagSize, 16(SP)
     ADDQ TagSize, RetLen
