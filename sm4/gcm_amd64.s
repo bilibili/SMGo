@@ -988,8 +988,12 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-144
 
     MOVQ h+112(FP), H
     MOVQ H, 0(SP)
-    ADDQ $48, H
-    MOVQ H, 8(SP)
+    MOVQ dst+16(FP), Ret
+    MOVQ dstLen+24(FP), RetLen
+    ADDQ RetLen, Ret
+    MOVQ plaintextLen+72(FP), Plaintext
+    ADDQ Plaintext, Ret
+    MOVQ Ret, 8(SP)
     MOVQ additionalData+88(FP), AdditionalData
     MOVQ AdditionalData, 16(SP)
     MOVQ additionalDataLen+96(FP), AdditionalData
@@ -1000,18 +1004,14 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-144
     ADDQ $80, Tmp
     MOVQ Tmp, 40(SP)
     CALL ·gHashUpdateAsm(SB)
+    MOVQ 8(SP), Tag
 
     //used registers: R15, CX, DI --- R9, DI
-
-    MOVQ dst+16(FP), Ret
-    MOVQ dstLen+24(FP), RetLen
-    ADDQ RetLen, Ret
-    MOVQ Ret, 16(SP)
     MOVQ plaintextLen+72(FP), Plaintext
+    SUBQ Plaintext, Tag
+    MOVQ Tag, 16(SP)
     MOVQ Plaintext, 24(SP)
-    MOVQ dstCap+32(FP), RetCap
-    SUBQ RetLen, RetCap
-    MOVQ RetCap, 32(SP)
+    MOVQ Plaintext, 32(SP)
     CALL ·gHashUpdateAsm(SB)
     MOVQ 40(SP), Tmp
     MOVQ 24(SP), Plaintext
@@ -1023,33 +1023,20 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-144
     MOVQ AdditionalData, 24(SP)
     MOVQ Plaintext, 32(SP)
     CALL ·gHashFinishAsm(SB)
+    MOVQ 8(SP), Tag
 
     //used registers: R13
-    MOVQ temp+112(FP),Tag
-    ADDQ $48, Tag
     MOVQ Tag, 0(SP)
     MOVQ Tag, 8(SP)
-    SUBQ $32, Tag
-    MOVQ Tag, 16(SP)
+    MOVQ temp+112(FP), TMask
+    ADDQ $16, TMask
+    MOVQ TMask, 16(SP)
     CALL ·xor16(SB)
-
-    //used registers: R15, CX, DI, R13, R14
-    MOVQ dst+16(FP), Ret
-    MOVQ dstLen+24(FP), RetLen
-    ADDQ RetLen, Ret
-    MOVQ plaintextLen+72(FP), Plaintext
-    ADDQ Plaintext, Ret
-    MOVQ Ret, 0(SP)
-    ADDQ Plaintext, RetLen
-    MOVQ tagSize+8(FP), TagSize
-    MOVQ TagSize, 16(SP)
-    ADDQ TagSize, RetLen
-    MOVQ RetLen, ret2+128(FP)
-    CALL ·copyAsm(SB)
 
     MOVQ dst+16(FP), Ret
     MOVQ Ret, ret1+120(FP)
     MOVQ dstCap+32(FP), RetCap
+    MOVQ RetCap, ret2+128(FP)
     MOVQ RetCap, ret3+136(FP)
 
     RET
