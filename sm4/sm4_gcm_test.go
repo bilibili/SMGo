@@ -169,7 +169,7 @@ func Test_sm4GcmAsm_Seal(t *testing.T) {
 }
 
 func Test_sm4GcmAsm_SealXN(t *testing.T) {
-	for blocks := 1; blocks < 100; blocks++ {
+	for blocks := 0; blocks < 100; blocks++ {
 		key, _ := hex.DecodeString("0123456789abcdeffedcba9876543210")
 
 		src := make([]byte, 16*blocks)

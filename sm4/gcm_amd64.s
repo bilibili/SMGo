@@ -1107,14 +1107,6 @@ done:
 
 
 TEXT ·openAsm(SB), NOSPLIT, $80-148
-    MOVQ roundKeys+0(FP), Enc
-    MOVQ tagSize+8(FP), TagSize
-    MOVQ dst+16(FP), Dst
-    MOVQ nonce+40(FP), Nonce
-    MOVQ cipher+64(FP), Ciphertext
-    MOVQ additionalData+88(FP), AdditionalData
-    MOVQ temp+112(FP), Tmp
-
     //used registers: AX, R10 (not include the function used)
     MOVQ roundKeys+0(FP), Enc
     MOVQ h+112(FP), H

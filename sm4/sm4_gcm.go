@@ -110,8 +110,8 @@ func (g *sm4GcmAsm) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte,
 		return nil, errOpen
 	}
 
-	//ret, out := ensureCapacity(dst, len(ciphertext)-g.tagSize)
-	ret := make([]byte,len(dst),len(dst)+len(ciphertext)-g.tagSize)  //consider 0 block later
+	ret, _ := ensureCapacity(dst, len(ciphertext)-g.tagSize)
+	//ret := make([]byte,len(dst),len(dst)+len(ciphertext)-g.tagSize)  //consider 0 block later
 	//out := ret[len(dst):]
 
 	//ret, out := ensureCapacity(dst, len(ciphertext))
@@ -193,11 +193,6 @@ func (g *sm4GcmAsm) calculateFirstCounter(nonce []byte, counter []byte, H []byte
 	tail = head[len(array):]
 	return
 }*/
-
-func makeArray(arrayLen int) (array []byte){
-	array=make([]byte, arrayLen)
-	return array
-}
 
 func ensureCapacity(array []byte, asked int) (head, tail []byte) {
 	res := needExpandAsm(array, asked)
