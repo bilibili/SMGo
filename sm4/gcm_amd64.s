@@ -1102,7 +1102,7 @@ done:
     MOVL CX, ret1+24(FP)
     RET
 
-//func openAsm(roundKeys *uint32, tagSize int,dst []byte, nonce []byte, ciphertext []byte, additionalData []byte, temp *byte) ([]byte, int32)
+//func openAsm(roundKeys *uint32, tagSize int,dst []byte, nonce []byte, ciphertext []byte, additionalData []byte, temp *byte) ([]byte, int)
 ////temp: H, J0, TMask, expectedTag, tmp, Counter-256, TMP-256
 
 
@@ -1202,11 +1202,43 @@ TEXT ·openAsm(SB), NOSPLIT, $80-148
     MOVQ TagSize, 16(SP)
     CALL ·constantTimeCompareAsm(SB)
     MOVL 24(SP), Res
-    MOVL Res, ret+144(FP)
+    MOVL Res, ret4+144(FP)
 
+    //cryptoBlocksAsm(&g.roundKeys[0], out, ciphertext[:len(ciphertext)-g.tagSize], &temp[16], &temp[80], &temp[336])
+    //
+    MOVQ roundKeys+0(FP), Enc
+    MOVQ Enc, 0(SP)
+    MOVQ dst+16(FP), Dst
+    MOVQ dstLen+24(FP), Tmp
+    ADDQ Tmp, Dst
+    MOVQ Dst, 8(SP)
+    MOVQ dstCap+32(FP), Dst
+    SUBQ Tmp, Dst
+    MOVQ Dst, 16(SP)
+    MOVQ Dst, 24(SP)
+    MOVQ cipher+64(FP), Ciphertext
+    MOVQ Ciphertext, 32(SP)
+    MOVQ cipherLen+72(FP), Ciphertext
+    MOVQ tagSize+8(FP), TagSize
+    SUBQ TagSize, Ciphertext
+    MOVQ Ciphertext, 40(SP)
+    MOVQ Ciphertext, 48(SP)
+    MOVQ temp+112(FP), Tmp
+    ADDQ $16, Tmp
+    MOVQ Tmp, 56(SP)
+    ADDQ $64, Tmp
+    MOVQ Tmp, 64(SP)
+    ADDQ $256, Tmp
+    MOVQ Tmp, 72(SP)
+    CALL ·cryptoBlocksAsm(SB)
+    MOVQ 40(SP), Ciphertext
 
-
-
+    MOVQ dst+16(FP), Dst
+    MOVQ Dst, ret1+120(FP)
+    MOVQ dstLen+24(FP), Dst
+    ADDQ Ciphertext, Dst
+    MOVQ Dst, ret2+128(FP)
+    MOVQ Dst, ret3+136(FP)
 
     RET
 

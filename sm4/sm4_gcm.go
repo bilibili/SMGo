@@ -110,6 +110,10 @@ func (g *sm4GcmAsm) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte,
 		return nil, errOpen
 	}
 
+	//ret, out := ensureCapacity(dst, len(ciphertext)-g.tagSize)
+	ret := make([]byte,len(dst),len(dst)+len(ciphertext)-g.tagSize)  //consider 0 block later
+	//out := ret[len(dst):]
+
 	//ret, out := ensureCapacity(dst, len(ciphertext))
 	//temp: H, J0, TMask, expectedTag, tmp, Counter-256, TMP-256
 	var temp [5*BlockSize+512] byte
@@ -122,7 +126,7 @@ func (g *sm4GcmAsm) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte,
 	//g.calculateFirstCounter(nonce, temp[16:32], temp[0:16])
 	//g.cipher.Encrypt(temp[32:48], temp[16:32])
 
-	_, r:=openAsm(&g.roundKeys[0], g.tagSize,dst, nonce, ciphertext, additionalData, &temp[0])
+	ret, flag:=openAsm(&g.roundKeys[0], g.tagSize,ret, nonce, ciphertext, additionalData, &temp[0])
 
 	//var expectedTag [BlockSize]byte
 	//g.gHashUpdate(temp[0:16], temp[48:64], additionalData)
@@ -131,7 +135,7 @@ func (g *sm4GcmAsm) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte,
 	//xor16(&temp[48], &temp[48], &temp[32])
 
 	//r:=constantTimeCompareAsm(&temp[48],&tag[0],g.tagSize)
-	if r!=0{
+	if flag!=0{
 		return nil, errOpen
 	}
 
@@ -141,10 +145,9 @@ func (g *sm4GcmAsm) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte,
 
 	//ret, out := ensureCapacity(dst, len(ciphertext))
 
-	ret := make([]byte,len(dst)+len(ciphertext)-g.tagSize)  //consider 0 block later
-	out := ret[len(dst):]
+	//g.cryptoBlocks(g.roundKeys, out, ciphertext[:len(ciphertext)-g.tagSize], temp[16:32])
+	//cryptoBlocksAsm(&g.roundKeys[0], out, ciphertext[:len(ciphertext)-g.tagSize], &temp[16], &temp[80], &temp[336])
 
-	g.cryptoBlocks(g.roundKeys, out, ciphertext[:len(ciphertext)-g.tagSize], temp[16:32])
 
 	return ret, nil
 }
@@ -499,19 +502,13 @@ func openAsm(roundKeys *uint32, tagSize int,dst []byte, nonce []byte, ciphertext
 
 
 
-//tag := ciphertext[len(ciphertext)-g.tagSize:]
-//ciphertext = ciphertext[:len(ciphertext)-g.tagSize]
-//
-//var H, J0, TMask [BlockSize]byte
-//g.cipher.Encrypt(H[:], H[:])
-//g.calculateFirstCounter(nonce, J0[:], H[:])
-//g.cipher.Encrypt(TMask[:], J0[:])
-//
-//var expectedTag [BlockSize]byte
-//g.gHashUpdate(H[:], expectedTag[:], additionalData)
-//g.gHashUpdate(H[:], expectedTag[:], ciphertext)
-//g.gHashFinish(H[:], expectedTag[:], uint64(len(additionalData)), uint64(len(ciphertext)))
-//xor16(&expectedTag[0], &expectedTag[0], &TMask[0])
+
+
+
+
+
+
+
 
 
 
