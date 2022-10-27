@@ -517,7 +517,7 @@ TEXT ·putUint32(SB),NOSPLIT,$0-16
     MOVB SIB, (DI)
     RET
 
-//func putUint64(b *byte, v uint64)  --- used registers: SI, DI
+//func putUint64(b *byte, v uint64)  --- used registers: SI, DI   why not SHRQ? this need test later
 TEXT ·putUint64(SB),NOSPLIT,$0-16
     MOVQ b+0(FP), DI
     MOVQ v+8(FP), SI
@@ -905,9 +905,10 @@ done:
 
 
 #define Enc AX
-#define Dec BX
+#define Dst BX
 #define Nonce DX
 #define Plaintext DI
+#define Ciphertext DI
 #define AdditionalData SI
 #define H R10
 #define TMask R11
@@ -917,13 +918,13 @@ done:
 #define RetLen R14
 #define RetCap DX
 #define Ret R15
+#define Res R15
 
 
 //func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte) []byte
 //temp:  H, TMask, J0, tag, counter, tmp, CNT-256, TMP-256
 //cryptoBlockAsm: 24, calculateFirstCounterAsm:48, ensureCapacityAsm:32  cryptoBlocksAsm:80  gHashUpdateAsm:48 gHashFinishAsm:40
 TEXT ·sealAsm(SB), NOSPLIT, $80-144
-
     //used registers: AX, R10 (not include the function used)
     MOVQ roundKeys+0(FP), Enc
     MOVQ h+112(FP), H
@@ -1053,49 +1054,161 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-144
 
     RET
 
+//func constantTimeCompareAsm(x *byte, y *byte, l int) int32
+TEXT ·constantTimeCompareAsm(SB), NOSPLIT, $0-28
+    MOVQ x+0(FP), DI
+    MOVQ y+8(FP), SI
+    MOVQ l+16(FP), AX
+    MOVQ $0, BX
+    MOVQ $0, CX
+fastCmp:
+    CMPQ AX, $8
+    JL slowCmp
+    MOVQ (DI), DX
+    XORQ DX, (SI)
+    ORQ (SI),BX
+    ADDQ $8, DI
+    ADDQ $8, SI
+    SUBQ $8, AX
+    JMP fastCmp
+slowCmp:
+    CMPQ AX, $1
+    JL done
+    MOVB (DI), DX
+    XORB DX, (SI)
+    ORB (SI), CX
+    ADDQ $1, DI
+    ADDQ $1, SI
+    SUBQ $1, AX
+    JMP slowCmp
+done:
+    ORB BX, CX
+    SHRQ $8, BX
+    ORB BX, CX
+    SHRQ $8, BX
+    ORB BX, CX
+    SHRQ $8, BX
+    ORB BX, CX
+    SHRQ $8, BX
+    ORB BX, CX
+    SHRQ $8, BX
+    ORB BX, CX
+    SHRQ $8, BX
+    ORB BX, CX
+    SHRQ $8, BX
+    ORB BX, CX
+    //DECL CX
+    //SHRL $31, CX
+    MOVL CX, ret1+24(FP)
+    RET
+
+//func openAsm(roundKeys *uint32, tagSize int,dst []byte, nonce []byte, ciphertext []byte, additionalData []byte, temp *byte) ([]byte, int32)
+////temp: H, J0, TMask, expectedTag, tmp, Counter-256, TMP-256
+
+
+TEXT ·openAsm(SB), NOSPLIT, $80-148
+    MOVQ roundKeys+0(FP), Enc
+    MOVQ tagSize+8(FP), TagSize
+    MOVQ dst+16(FP), Dst
+    MOVQ nonce+40(FP), Nonce
+    MOVQ cipher+64(FP), Ciphertext
+    MOVQ additionalData+88(FP), AdditionalData
+    MOVQ temp+112(FP), Tmp
+
+    //used registers: AX, R10 (not include the function used)
+    MOVQ roundKeys+0(FP), Enc
+    MOVQ h+112(FP), H
+    MOVQ Enc, 0(SP)
+    MOVQ H, 8(SP)
+    MOVQ H, 16(SP)
+    CALL ·cryptoBlockAsm(SB)
+    MOVQ 8(SP), H
+
+    //used registers: DX, R9, R12, R11
+    MOVQ nonce+40(FP), Nonce
+    MOVQ Nonce, 0(SP)
+    MOVQ nonceLen+48(FP), Nonce
+    MOVQ Nonce, 8(SP)
+    MOVQ nonceCap+56(FP), Nonce
+    MOVQ Nonce, 16(SP)
+    MOVQ temp+112(FP), Tmp
+    MOVQ Tmp, J0
+    ADDQ $16, J0
+    MOVQ J0, 24(SP)
+    MOVQ H, 32(SP)
+    ADDQ $64, Tmp
+    MOVQ Tmp, 40(SP)
+    CALL ·calculateFirstCounterAsm(SB)
+    MOVQ 24(SP), J0
+    MOVQ 40(SP), TMask
+
+    //used registers: R11, AX, R12
+    SUBQ $32, TMask
+    MOVQ roundKeys+0(FP), Enc
+    MOVQ Enc, 0(SP)
+    MOVQ TMask, 8(SP)
+    MOVQ J0, 16(SP)
+    CALL ·cryptoBlockAsm(SB)
+
+
+    MOVQ h+112(FP), H
+    MOVQ H, 0(SP)
+    ADDQ $48, H
+    MOVQ H, 8(SP)
+    MOVQ additionalData+88(FP), AdditionalData
+    MOVQ AdditionalData, 16(SP)
+    MOVQ additionalDataLen+96(FP), AdditionalData
+    MOVQ AdditionalData, 24(SP)
+    MOVQ additionalDataCap+104(FP), AdditionalData
+    MOVQ AdditionalData, 32(SP)
+    MOVQ temp+112(FP), Tmp
+    ADDQ $64, Tmp
+    MOVQ Tmp, 40(SP)
+    CALL ·gHashUpdateAsm(SB)
+
+    //used registers: R15, CX, DI --- R9, DI
+    MOVQ cipher+64(FP), Ciphertext
+    MOVQ Ciphertext, 16(SP)
+    MOVQ cipherLen+72(FP), Ciphertext
+    MOVQ tagSize+8(FP), TagSize
+    SUBQ TagSize, Ciphertext
+    MOVQ Ciphertext, 24(SP)
+    MOVQ Ciphertext, 32(SP)
+    CALL ·gHashUpdateAsm(SB)
+    MOVQ 40(SP), Tmp
+    MOVQ 24(SP), Ciphertext
+
+    //used registers: R9, SI, DI
+    MOVQ Tmp, 16(SP)
+    MOVQ additionalDataLen+96(FP), AdditionalData
+    MOVQ AdditionalData, 24(SP)
+    MOVQ Ciphertext, 32(SP)
+    CALL ·gHashFinishAsm(SB)
+    MOVQ 8(SP), Tag
+
+    //used registers: R13
+    MOVQ Tag, 0(SP)
+    SUBQ $16, Tag
+    MOVQ Tag, 16(SP)
+    CALL ·xor16(SB)
+
+    //r:=constantTimeCompareAsm(&temp[48],&tag[0],g.tagSize)
+    MOVQ cipher+64(FP), Dst
+    MOVQ cipherlen+72(FP), Ciphertext
+    ADDQ Ciphertext, Dst
+    MOVQ tagSize+8(FP), TagSize
+    SUBQ TagSize, Dst
+    MOVQ Dst, 8(SP)
+    MOVQ TagSize, 16(SP)
+    CALL ·constantTimeCompareAsm(SB)
+    MOVL 24(SP), Res
+    MOVL Res, ret+144(FP)
 
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    RET
 
 
 

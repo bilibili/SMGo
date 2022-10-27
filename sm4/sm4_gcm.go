@@ -7,7 +7,6 @@ package sm4
 
 import (
 	"crypto/cipher"
-	"crypto/subtle"
 	"errors"
 	"unsafe"
 )
@@ -110,29 +109,42 @@ func (g *sm4GcmAsm) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte,
 	if uint64(len(ciphertext)) > ((1<<32)-2)*BlockSize+uint64(g.tagSize) {
 		return nil, errOpen
 	}
-	tag := ciphertext[len(ciphertext)-g.tagSize:]
-	ciphertext = ciphertext[:len(ciphertext)-g.tagSize]
 
-	var H, J0, TMask [BlockSize]byte
-	g.cipher.Encrypt(H[:], H[:])
-	g.calculateFirstCounter(nonce, J0[:], H[:])
-	g.cipher.Encrypt(TMask[:], J0[:])
+	//ret, out := ensureCapacity(dst, len(ciphertext))
+	//temp: H, J0, TMask, expectedTag, tmp, Counter-256, TMP-256
+	var temp [5*BlockSize+512] byte
 
-	var expectedTag [BlockSize]byte
-	g.gHashUpdate(H[:], expectedTag[:], additionalData)
-	g.gHashUpdate(H[:], expectedTag[:], ciphertext)
-	g.gHashFinish(H[:], expectedTag[:], uint64(len(additionalData)), uint64(len(ciphertext)))
-	xor16(&expectedTag[0], &expectedTag[0], &TMask[0])
+	//tag := ciphertext[len(ciphertext)-g.tagSize:]
+	//ciphertext = ciphertext[:len(ciphertext)-g.tagSize]
 
-	if subtle.ConstantTimeCompare(expectedTag[:g.tagSize], tag) != 1 {
+	//var H, J0, TMask [BlockSize]byte
+	//g.cipher.Encrypt(temp[0:16], temp[0:16])
+	//g.calculateFirstCounter(nonce, temp[16:32], temp[0:16])
+	//g.cipher.Encrypt(temp[32:48], temp[16:32])
+
+	_, r:=openAsm(&g.roundKeys[0], g.tagSize,dst, nonce, ciphertext, additionalData, &temp[0])
+
+	//var expectedTag [BlockSize]byte
+	//g.gHashUpdate(temp[0:16], temp[48:64], additionalData)
+	//g.gHashUpdate(temp[0:16], temp[48:64], ciphertext)
+	//g.gHashFinish(temp[0:16], temp[48:64], uint64(len(additionalData)), uint64(len(ciphertext)-g.tagSize))
+	//xor16(&temp[48], &temp[48], &temp[32])
+
+	//r:=constantTimeCompareAsm(&temp[48],&tag[0],g.tagSize)
+	if r!=0{
 		return nil, errOpen
 	}
 
+	//if subtle.ConstantTimeCompare(temp[48:48+g.tagSize], tag) != 1 {
+	//	return nil, errOpen
+	//}
+
 	//ret, out := ensureCapacity(dst, len(ciphertext))
 
-	ret := make([]byte,len(dst)+len(ciphertext))  //consider 0 block later
+	ret := make([]byte,len(dst)+len(ciphertext)-g.tagSize)  //consider 0 block later
 	out := ret[len(dst):]
-	g.cryptoBlocks(g.roundKeys, out, ciphertext, J0[:])
+
+	g.cryptoBlocks(g.roundKeys, out, ciphertext[:len(ciphertext)-g.tagSize], temp[16:32])
 
 	return ret, nil
 }
@@ -459,6 +471,11 @@ func needExpandAsm(array []byte, asked int) int
 //go:noescape
 func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte) []byte
 
+//go:noescape
+func constantTimeCompareAsm(x *byte, y *byte, l int) int32
+
+//go:noescape
+func openAsm(roundKeys *uint32, tagSize int,dst []byte, nonce []byte, ciphertext []byte, additionalData []byte, temp *byte) ([]byte, int32)
 
 
 
@@ -481,23 +498,20 @@ func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext
 
 
 
-////used registers: R14, DI, CX (before call) --- DX, R14, R15, CX(after call)
-//MOVQ tagSize+8(FP), TagSize
-//MOVQ plaintextLen+72(FP), Plaintext
-//ADDQ Plaintext, TagSize
-//MOVQ dst+16(FP), Dst
-//MOVQ Dst, 0(SP)
-//MOVQ dstlen+24(FP), Dst
-//MOVQ Dst, 8(SP)
-//MOVQ dstCap+32(FP), Dst
-//MOVQ Dst, 16(SP)
-//MOVQ TagSize, 24(SP)
-//CALL ·ensureCapacityAsm(SB)
+
+//tag := ciphertext[len(ciphertext)-g.tagSize:]
+//ciphertext = ciphertext[:len(ciphertext)-g.tagSize]
 //
-
-
-
-
+//var H, J0, TMask [BlockSize]byte
+//g.cipher.Encrypt(H[:], H[:])
+//g.calculateFirstCounter(nonce, J0[:], H[:])
+//g.cipher.Encrypt(TMask[:], J0[:])
+//
+//var expectedTag [BlockSize]byte
+//g.gHashUpdate(H[:], expectedTag[:], additionalData)
+//g.gHashUpdate(H[:], expectedTag[:], ciphertext)
+//g.gHashFinish(H[:], expectedTag[:], uint64(len(additionalData)), uint64(len(ciphertext)))
+//xor16(&expectedTag[0], &expectedTag[0], &TMask[0])
 
 
 
