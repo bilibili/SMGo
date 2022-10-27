@@ -148,8 +148,6 @@ func Test_sm4GcmAsm_Seal(t *testing.T) {
 		if !reflect.DeepEqual(dst, expected) {
 			fmt.Printf("failed test case #%d\n%X\n%X\n", i, dst, expected)
 			t.Fail()
-		}else{
-			fmt.Printf("success test case #%d\n%X\n%X\n", i, dst, expected)
 		}
 
 		asm2Go, e1 := gcmGo.Open(nil, nonce, dst, aad)
@@ -160,10 +158,7 @@ func Test_sm4GcmAsm_Seal(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(go2Asm, src) || !reflect.DeepEqual(asm2Go, src) {
-
 			t.Fail()
-		}else{
-			fmt.Println("success")
 		}
 	}
 }
@@ -242,8 +237,6 @@ func Test_sm4GcmAsm_Seal_Random(t *testing.T) {
 			fmt.Println("fail")
 			fmt.Printf("#%d\n%X\n%X\n", i, dst, expected)
 			t.Fail()
-		}else{
-			fmt.Println("success")
 		}
 
 		asm2Go, e1 := gcmGo.Open(nil, nonce, dst, aad)

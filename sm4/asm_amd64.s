@@ -208,11 +208,10 @@ TEXT ·transpose4x4(SB),NOSPLIT,$0-16
 //      suppose we begin with: {a0, a1, a2, a3}, {b0, b1, b2, b3}, -, -
 //      we want to reach:      {a0, b0--}, {a1, b1--}, {a2,b2--}, {a3,b3--}
 #define transpose2x4(V1, V2, V3, V4, Tmp1, Tmp2) \
-    VPUNPCKHDQ  V2, V1, Tmp1 \      // Tmp1: a2, b2, a3, b3                     //128: SSE2; 256: AVX2; 512: AVX512F
+    VPUNPCKHDQ  V2, V1, V3 \      // V3: a2, b2, a3, b3                     //128: SSE2; 256: AVX2; 512: AVX512F
     VPUNPCKLDQ  V2, V1, V1 \        // V1: a0, b0, a1, b1                       //latency 1, CPI 1
     VPUNPCKHQDQ V1, V1, V2 \        // V2: a1, b1, -, -
-    VPUNPCKLQDQ V1, Tmp1, V3 \      // V3: a2, b2, -, -
-    VPUNPCKHQDQ V1, Tmp1, V4 \      // V4: a2, b2, -, -
+    VPUNPCKHQDQ V1, V3, V4 \      // V4: a2, b2, -, -
 
 //      suppose we begin with: {a0, b0--}, {a1, b1,--}, {a2, b2--}, {a3, b3--}
 //      we want to reach:      {a0, a1, a2, a3}, {b0, b1, b2, b3}, -, -
@@ -247,10 +246,9 @@ TEXT ·transpose2x4(SB),NOSPLIT,$0-16
 //      we want to reach:      {a0---}, {a1---}, {a2---}, {a3---}
 #define transpose1x4(V1, V2, V3, V4, Tmp1, Tmp2) \
     VPUNPCKLDQ  V1, V1, Tmp1 \      // Tmp1: a0, a0, a1, a1                     //128: SSE2; 256: AVX2; 512: AVX512F
-    VPUNPCKHDQ  V1, V1, Tmp2 \      // Tmp2: a2, a2, a3, a3                     //latency 1, CPI 1
+    VPUNPCKHDQ  V1, V1, V3 \      // V3: a2, a2, a3, a3                     //latency 1, CPI 1
     VPUNPCKHDQ  Tmp1, Tmp1, V2 \    // V2: a1 ---
-    VPUNPCKLDQ  Tmp2, Tmp2, V3 \    // V3: a2 ---
-    VPUNPCKHDQ  Tmp2, Tmp2, V4 \    // V4: a3 ---
+    VPUNPCKHDQ  V3, V3, V4 \    // V4: a3 ---
 
 //      suppose we begin with: {a0---}, {a1---}, {a2---}, {a3---}
 //      we want to reach:      {a0, a1, a2, a3}, -, -, -
