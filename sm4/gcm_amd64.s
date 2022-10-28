@@ -358,100 +358,61 @@ blocksEnd:
 //VMOVDQU32   DEBUGz, (BX)
     RET
 
-//func xor256(dst *byte, src1 *byte, src2 *byte)
-TEXT ·xor256(SB),NOSPLIT,$0-24
 
-	MOVQ    dst+0(FP), AX
-	MOVQ    src1+8(FP), BX
-	MOVQ    src2+16(FP), CX
 
-    VMOVDQU32   (BX), Z1
-    VMOVDQU32   64(BX), Z4
-    VMOVDQU32   128(BX), Z7
-    VMOVDQU32   192(BX), Z10
+#define xor256(dst, src1, src2)    \
+    VMOVDQU32   (src1), Z1         \
+    VMOVDQU32   64(src1), Z4       \
+    VMOVDQU32   128(src1), Z7      \
+    VMOVDQU32   192(src1), Z10     \
+    VMOVDQU32   (src2), Z2         \
+    VMOVDQU32   64(src2), Z5       \
+    VMOVDQU32   128(src2), Z8      \
+    VMOVDQU32   192(src2), Z11     \
+    VPXORD      Z1, Z2, Z0         \
+    VPXORD      Z4, Z5, Z3         \
+    VPXORD      Z7, Z8, Z6         \
+    VPXORD      Z10, Z11, Z9       \
+    VMOVDQU32   Z0, (dst)          \
+    VMOVDQU32   Z3, 64(dst)        \
+    VMOVDQU32   Z6, 128(dst)       \
+    VMOVDQU32   Z9, 192(dst)       \
 
-    VMOVDQU32   (CX), Z2
-    VMOVDQU32   64(CX), Z5
-    VMOVDQU32   128(CX), Z8
-    VMOVDQU32   192(CX), Z11
 
-    VPXORD      Z1, Z2, Z0
-    VPXORD      Z4, Z5, Z3
-    VPXORD      Z7, Z8, Z6
-    VPXORD      Z10, Z11, Z9
-
-    VMOVDQU32   Z0, (AX)
-    VMOVDQU32   Z3, 64(AX)
-    VMOVDQU32   Z6, 128(AX)
-    VMOVDQU32   Z9, 192(AX)
-
-    RET
 
 //func xor128(dst *byte, src1 *byte, src2 *byte)
-TEXT ·xor128(SB),NOSPLIT,$0-24
+#define xor128(dst,src1,src2)   \
+    VMOVDQU32   (src1), Z1      \
+    VMOVDQU32   64(src1), Z4    \
+    VMOVDQU32   (src2), Z2      \
+    VMOVDQU32   64(src2), Z5    \
+    VPXORD      Z1, Z2, Z0      \
+    VPXORD      Z4, Z5, Z3      \
+    VMOVDQU32   Z0, (dst)       \
+    VMOVDQU32   Z3, 64(dst)     \
 
-	MOVQ    dst+0(FP), AX
-	MOVQ    src1+8(FP), BX
-	MOVQ    src2+16(FP), CX
 
-    VMOVDQU32   (BX), Z1
-    VMOVDQU32   64(BX), Z4
 
-    VMOVDQU32   (CX), Z2
-    VMOVDQU32   64(CX), Z5
-
-    VPXORD      Z1, Z2, Z0
-    VPXORD      Z4, Z5, Z3
-
-    VMOVDQU32   Z0, (AX)
-    VMOVDQU32   Z3, 64(AX)
-
-    RET
-
-//func xor64(dst *byte, src1 *byte, src2 *byte)
-TEXT ·xor64(SB),NOSPLIT,$0-24
-
-	MOVQ    dst+0(FP), AX
-	MOVQ    src1+8(FP), BX
-	MOVQ    src2+16(FP), CX
-
-    VMOVDQU32   (BX), Z1
-    VMOVDQU32   (CX), Z2
-    VPXORD      Z1, Z2, Z0
-
-    VMOVDQU32   Z0, (AX)
-
-    RET
+#define xor64(dst,src1,src2)  \
+    VMOVDQU32   (src1), Z1    \
+    VMOVDQU32   (src2), Z2    \
+    VPXORD      Z1, Z2, Z0    \
+    VMOVDQU32   Z0, (dst)     \
 
 //func xor32(dst *byte, src1 *byte, src2 *byte)
-TEXT ·xor32(SB),NOSPLIT,$0-24
+#define xor32(dst,src1,src2)   \
+    VMOVDQU32   (src1), Y1     \
+    VMOVDQU32   (src2), Y2     \
+    VPXORD      Y1, Y2, Y0     \
+    VMOVDQU32   Y0, (dst)      \
 
-	MOVQ    dst+0(FP), AX
-	MOVQ    src1+8(FP), BX
-	MOVQ    src2+16(FP), CX
-
-    VMOVDQU32   (BX), Y1
-    VMOVDQU32   (CX), Y2
-    VPXORD      Y1, Y2, Y0
-
-    VMOVDQU32   Y0, (AX)
-
-    RET
 
 //func xor16(dst *byte, src1 *byte, src2 *byte)
-TEXT ·xor16(SB),NOSPLIT,$0-24
-
-	MOVQ    dst+0(FP), AX
-	MOVQ    src1+8(FP), BX
-	MOVQ    src2+16(FP), CX
-
-    VMOVDQU32   (BX), X1
-    VMOVDQU32   (CX), X2
-    VPXORD      X1, X2, X0
-
-    VMOVDQU32   X0, (AX)
-
-    RET
+#define xor16(dst,src1,src2) \
+    VMOVDQU32   (src1), X1   \
+    VMOVDQU32   (src2), X2   \
+    VPXORD      X1, X2, X0   \
+    VMOVDQU32   X0, (dst)    \
     
 
 //func makeCounter(dst *byte, src *byte) --- used registers: DI, SI, AX
@@ -657,10 +618,11 @@ loopX16:
     MOVQ 0(SP), RoundKeys
     MOVQ 8(SP), Tmp
     MOVQ 16(SP), Counter
-    MOVQ Out, 0(SP)
-    MOVQ Tmp, 8(SP)
-    MOVQ In, 16(SP)
-    CALL ·xor256(SB)
+    //MOVQ Out, 0(SP)
+    //MOVQ Tmp, 8(SP)
+    //MOVQ In, 16(SP)
+    //CALL ·xor256(SB)
+    xor256(Out,Tmp,In)
     ADDQ $256, Out
     ADDQ $256, In
     ADDQ $16, BlockCount
@@ -682,10 +644,11 @@ loopX8:
     MOVQ 0(SP), RoundKeys
     MOVQ 8(SP), Tmp
     MOVQ 16(SP), Counter
-    MOVQ Out, 0(SP)
-    MOVQ Tmp, 8(SP)
-    MOVQ In, 16(SP)
-    CALL ·xor128(SB)
+    //MOVQ Out, 0(SP)
+    //MOVQ Tmp, 8(SP)
+    //MOVQ In, 16(SP)
+    //CALL ·xor128(SB)
+    xor128(Out,Tmp,In)
     ADDQ $128, Out
     ADDQ $128, In
     ADDQ $8, BlockCount
@@ -707,10 +670,11 @@ loopX4:
     MOVQ 0(SP), RoundKeys
     MOVQ 8(SP), Tmp
     MOVQ 16(SP), Counter
-    MOVQ Out, 0(SP)
-    MOVQ Tmp, 8(SP)
-    MOVQ In, 16(SP)
-    CALL ·xor64(SB)
+    //MOVQ Out, 0(SP)
+    //MOVQ Tmp, 8(SP)
+    //MOVQ In, 16(SP)
+    //CALL ·xor64(SB)
+    xor64(Out,Tmp,In)
     ADDQ $64, Out
     ADDQ $64, In
     ADDQ $4, BlockCount
@@ -732,10 +696,11 @@ loopX2:
     MOVQ 0(SP), RoundKeys
     MOVQ 8(SP), Tmp
     MOVQ 16(SP), Counter
-    MOVQ Out, 0(SP)
-    MOVQ Tmp, 8(SP)
-    MOVQ In, 16(SP)
-    CALL ·xor32(SB)
+    //MOVQ Out, 0(SP)
+    //MOVQ Tmp, 8(SP)
+    //MOVQ In, 16(SP)
+    //CALL ·xor32(SB)
+    xor32(Out,Tmp,In)
     ADDQ $32, Out
     ADDQ $32, In
     ADDQ $2, BlockCount
@@ -757,10 +722,11 @@ loopX1:
     MOVQ 0(SP), RoundKeys
     MOVQ 8(SP), Tmp
     MOVQ 16(SP), Counter
-    MOVQ Out, 0(SP)
-    MOVQ Tmp, 8(SP)
-    MOVQ In, 16(SP)
-    CALL ·xor16(SB)
+    //MOVQ Out, 0(SP)
+    //MOVQ Tmp, 8(SP)
+    //MOVQ In, 16(SP)
+    //CALL ·xor16(SB)
+    xor16(Out,Tmp,In)
     ADDQ $16, Out
     ADDQ $16, In
     ADDQ $1, BlockCount
@@ -1016,12 +982,14 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-144    //80->88
     MOVQ 8(SP), Tag
 
     //used registers: R13
-    MOVQ Tag, 0(SP)
-    MOVQ Tag, 8(SP)
+    //MOVQ Tag, 0(SP)
+    //MOVQ Tag, 8(SP)
     MOVQ temp+112(FP), TMask
     ADDQ $16, TMask
-    MOVQ TMask, 16(SP)
-    CALL ·xor16(SB)
+    //MOVQ TMask, 16(SP)
+    //CALL ·xor16(SB)
+
+    xor16(Tag, Tag, TMask)
 
     MOVQ dst+16(FP), Ret
     MOVQ Ret, ret1+120(FP)
@@ -1155,9 +1123,11 @@ TEXT ·openAsm(SB), NOSPLIT, $80-148
 
     //used registers: R13
     MOVQ Tag, 0(SP)
-    SUBQ $16, Tag
-    MOVQ Tag, 16(SP)
-    CALL ·xor16(SB)
+    MOVQ Tag, TMask
+    SUBQ $16, TMask
+    //MOVQ TMask, 16(SP)
+    //CALL ·xor16(SB)
+    xor16(Tag, Tag, TMask)
 
     //r:=constantTimeCompareAsm(&temp[48],&tag[0],g.tagSize)
     MOVQ cipher+64(FP), Dst

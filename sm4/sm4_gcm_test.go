@@ -14,25 +14,25 @@ import (
 	"testing"
 )
 
-func Test_xor256(t *testing.T) {
-	testXor(xor256, 256, t)
-}
+//func Test_xor256(t *testing.T) {
+//	testXor(xor256, 256, t)
+//}
+//
+//func Test_xor128(t *testing.T) {
+//	testXor(xor128, 128, t)
+//}
+//
+//func Test_xor64(t *testing.T) {
+//	testXor(xor64, 64, t)
+//}
 
-func Test_xor128(t *testing.T) {
-	testXor(xor128, 128, t)
-}
+//func Test_xor32(t *testing.T) {
+//	testXor(xor32, 32, t)
+//}
 
-func Test_xor64(t *testing.T) {
-	testXor(xor64, 64, t)
-}
-
-func Test_xor32(t *testing.T) {
-	testXor(xor32, 32, t)
-}
-
-func Test_xor16(t *testing.T) {
-	testXor(xor16, 16, t)
-}
+//func Test_xor16(t *testing.T) {
+//	testXor(xor16, 16, t)
+//}
 
 func testXor(xorFunc func(*byte, *byte, *byte), count int, t *testing.T) {
 	dst := make([]byte, count)

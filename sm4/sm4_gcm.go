@@ -163,14 +163,14 @@ func xor256(dst *byte, src1 *byte, src2 *byte)
 //go:noescape
 func xor128(dst *byte, src1 *byte, src2 *byte)
 
-//go:noescape
-func xor64(dst *byte, src1 *byte, src2 *byte)
+////go:noescape
+//func xor64(dst *byte, src1 *byte, src2 *byte)
 
-//go:noescape
-func xor32(dst *byte, src1 *byte, src2 *byte)
+////go:noescape
+//func xor32(dst *byte, src1 *byte, src2 *byte)
 
-//go:noescape
-func xor16(dst *byte, src1 *byte, src2 *byte)
+////go:noescape
+//func xor16(dst *byte, src1 *byte, src2 *byte)
 
 //go:noescape
 func makeCounter(dst *byte, src *byte)
@@ -321,8 +321,19 @@ func openAsm(roundKeys *uint32, tagSize int,dst []byte, nonce []byte, ciphertext
 //MOVL   AX,        8(DI)
 //RET
 
-
-
+//TEXT ·xor16(SB),NOSPLIT,$0-24
+//
+//MOVQ    dst+0(FP), AX
+//MOVQ    src1+8(FP), BX
+//MOVQ    src2+16(FP), CX
+//
+//VMOVDQU32   (BX), X1
+//VMOVDQU32   (CX), X2
+//VPXORD      X1, X2, X0
+//
+//VMOVDQU32   X0, (AX)
+//
+//RET
 
 //TEXT ·fillCounterX(SB), NOSPLIT, $40-24
 //MOVQ src+8(FP), DI
@@ -347,10 +358,82 @@ func openAsm(roundKeys *uint32, tagSize int,dst []byte, nonce []byte, ciphertext
 //done:
 //RET
 
+//TEXT ·xor32(SB),NOSPLIT,$0-24
+//
+//MOVQ    dst+0(FP), AX
+//MOVQ    src1+8(FP), BX
+//MOVQ    src2+16(FP), CX
+//
+//VMOVDQU32   (BX), Y1
+//VMOVDQU32   (CX), Y2
+//VPXORD      Y1, Y2, Y0
+//
+//VMOVDQU32   Y0, (AX)
+//
+//RET
 
 
+////func xor64(dst *byte, src1 *byte, src2 *byte)
+//TEXT ·xor64(SB),NOSPLIT,$0-24
+//
+//MOVQ    dst+0(FP), AX
+//MOVQ    src1+8(FP), BX
+//MOVQ    src2+16(FP), CX
+//
+//VMOVDQU32   (BX), Z1
+//VMOVDQU32   (CX), Z2
+//VPXORD      Z1, Z2, Z0
+//
+//VMOVDQU32   Z0, (AX)
+//
+//RET
 
+//TEXT ·xor128(SB),NOSPLIT,$0-24
+//
+//MOVQ    dst+0(FP), AX
+//MOVQ    src1+8(FP), BX
+//MOVQ    src2+16(FP), CX
+//
+//VMOVDQU32   (BX), Z1
+//VMOVDQU32   64(BX), Z4
+//
+//VMOVDQU32   (CX), Z2
+//VMOVDQU32   64(CX), Z5
+//
+//VPXORD      Z1, Z2, Z0
+//VPXORD      Z4, Z5, Z3
+//
+//VMOVDQU32   Z0, (AX)
+//VMOVDQU32   Z3, 64(AX)
+//
+//RET
 
-
-
+////func xor256(dst *byte, src1 *byte, src2 *byte)
+//TEXT ·xor256(SB),NOSPLIT,$0-24
+//
+//MOVQ    dst+0(FP), AX
+//MOVQ    src1+8(FP), BX
+//MOVQ    src2+16(FP), CX
+//
+//VMOVDQU32   (BX), Z1
+//VMOVDQU32   64(BX), Z4
+//VMOVDQU32   128(BX), Z7
+//VMOVDQU32   192(BX), Z10
+//
+//VMOVDQU32   (CX), Z2
+//VMOVDQU32   64(CX), Z5
+//VMOVDQU32   128(CX), Z8
+//VMOVDQU32   192(CX), Z11
+//
+//VPXORD      Z1, Z2, Z0
+//VPXORD      Z4, Z5, Z3
+//VPXORD      Z7, Z8, Z6
+//VPXORD      Z10, Z11, Z9
+//
+//VMOVDQU32   Z0, (AX)
+//VMOVDQU32   Z3, 64(AX)
+//VMOVDQU32   Z6, 128(AX)
+//VMOVDQU32   Z9, 192(AX)
+//
+//RET
 
