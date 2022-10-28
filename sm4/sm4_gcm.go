@@ -224,10 +224,128 @@ func constantTimeCompareAsm(x *byte, y *byte, l int) int32
 func openAsm(roundKeys *uint32, tagSize int,dst []byte, nonce []byte, ciphertext []byte, additionalData []byte, temp *byte) ([]byte, int32)
 
 
+////func putUint32(b *byte, v uint32)    --- used registers: DI, SI
+//TEXT ·putUint32(SB),NOSPLIT,$0-16
+//MOVQ b+0(FP), DI
+//MOVL v+8(FP), SI
+//MOVB SIB, 3(DI)
+//SHRL $8, SI
+//MOVB SIB, 2(DI)
+//SHRL $8, SI
+//MOVB SIB, 1(DI)
+//SHRL $8, SI
+//MOVB SIB, (DI)
+//RET
+//
+////func putUint64(b *byte, v uint64)  --- used registers: SI, DI   why not SHRQ? this need test later
+//TEXT ·putUint64(SB),NOSPLIT,$0-16
+//MOVQ b+0(FP), DI
+//MOVQ v+8(FP), SI
+//MOVB SIB, 7(DI)
+//SHRL $8, SI
+//MOVB SIB, 6(DI)
+//SHRL $8, SI
+//MOVB SIB, 5(DI)
+//SHRL $8, SI
+//MOVB SIB, 4(DI)
+//SHRL $8, SI
+//MOVB SIB, 3(DI)
+//SHRL $8, SI
+//MOVB SIB, 2(DI)
+//SHRL $8, SI
+//MOVB SIB, 1(DI)
+//SHRL $8, SI
+//MOVB SIB, (DI)
+//RET
+//
+////func makeUint32(b *byte) uint32  --- used registers: DI, SI
+//TEXT ·makeUint32(SB),NOSPLIT,$0-16
+//MOVQ b+0(FP), DI
+//MOVB (DI), SIB
+//SHLL $8, SI
+//MOVB 1(DI), SIB
+//SHLL $8, SI
+//MOVB 2(DI), SIB
+//SHLL $8, SI
+//MOVB 3(DI), SIB
+//MOVL SI, ret+8(FP)
+//RET
+//
+////func fillSingleBlockAsm(dst *byte, src *byte, count uint32)  --- used registers: DI, SI,AX
+//TEXT ·fillSingleBlockAsm(SB),NOSPLIT,$16-24
+//MOVQ dst+0(FP), DI
+//MOVQ src+8(FP), SI
+//
+//MOVQ DI, 0(SP)
+//MOVQ SI, 0x8(SP)
+//CALL ·copy12(SB)
+//
+//MOVQ 0(SP), DI
+//MOVQ 0x8(SP), SI
+//ADDQ $12, DI
+//MOVQ DI, 0(SP)
+//MOVL count+16(FP), AX
+//MOVL AX, 0x8(SP)
+//CALL ·putUint32(SB)
+//RET
+
+////func makeCounter(dst *byte, src *byte) --- used registers: DI, SI, AX
+//TEXT ·makeCounter(SB),NOSPLIT,$0-16
+//
+//MOVQ   dst+0(FP), DI
+//MOVQ   src+8(FP), SI
+//MOVQ   0(SI),     AX
+//MOVQ   AX,        0(DI)
+//MOVL   8(SI),     AX
+//MOVL   AX,         8(DI)
+//MOVB   $1,        15(DI)
+//RET
+//
+////func copy12(dst *byte, src *byte)     --- used registers: DI, SI, AX
+//TEXT ·copy12(SB),NOSPLIT,$0-16
+//MOVQ   dst+0(FP), DI
+//MOVQ   src+8(FP), SI
+//MOVQ   0(SI),     AX
+//MOVQ   AX,        0(DI)
+//MOVL   8(SI),     AX
+//MOVL   AX,        8(DI)
+//RET
+
+////func copy12(dst *byte, src *byte)     --- used registers: DI, SI, AX
+//TEXT ·copy12(SB),NOSPLIT,$0-16
+//MOVQ   dst+0(FP), DI
+//MOVQ   src+8(FP), SI
+//MOVQ   0(SI),     AX
+//MOVQ   AX,        0(DI)
+//MOVL   8(SI),     AX
+//MOVL   AX,        8(DI)
+//RET
 
 
 
 
+//TEXT ·fillCounterX(SB), NOSPLIT, $40-24
+//MOVQ src+8(FP), DI
+//ADDQ $12, DI
+//makeUint32(DI,SI)
+//SUBQ $12, DI
+//MOVL count+16(FP), AX
+//ADDL SI, AX
+//ADDL $1, AX
+//MOVL blockNum+20(FP), BX
+//MOVQ dst+0(FP), CX
+//INCL BX
+//
+//start:
+//DECL BX
+//JZ done
+//fillSingleBlockAsm(CX, DI, AX, DX)
+////ADDQ $16, CX
+//ADDL $1, AX
+//JMP start
+//
+//done:
+//RET
 
 
 

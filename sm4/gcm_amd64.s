@@ -452,28 +452,22 @@ TEXT ·xor16(SB),NOSPLIT,$0-24
     VMOVDQU32   X0, (AX)
 
     RET
+    
 
 //func makeCounter(dst *byte, src *byte) --- used registers: DI, SI, AX
-TEXT ·makeCounter(SB),NOSPLIT,$0-16
-
-    MOVQ   dst+0(FP), DI
-    MOVQ   src+8(FP), SI
-    MOVQ   0(SI),     AX
-    MOVQ   AX,        0(DI)
-    MOVL   8(SI),     AX
-    MOVL   AX,         8(DI)
-    MOVB   $1,        15(DI)
-    RET
+#define makeCounter(dst, src, temp) \
+    MOVQ   0(src),     temp    \
+    MOVQ   temp,        0(dst) \
+    MOVL   8(src),     temp    \
+    MOVL   temp,         8(dst) \
+    MOVB   $1,        15(dst)   \
 
 //func copy12(dst *byte, src *byte)     --- used registers: DI, SI, AX
-TEXT ·copy12(SB),NOSPLIT,$0-16
-    MOVQ   dst+0(FP), DI
-    MOVQ   src+8(FP), SI
-    MOVQ   0(SI),     AX
-    MOVQ   AX,        0(DI)
-    MOVL   8(SI),     AX
-    MOVL   AX,        8(DI)
-    RET
+#define copy12(dst, src, temp)  \
+    MOVQ   0(src),     temp \
+    MOVQ   temp,        0(dst) \
+    MOVL   8(src),     temp  \
+    MOVL   temp,        8(dst)  \
 
 //func copy(dst *byte, src *byte, len int)  ---used registers: DI, SI, AX, BX,
 TEXT ·copyAsm(SB),NOSPLIT,$0-24
@@ -518,82 +512,78 @@ copyB:
     JMP copyB
 done:
     RET
-
-
+    
 //func putUint32(b *byte, v uint32)    --- used registers: DI, SI
-TEXT ·putUint32(SB),NOSPLIT,$0-16
-    MOVQ b+0(FP), DI
-    MOVL v+8(FP), SI
-    MOVB SIB, 3(DI)
-    SHRL $8, SI
-    MOVB SIB, 2(DI)
-    SHRL $8, SI
-    MOVB SIB, 1(DI)
-    SHRL $8, SI
-    MOVB SIB, (DI)
-    RET
+#define putUint32(b,v) \
+    MOVB v, 3(b)  \
+    SHRL $8, v    \
+    MOVB v, 2(b)  \
+    SHRL $8, v    \
+    MOVB v, 1(b)  \
+    SHRL $8, v    \
+    MOVB v, (b)   \
 
 //func putUint64(b *byte, v uint64)  --- used registers: SI, DI   why not SHRQ? this need test later
-TEXT ·putUint64(SB),NOSPLIT,$0-16
-    MOVQ b+0(FP), DI
-    MOVQ v+8(FP), SI
-    MOVB SIB, 7(DI)
-    SHRL $8, SI
-    MOVB SIB, 6(DI)
-    SHRL $8, SI
-    MOVB SIB, 5(DI)
-    SHRL $8, SI
-    MOVB SIB, 4(DI)
-    SHRL $8, SI
-    MOVB SIB, 3(DI)
-    SHRL $8, SI
-    MOVB SIB, 2(DI)
-    SHRL $8, SI
-    MOVB SIB, 1(DI)
-    SHRL $8, SI
-    MOVB SIB, (DI)
-    RET
+#define putUint64(b,v) \
+    MOVB v, 7(b)  \
+    SHRL $8, v    \
+    MOVB v, 6(b)  \
+    SHRL $8, v    \
+    MOVB v, 5(b)  \
+    SHRL $8, v    \
+    MOVB v, 4(b)  \
+    SHRL $8, v    \
+    MOVB v, 3(b)  \
+    SHRL $8, v    \
+    MOVB v, 2(b)  \
+    SHRL $8, v    \
+    MOVB v, 1(b)  \
+    SHRL $8, v    \
+    MOVB v, (b)   \
 
 //func makeUint32(b *byte) uint32  --- used registers: DI, SI
-TEXT ·makeUint32(SB),NOSPLIT,$0-16
-    MOVQ b+0(FP), DI
-    MOVB (DI), SIB
-    SHLL $8, SI
-    MOVB 1(DI), SIB
-    SHLL $8, SI
-    MOVB 2(DI), SIB
-    SHLL $8, SI
-    MOVB 3(DI), SIB
-    MOVL SI, ret+8(FP)
-    RET
+#define makeUint32(b,v) \
+    MOVB (b), v  \
+    SHLL $8, v   \
+    MOVB 1(b), v \
+    SHLL $8, v   \
+    MOVB 2(b), v \
+    SHLL $8, v   \
+    MOVB 3(b), v \
 
 //func fillSingleBlockAsm(dst *byte, src *byte, count uint32)  --- used registers: DI, SI,AX
-TEXT ·fillSingleBlockAsm(SB),NOSPLIT,$16-24
-    MOVQ dst+0(FP), DI
-    MOVQ src+8(FP), SI
+#define fillSingleBlockAsm(dst, src, count, temp) \
+    copy12(dst, src, temp) \
+    ADDQ $12, dst          \
+    MOVQ count, temp       \
+    putUint32(dst, temp)  \
+    ADDQ $4, dst          \
 
-    MOVQ DI, 0(SP)
-    MOVQ SI, 0x8(SP)
-    CALL ·copy12(SB)
 
-    MOVQ 0(SP), DI
-    MOVQ 0x8(SP), SI
-    ADDQ $12, DI
-    MOVQ DI, 0(SP)
-    MOVL count+16(FP), AX
-    MOVL AX, 0x8(SP)
-    CALL ·putUint32(SB)
-    RET
+#define fillCounterX1(dst, src, count, blockNum, temp1, temp2) \
+    ADDQ $12, src         \
+    makeUint32(src,temp1)  \
+    SUBQ $12, src         \
+    ADDL count, temp1     \
+    ADDL $1, temp1        \
+    INCL blockNum         \
+start: DECL blockNum      \
+    JZ fillEnd            \
+    fillSingleBlockAsm(dst, src, temp1, temp2) \
+    ADDL $1, temp1 \
+    JMP start \
+fillEnd: ADDL blockNum, count \
 
 //func fillCounterX(dst *byte, src *byte, count uint32, blockNum uint32)    --- used registers: DI, SI, AX, BX, CX
 TEXT ·fillCounterX(SB), NOSPLIT, $40-24
     MOVQ src+8(FP), DI
     ADDQ $12, DI
-    MOVQ DI, 0(SP)
-    CALL ·makeUint32(SB)
-    MOVQ 0(SP), DI
+//MOVQ DI, 0(SP)
+    makeUint32(DI, SI)
+//CALL ·makeUint32(SB)
+//MOVQ 0(SP), DI
     SUBQ $12, DI
-    MOVQ 0x8(SP), SI
+//MOVQ 0x8(SP), SI
     MOVL count+16(FP), AX
     ADDL SI, AX
     ADDL $1, AX
@@ -604,19 +594,21 @@ TEXT ·fillCounterX(SB), NOSPLIT, $40-24
 start:
     DECL BX
     JZ done
-    MOVQ CX, 0(SP)
-    MOVQ DI, 8(SP)
-    MOVL AX, 16(SP)
-    CALL ·fillSingleBlockAsm(SB)
-    MOVQ 0(SP), CX
-    MOVQ 8(SP), DI
-    MOVL 16(SP), AX
-    ADDQ $16, CX
+    //MOVQ CX, 0(SP)
+    //MOVQ DI, 8(SP)
+    //MOVL AX, 16(SP)
+    fillSingleBlockAsm(CX, DI, AX, DX)
+    //CALL ·fillSingleBlockAsm(SB)
+    //MOVQ 0(SP), CX
+    //MOVQ 8(SP), DI
+    //MOVL 16(SP), AX
+    //ADDQ $16, CX
     ADDL $1, AX
     JMP start
 
 done:
-    RET
+RET
+
 
 TEXT ·xorAsm(SB),NOSPLIT,$0-16
     MOVQ src1+0(FP), AX
@@ -849,13 +841,15 @@ TEXT ·gHashFinishAsm(SB),NOSPLIT,$32-40
     MOVQ plainLen+32(FP), CX
     SHLQ $3, BX
     SHLQ $3, CX
-    MOVQ AX, 0(SP)
-    MOVQ BX, 8(SP)
-    CALL ·putUint64(SB)
+    //MOVQ AX, 0(SP)
+    //MOVQ BX, 8(SP)
+    putUint64(AX,BX)
+    //CALL ·putUint64(SB)
     ADDQ $8, AX
-    MOVQ AX, 0(SP)
-    MOVQ CX, 8(SP)
-    CALL ·putUint64(SB)
+    //MOVQ AX, 0(SP)
+    //MOVQ CX, 8(SP)
+    putUint64(AX,CX)
+    //CALL ·putUint64(SB)
     SUBQ $8, AX
     MOVQ AX, 16(SP)
     MOVQ h+0(FP), AX
@@ -892,9 +886,10 @@ TEXT ·calculateFirstCounterAsm(SB),NOSPLIT,$48-48
     JMP done
 
 branch1:
-    MOVQ AX, 0(SP)
-    MOVQ DI, 8(SP)
-    CALL ·makeCounter(SB)
+    //MOVQ AX, 0(SP)
+    //MOVQ DI, 8(SP)
+    makeCounter(AX, DI, CX)
+    //CALL ·makeCounter(SB)
 
 done:
     RET
