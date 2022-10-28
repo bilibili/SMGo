@@ -189,6 +189,22 @@ GLOBL MERGE_H23<>(SB), (NOPTR+RODATA), $64
 #define Tmp R9
 #define BlockCount R15
 
+#define Enc AX
+#define Dst BX
+#define Nonce DX
+#define Plaintext DI
+#define Ciphertext DI
+#define AdditionalData SI
+#define H R10
+#define TMask R11
+#define J0 R12
+#define Tag R13
+#define TagSize CX
+#define RetLen R14
+#define RetCap DX
+#define Ret R15
+#define Res R15
+
 #define loadMasks() \
     MOVQ                $AND_MASK<>(SB), R8 \
     MOVQ                $LOWER_MASK<>(SB), R9 \
@@ -631,8 +647,6 @@ TEXT ·cryptoBlocksAsm(SB),NOSPLIT,$40-80
     MOVQ preCount+56(FP), PreCounter
     MOVQ count+64(FP), Counter
     MOVQ tmp+72(FP), Tmp
-    //clear zero for Tmp and Counter
-
 
     MOVL $0, BlockCount  //BlockCount
     
@@ -901,30 +915,10 @@ done:
     RET
 
 
-
-
-
-#define Enc AX
-#define Dst BX
-#define Nonce DX
-#define Plaintext DI
-#define Ciphertext DI
-#define AdditionalData SI
-#define H R10
-#define TMask R11
-#define J0 R12
-#define Tag R13
-#define TagSize CX
-#define RetLen R14
-#define RetCap DX
-#define Ret R15
-#define Res R15
-
-
 //func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte) []byte
 //temp:  H, TMask, J0, tag, counter, tmp, CNT-256, TMP-256
 //cryptoBlockAsm: 24, calculateFirstCounterAsm:48, ensureCapacityAsm:32  cryptoBlocksAsm:80  gHashUpdateAsm:48 gHashFinishAsm:40
-TEXT ·sealAsm(SB), NOSPLIT, $80-144
+TEXT ·sealAsm(SB), NOSPLIT, $80-144    //80->88
     //used registers: AX, R10 (not include the function used)
     MOVQ roundKeys+0(FP), Enc
     MOVQ h+112(FP), H
@@ -994,6 +988,7 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-144
     MOVQ plaintextLen+72(FP), Plaintext
     ADDQ Plaintext, Ret
     MOVQ Ret, 8(SP)
+
     MOVQ additionalData+88(FP), AdditionalData
     MOVQ AdditionalData, 16(SP)
     MOVQ additionalDataLen+96(FP), AdditionalData
@@ -1084,8 +1079,6 @@ done:
     ORB BX, CX
     SHRQ $8, BX
     ORB BX, CX
-    //DECL CX
-    //SHRL $31, CX
     MOVL CX, ret1+24(FP)
     RET
 
