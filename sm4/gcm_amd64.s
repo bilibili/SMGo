@@ -542,11 +542,11 @@ done:
     SUBQ $12, src             \
     ADDL count, temp1         \
     ADDL $1, temp1            \
-    fillSingleBlockAsm(dst, src, temp1, temp2) \
+    fill: fillSingleBlockAsm(dst, src, temp1, temp2) \
     ADDL $1, temp1  \
     SUBQ $1, blockNum \
     CMPQ blockNum, $0  \
-    JG -8(PC) \
+    JG fill \
     MOVQ temp3, dst \
 
 
@@ -625,13 +625,13 @@ loopX16:
 loopX8:
     CMPQ InLen, $128
     JL loopX4
-    //MOVQ Counter, 0(SP)
-    //MOVQ PreCounter, 8(SP)
-    //MOVL BlockCount, 16(SP)
-    //MOVL $8, 20(SP)
-    //CALL ·fillCounterX(SB)
-    MOVL $8, DI
-    fillCounterX1(Counter,PreCounter,BlockCount,DI, SI, AX,BX)
+    MOVQ Counter, 0(SP)
+    MOVQ PreCounter, 8(SP)
+    MOVL BlockCount, 16(SP)
+    MOVL $8, 20(SP)
+    CALL ·fillCounterX(SB)
+    //MOVL $8, DI
+    //fillCounterX1(Counter,PreCounter,BlockCount,DI, SI, AX,BX)
     MOVQ RoundKeys, 0(SP)
     MOVQ Tmp, 8(SP)
     MOVQ Counter, 16(SP)
