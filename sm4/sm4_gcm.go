@@ -100,7 +100,7 @@ func (g *sm4GcmAsm) calculateFirstCounter(nonce []byte, counter []byte, H []byte
 
 
 func ensureCapacity(array []byte, asked int) (head []byte) {
-	res := needExpandAsm(array, asked)
+	res := needExpand(array, asked)
 	arrayLen := len(array)
 	if res == 0{
 		head = array
@@ -212,7 +212,7 @@ func gHashFinishAsm(H *byte, tag *byte, tmp *byte, aadLen uint64, plainLen uint6
 func copyAsm(dst *byte, src *byte, len int)
 
 //go:noescape
-func needExpandAsm(array []byte, asked int) int
+func needExpand(array []byte, asked int) int
 
 //go:noescape
 func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte) []byte
@@ -436,4 +436,73 @@ func openAsm(roundKeys *uint32, tagSize int,dst []byte, nonce []byte, ciphertext
 //VMOVDQU32   Z9, 192(AX)
 //
 //RET
+
+//#define gHashBlocks(H, tag, data, count,temp1,temp2)  \
+//VMOVDQU32   (H), VxH     \
+//VMOVDQU32   (tag), VxTag \
+//loadMasks()              \
+//MOVQ	            $GCM_POLY<>(SB), temp1   \
+//VBROADCASTI32X2     (temp1), VzReduce        \
+//reverseBits(VxH, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)   \
+//reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)  \
+//VPSRLDQ     $8, VxH, VxHs      \
+//VPXORD      VxH, VxHs, VxHs    \
+//CMPQ        count, $8           \
+//JL          loopBy1             \
+//MOVQ        $SHUFFLE_X_LANES<>(SB), temp1   \
+//VMOVDQU32   (temp1), VzIcount               \
+//MOVQ        $MERGE_H01<>(SB), temp1         \
+//MOVQ        $MERGE_H23<>(SB), temp2         \
+//VMOVDQU32   (temp1), VyIcountH01            \
+//VMOVDQU32   (temp2), VzIcountH23            \
+//MOVQ        $0b00001100, temp1              \
+//MOVQ        $0b11110000, temp2              \
+//KMOVW       temp1, MASK_Mov0_1              \
+//KMOVW       temp2, MASK_Mov01_23            \
+//mul(VxH, VxHs, VxH, VxLow, VxMid, VxHigh, T0x)  \
+//reduce(U1x, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x) \
+//mul(VxH, VxHs, U1x, VxLow, VxMid, VxHigh, T0x)  \
+//reduce(U2x, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x) \
+//mul(VxH, VxHs, U2x, VxLow, VxMid, VxHigh, T0x)   \
+//reduce(VxH4, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x) \
+//VPERMQ      U2y, VyIcountH01, MASK_Mov0_1, VyH4      \
+//VPERMQ      VyH, VyIcountH01, MASK_Mov0_1, U1y       \
+//VPERMQ      U1z, VzIcountH23, MASK_Mov01_23, VzH4    \
+//VPSRLDQ     $8, VzH4, VzH4s                          \
+//VPXORD      VzH4, VzH4s, VzH4s                       \
+//JMP loopBy4   \
+//
+//
+//loopBy4:
+//load4X()
+//VPXORD     VzTag, VzDat, VzDat
+//mul(VzH4, VzH4s, VzDat, VzLow, VzMid, VzHigh, T0z)
+//reduce(VzTag, VzReduce, VzLow, VzMid, VzHigh, T0z, T1z, T2z, T3z)
+//VPERMQ      $0b01001110, VzTag, T0z
+//VPXORD      VzTag, T0z, T0z
+//VPERMQ      T0z, VzIcount, T1z
+//VPXORD      T0x, T1x, VxTag
+//SUBQ        $4, count
+//CMPQ        count, $3
+//JG          loopBy4
+//CMPQ        count, $0
+//JE          blocksEnd
+//JMP loopBy1
+//
+//
+//loopBy1:
+//load1X()
+//VPXORD     VxTag, VxDat, VxDat
+//mul(VxH, VxHs, VxDat, VxLow, VxMid, VxHigh, T0x)
+//reduce(VxTag, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)
+//SUBQ        $1, count
+//CMPQ        count, $0
+//JG          loopBy1
+//JMP blocksEnd
+//
+//blocksEnd:
+//reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
+//VMOVDQU32   VxTag, (tag)
+//
+
 

@@ -180,14 +180,6 @@ GLOBL MERGE_H23<>(SB), (NOPTR+RODATA), $64
 #define DEBUG        X31
 #define DEBUGz       Z31
 
-#define RoundKeys R10
-#define Out R14
-#define In R13
-#define InLen R12
-#define PreCounter R11
-#define Counter R8
-#define Tmp R9
-#define BlockCount R15
 
 #define Enc AX
 #define Dst BX
@@ -263,101 +255,101 @@ GLOBL MERGE_H23<>(SB), (NOPTR+RODATA), $64
     reverseBits(VxDat, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
 
 //func gHashBlocks(H *byte, tag *byte, data *byte, count int)
+//func gHashBlocks(H *byte, tag *byte, data *byte, count int)
 TEXT ·gHashBlocks(SB),NOSPLIT,$0-32
 
 	MOVQ	    h+0(FP), AX
 	MOVQ	    tag+8(FP), BX
 	MOVQ	    data+16(FP), CX
-    MOVQ        count+24(FP), DX
+	MOVQ        count+24(FP), DX
 
-    // carefully hide the latency
-    VMOVDQU32   (AX), VxH // latency 7, CPI 0.5
-    VMOVDQU32   (BX), VxTag // higher lanes will be cleared automatically
+	// carefully hide the latency
+	VMOVDQU32   (AX), VxH // latency 7, CPI 0.5
+	VMOVDQU32   (BX), VxTag // higher lanes will be cleared automatically
 
-    loadMasks()
+	loadMasks()
 
 	MOVQ	            $GCM_POLY<>(SB), R8
 	VBROADCASTI32X2     (R8), VzReduce // latency 3, CPI 1
 
-    reverseBits(VxH, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
-    reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
+	reverseBits(VxH, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
+	reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
 
-    VPSRLDQ     $8, VxH, VxHs
-    VPXORD      VxH, VxHs, VxHs //h^l in lower Hs
+	VPSRLDQ     $8, VxH, VxHs
+	VPXORD      VxH, VxHs, VxHs //h^l in lower Hs
 
-    CMPQ        DX, $8 // this could be fine tuned based on benchmark results
-    JL          loopBy1
+	CMPQ        DX, $8 // this could be fine tuned based on benchmark results
+	JL          loopBy1
 
-    // precompute H^2, H^3 & H^4
-    MOVQ        $SHUFFLE_X_LANES<>(SB), R8
-    VMOVDQU32   (R8), VzIdx
+	// precompute H^2, H^3 & H^4
+	MOVQ        $SHUFFLE_X_LANES<>(SB), R8
+	VMOVDQU32   (R8), VzIdx
 
-    MOVQ        $MERGE_H01<>(SB), R8
-    MOVQ        $MERGE_H23<>(SB), R9
-    VMOVDQU32   (R8), VyIdxH01
-    VMOVDQU32   (R9), VzIdxH23
+	MOVQ        $MERGE_H01<>(SB), R8
+	MOVQ        $MERGE_H23<>(SB), R9
+	VMOVDQU32   (R8), VyIdxH01
+	VMOVDQU32   (R9), VzIdxH23
 
-    MOVQ        $0b00001100, R8
-    MOVQ        $0b11110000, R9
-    KMOVW       R8, MASK_Mov0_1
-    KMOVW       R9, MASK_Mov01_23
+	MOVQ        $0b00001100, R8
+	MOVQ        $0b11110000, R9
+	KMOVW       R8, MASK_Mov0_1
+	KMOVW       R9, MASK_Mov01_23
 
-    mul(VxH, VxHs, VxH, VxLow, VxMid, VxHigh, T0x)
-    reduce(U1x, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)
+	mul(VxH, VxHs, VxH, VxLow, VxMid, VxHigh, T0x)
+	reduce(U1x, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)
 
-    mul(VxH, VxHs, U1x, VxLow, VxMid, VxHigh, T0x)
-    reduce(U2x, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)
+	mul(VxH, VxHs, U1x, VxLow, VxMid, VxHigh, T0x)
+	reduce(U2x, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)
 
-    mul(VxH, VxHs, U2x, VxLow, VxMid, VxHigh, T0x)
-    reduce(VxH4, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)
+	mul(VxH, VxHs, U2x, VxLow, VxMid, VxHigh, T0x)
+	reduce(VxH4, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)
 
-    // we have H^4 : : :  , we should obtain H^4 : H^3 (U2x) : H^2 (U1x) : H (VxH)
-    VPERMQ      U2y, VyIdxH01, MASK_Mov0_1, VyH4
-    VPERMQ      VyH, VyIdxH01, MASK_Mov0_1, U1y
-    VPERMQ      U1z, VzIdxH23, MASK_Mov01_23, VzH4
+	// we have H^4 : : :  , we should obtain H^4 : H^3 (U2x) : H^2 (U1x) : H (VxH)
+	VPERMQ      U2y, VyIdxH01, MASK_Mov0_1, VyH4
+	VPERMQ      VyH, VyIdxH01, MASK_Mov0_1, U1y
+	VPERMQ      U1z, VzIdxH23, MASK_Mov01_23, VzH4
 
-    VPSRLDQ     $8, VzH4, VzH4s
-    VPXORD      VzH4, VzH4s, VzH4s //h^l in lower Hs
+	VPSRLDQ     $8, VzH4, VzH4s
+	VPXORD      VzH4, VzH4s, VzH4s //h^l in lower Hs
 
-loopBy4:
-    load4X()
-    VPXORD     VzTag, VzDat, VzDat
-    mul(VzH4, VzH4s, VzDat, VzLow, VzMid, VzHigh, T0z)
-    reduce(VzTag, VzReduce, VzLow, VzMid, VzHigh, T0z, T1z, T2z, T3z)
+	loopBy4:
+	load4X()
+	VPXORD     VzTag, VzDat, VzDat
+	mul(VzH4, VzH4s, VzDat, VzLow, VzMid, VzHigh, T0z)
+	reduce(VzTag, VzReduce, VzLow, VzMid, VzHigh, T0z, T1z, T2z, T3z)
 
-    // xor 4 parts together
-    // total latency is 8
-    VPERMQ      $0b01001110, VzTag, T0z // begin with 0:1:2:3, then exchange 0 vs 1, 2 vs 3 of the 4 128 bit lanes. latency 3, CPI 1
-    VPXORD      VzTag, T0z, T0z // we have T0z: 0^1 : 0^1 : 2^3 : 2^3
-    VPERMQ      T0z, VzIdx, T1z // we have T1z: 2^3 : 0^1 : 2^3 : 2^3
-    VPXORD      T0x, T1x, VxTag // VzTag: 0^1^2^3 : 0: 0: 0 (the higher lanes are cleared automatically - X version has lower CPI)
+	// xor 4 parts together
+	// total latency is 8
+	VPERMQ      $0b01001110, VzTag, T0z // begin with 0:1:2:3, then exchange 0 vs 1, 2 vs 3 of the 4 128 bit lanes. latency 3, CPI 1
+	VPXORD      VzTag, T0z, T0z // we have T0z: 0^1 : 0^1 : 2^3 : 2^3
+	VPERMQ      T0z, VzIdx, T1z // we have T1z: 2^3 : 0^1 : 2^3 : 2^3
+	VPXORD      T0x, T1x, VxTag // VzTag: 0^1^2^3 : 0: 0: 0 (the higher lanes are cleared automatically - X version has lower CPI)
 
-    SUBQ        $4, DX
-    CMPQ        DX, $3
-    JG          loopBy4
+	SUBQ        $4, DX
+	CMPQ        DX, $3
+	JG          loopBy4
 
-    CMPQ        DX, $0
-    JE          blocksEnd
+	CMPQ        DX, $0
+	JE          blocksEnd
 
-loopBy1:
-    load1X()
+	loopBy1:
+	load1X()
 
-    VPXORD     VxTag, VxDat, VxDat
-    mul(VxH, VxHs, VxDat, VxLow, VxMid, VxHigh, T0x)
-    reduce(VxTag, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)
+	VPXORD     VxTag, VxDat, VxDat
+	mul(VxH, VxHs, VxDat, VxLow, VxMid, VxHigh, T0x)
+	reduce(VxTag, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)
 
-    SUBQ        $1, DX
-    CMPQ        DX, $0
-    JG          loopBy1
+	SUBQ        $1, DX
+	CMPQ        DX, $0
+	JG          loopBy1
 
-blocksEnd:
-    reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
-    VMOVDQU32   VxTag, (BX)
+	blocksEnd:
+	reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
+	VMOVDQU32   VxTag, (BX)
 
-//reverseBits(DEBUGz, VzAndMask, VzHigherMask, VzLowerMask, T1z, T2z)
-//VMOVDQU32   DEBUGz, (BX)
-    RET
-
+	//reverseBits(DEBUGz, VzAndMask, VzHigherMask, VzLowerMask, T1z, T2z)
+	//VMOVDQU32   DEBUGz, (BX)
+	RET
 
 
 #define xor256(dst, src1, src2)    \
@@ -520,31 +512,12 @@ done:
     putUint32(dst, temp)  \
     ADDQ $4, dst          \
 
-
-#define fillCounterX1(dst, src, count, blockNum, temp1, temp2) \
-    ADDQ $12, src         \
-    makeUint32(src,temp1)  \
-    SUBQ $12, src         \
-    ADDL count, temp1     \
-    ADDL $1, temp1        \
-    INCL blockNum         \
-start: DECL blockNum      \
-    JZ fillEnd            \
-    fillSingleBlockAsm(dst, src, temp1, temp2) \
-    ADDL $1, temp1 \
-    JMP start \
-fillEnd: ADDL blockNum, count \
-
 //func fillCounterX(dst *byte, src *byte, count uint32, blockNum uint32)    --- used registers: DI, SI, AX, BX, CX
 TEXT ·fillCounterX(SB), NOSPLIT, $40-24
     MOVQ src+8(FP), DI
     ADDQ $12, DI
-//MOVQ DI, 0(SP)
     makeUint32(DI, SI)
-//CALL ·makeUint32(SB)
-//MOVQ 0(SP), DI
     SUBQ $12, DI
-//MOVQ 0x8(SP), SI
     MOVL count+16(FP), AX
     ADDL SI, AX
     ADDL $1, AX
@@ -555,20 +528,28 @@ TEXT ·fillCounterX(SB), NOSPLIT, $40-24
 start:
     DECL BX
     JZ done
-    //MOVQ CX, 0(SP)
-    //MOVQ DI, 8(SP)
-    //MOVL AX, 16(SP)
     fillSingleBlockAsm(CX, DI, AX, DX)
-    //CALL ·fillSingleBlockAsm(SB)
-    //MOVQ 0(SP), CX
-    //MOVQ 8(SP), DI
-    //MOVL 16(SP), AX
-    //ADDQ $16, CX
     ADDL $1, AX
     JMP start
 
 done:
-RET
+    RET
+
+#define fillCounterX1(dst,src,count,blockNum, temp1, temp2,temp3) \
+    MOVQ dst, temp3           \
+    ADDQ $12, src             \
+    makeUint32(src, temp1)    \
+    SUBQ $12, src             \
+    ADDL count, temp1         \
+    ADDL $1, temp1            \
+    fillSingleBlockAsm(dst, src, temp1, temp2) \
+    ADDL $1, temp1  \
+    SUBQ $1, blockNum \
+    CMPQ blockNum, $0  \
+    JG -8(PC) \
+    MOVQ temp3, dst \
+
+
 
 
 TEXT ·xorAsm(SB),NOSPLIT,$0-16
@@ -591,8 +572,17 @@ loop:
 done:
     RET
 
+
+#define RoundKeys R10
+#define Out R14
+#define In R13
+#define InLen R12
+#define PreCounter R11
+#define Counter R8
+#define Tmp R9
+#define BlockCount R15
 //cryptoBlocksAsm(roundKeys *uint32, out []byte, in []byte, preCounter *byte, counter *byte, tmp *byte) --- used registers: R8-R15, SI,DI,AX-DX  something happend between uint and int,need check again
-TEXT ·cryptoBlocksAsm(SB),NOSPLIT,$40-80
+TEXT ·cryptoBlocksAsm(SB),NOSPLIT,$56-80
     MOVQ roundKeys+0(FP), RoundKeys
     MOVQ out+8(FP), Out
     MOVQ in+32(FP), In
@@ -606,11 +596,14 @@ TEXT ·cryptoBlocksAsm(SB),NOSPLIT,$40-80
 loopX16:
     CMPQ InLen, $256
     JL loopX8
-    MOVQ Counter, 0(SP)
-    MOVQ PreCounter, 8(SP)
-    MOVL BlockCount, 16(SP)
-    MOVL $16, 20(SP)
-    CALL ·fillCounterX(SB)
+    //MOVQ Counter, 0(SP)
+    //MOVQ PreCounter, 8(SP)
+    //MOVL BlockCount, 16(SP)
+    //MOVL $16, 20(SP)
+    //CALL ·fillCounterX(SB)
+    MOVL $16, DI
+    //fillCounterX1(dst,src,count,blockNum, temp1, temp2,temp3)
+    fillCounterX1(Counter,PreCounter,BlockCount,DI, SI, AX,BX)
     MOVQ RoundKeys, 0(SP)
     MOVQ Tmp, 8(SP)
     MOVQ Counter, 16(SP)
@@ -632,11 +625,13 @@ loopX16:
 loopX8:
     CMPQ InLen, $128
     JL loopX4
-    MOVQ Counter, 0(SP)
-    MOVQ PreCounter, 8(SP)
-    MOVL BlockCount, 16(SP)
-    MOVL $8, 20(SP)
-    CALL ·fillCounterX(SB)
+    //MOVQ Counter, 0(SP)
+    //MOVQ PreCounter, 8(SP)
+    //MOVL BlockCount, 16(SP)
+    //MOVL $8, 20(SP)
+    //CALL ·fillCounterX(SB)
+    MOVL $8, DI
+    fillCounterX1(Counter,PreCounter,BlockCount,DI, SI, AX,BX)
     MOVQ RoundKeys, 0(SP)
     MOVQ Tmp, 8(SP)
     MOVQ Counter, 16(SP)
@@ -776,6 +771,7 @@ TEXT ·gHashUpdateAsm(SB),NOSPLIT,$32-48
     SHRQ $4, BX
     MOVQ BX, 24(SP)
     CALL ·gHashBlocks(SB)
+    //gHashBlocks(DI, SI, AX, BX,R8,R9)
     MOVQ 16(SP), AX
 last:
     CMPQ R13, $0
@@ -796,7 +792,9 @@ last:
     MOVQ R14, 8(SP)
     MOVQ CX, 16(SP)
     MOVQ $1, 24(SP)
+    //MOVQ $1, R13
     CALL ·gHashBlocks(SB)
+    //gHashBlocks(R15, R14, CX, R13,R8,R9)
 done:
     RET
 
@@ -818,12 +816,14 @@ TEXT ·gHashFinishAsm(SB),NOSPLIT,$32-40
     //CALL ·putUint64(SB)
     SUBQ $8, AX
     MOVQ AX, 16(SP)
-    MOVQ h+0(FP), AX
-    MOVQ AX, 0(SP)
-    MOVQ tag+8(FP), AX
-    MOVQ AX, 8(SP)
+    MOVQ h+0(FP), BX
+    MOVQ BX, 0(SP)
+    MOVQ tag+8(FP), CX
+    MOVQ CX, 8(SP)
     MOVQ $1, 24(SP)
+    //MOVQ $1, R15
     CALL ·gHashBlocks(SB)
+    //gHashBlocks(BX, CX, AX, R15,R8,R9)
     RET
 
 //func calculateFirstCounterAsm(nonce []byte, counter *byte, H *byte, tmp *byte)
@@ -860,20 +860,25 @@ branch1:
 done:
     RET
 
-TEXT ·needExpandAsm(SB), $0-40
-    MOVQ array+0(FP), DI
-    MOVQ arrayLen+8(FP), SI
-    MOVQ arrayCap+16(FP), AX
-    MOVQ asked+24(FP), BX
-    SUBQ SI, AX
-    CMPQ AX, BX
-    JGE keepBranch
-    MOVQ $1, ret1+32(FP)
-    JMP done
-keepBranch:
-    MOVQ $0, ret1+32(FP)
-done:
-    RET
+#define needExpandAsm(arrayLen, arrayCap, asked, res, temp1, temp2) \
+    MOVQ arrayCap, temp1     \
+    SUBQ arrayLen, temp1     \
+    MOVQ $0, temp2           \
+    CMPQ temp1, asked         \
+    JGE 2(PC)                \
+    MOVQ $1, temp2           \
+    MOVQ temp2, res          \
+
+TEXT ·needExpand(SB), $0-40
+	MOVQ array+0(FP), DI
+	MOVQ arrayLen+8(FP), SI
+	MOVQ arrayCap+16(FP), AX
+	MOVQ asked+24(FP), BX
+	needExpandAsm(SI, AX, BX, CX, R8, R9)
+	MOVQ CX, ret1+32(FP)
+	RET
+
+
 
 
 //func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte) []byte
