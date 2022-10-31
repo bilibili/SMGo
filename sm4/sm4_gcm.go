@@ -130,25 +130,25 @@ func (g *sm4GcmAsm) cryptoBlocks(roundKeys []uint32, out, in, preCounter []byte)
 	cryptoBlocksAsm(&roundKeys[0], out, in, &preCounter[0], &counter[0], &tmp[0])
 }
 
-func fillCounter256(dst, src []byte, count uint32) {
-	fillCounterX(&dst[0], &src[0], count, 16)
-}
-
-func fillCounter128(dst, src []byte, count uint32) {
-	fillCounterX(&dst[0], &src[0], count, 8)
-}
-
-func fillCounter64(dst, src []byte, count uint32) {
-	fillCounterX(&dst[0], &src[0], count, 4)
-}
-
-func fillCounter32(dst, src []byte, count uint32) {
-	fillCounterX(&dst[0], &src[0], count, 2)
-}
-
-func fillCounter16(dst, src []byte, count uint32) {
-	fillCounterX(&dst[0], &src[0], count, 1)
-}
+//func fillCounter256(dst, src []byte, count uint32) {
+//	fillCounterX(&dst[0], &src[0], count, 16)
+//}
+//
+//func fillCounter128(dst, src []byte, count uint32) {
+//	fillCounterX(&dst[0], &src[0], count, 8)
+//}
+//
+//func fillCounter64(dst, src []byte, count uint32) {
+//	fillCounterX(&dst[0], &src[0], count, 4)
+//}
+//
+//func fillCounter32(dst, src []byte, count uint32) {
+//	fillCounterX(&dst[0], &src[0], count, 2)
+//}
+//
+//func fillCounter16(dst, src []byte, count uint32) {
+//	fillCounterX(&dst[0], &src[0], count, 1)
+//}
 
 func fillSingleBlock(dst, src []byte, count uint32) {
 	fillSingleBlockAsm(&dst[0],&src[0],count)
