@@ -177,6 +177,22 @@ GLOBL Shuffle<>(SB), (NOPTR+RODATA), $16
 #define Tmp R9
 #define BlockCount R15
 
+#define Enc R14    //AX
+#define Dst BX
+#define Nonce DX
+#define Plaintext DI
+#define Ciphertext DI
+#define AdditionalData SI
+#define H R10
+#define TMask R11
+#define J0 R12
+#define Tag R13
+#define TagSize CX
+#define RetCap DX
+#define Ret R15
+#define Res R15
+
+
 #define xor256(dst, src1, src2)    \
     VMOVDQU32   (src1), Z1         \
     VMOVDQU32   64(src1), Z4       \
@@ -372,26 +388,20 @@ done:
     ADDQ $4, dst          \
 
 //func fillCounterX(dst *byte, src *byte, count uint32, blockNum uint32)    --- used registers: DI, SI, AX, BX, CX
-TEXT ·fillCounterX(SB), NOSPLIT, $40-24
-    MOVQ src+8(FP), DI
-    ADDQ $12, DI
-    makeUint32(DI, SI)
-    SUBQ $12, DI
-    MOVL count+16(FP), AX
-    ADDL SI, AX
-    ADDL $1, AX
-    MOVL blockNum+20(FP), BX
-    MOVQ dst+0(FP), CX
-    INCL BX
-    start:
-    DECL BX
-    JZ done
-    fillSingleBlockAsm(CX, DI, AX, DX)
-    ADDL $1, AX
-    JMP start
+#define fillCounterX(dst,src,count,blockNum, temp1, temp2,temp3) \
+    MOVQ dst, temp3           \
+    ADDQ $12, src             \
+    makeUint32(src, temp1)    \
+    SUBQ $12, src             \
+    ADDL count, temp1         \
+    ADDL $1, temp1            \
+    fill0: fillSingleBlockAsm(dst, src, temp1, temp2) \
+    ADDL $1, temp1  \
+    SUBQ $1, blockNum \
+    CMPQ blockNum, $0  \
+    JG fill0 \
+    MOVQ temp3, dst \
 
-    done:
-    RET
 
 #define fillCounterX16(dst,src,count,blockNum, temp1, temp2,temp3) \
     MOVQ dst, temp3           \
@@ -1188,16 +1198,7 @@ loopX16:
     JL loopX8
     MOVL $16, DI
     fillCounterX16(Counter,PreCounter,BlockCount,DI, SI, AX,BX)
-    //MOVQ RoundKeys, 0(SP)
-    //MOVQ Tmp, 8(SP)
-    //MOVQ Counter, 16(SP)
-    //CALL ·cryptoBlockAsmX16(SB)
-    //MOVQ 0(SP), RoundKeys
-    //MOVQ 8(SP), Tmp
-    //MOVQ 16(SP), Counter
-
     cryptoBlockAsmX16Macro(RoundKeys,Tmp,Counter)
-
     xor256(Out,Tmp,In)
     ADDQ $256, Out
     ADDQ $256, In
@@ -1209,34 +1210,18 @@ loopX8:
     JL loopX4
     MOVL $8, DI
     fillCounterX8(Counter,PreCounter,BlockCount,DI, SI, AX,BX)
-    //MOVQ RoundKeys, 0(SP)
-    //MOVQ Tmp, 8(SP)
-    //CALL ·cryptoBlockAsmX8(SB)
-    //MOVQ 0(SP), RoundKeys
-    //MOVQ 8(SP), Tmp
-    //MOVQ 16(SP), Counter
-
     cryptoBlockAsmX8Macro(RoundKeys, Tmp, Counter)
-
     xor128(Out,Tmp,In)
     ADDQ $128, Out
     ADDQ $128, In
     ADDQ $8, BlockCount
     SUBQ $128, InLen
     JMP loopX8
-
 loopX4:
     CMPQ InLen, $64
     JL loopX2
     MOVL $4, DI
     fillCounterX4(Counter,PreCounter,BlockCount,DI, SI, AX,BX)
-    //MOVQ RoundKeys, 0(SP)
-    //MOVQ Tmp, 8(SP)
-    //MOVQ Counter, 16(SP)
-    //CALL ·cryptoBlockAsmX4(SB)
-    //MOVQ 0(SP), RoundKeys
-    //MOVQ 8(SP), Tmp
-    //MOVQ 16(SP), Counter
     cryptoBlockAsmX4Macro(RoundKeys,Tmp,Counter)
     xor64(Out,Tmp,In)
     ADDQ $64, Out
@@ -1249,13 +1234,6 @@ loopX2:
     JL loopX1
     MOVL $2, DI
     fillCounterX2(Counter,PreCounter,BlockCount,DI, SI, AX,BX)
-    //MOVQ RoundKeys, 0(SP)
-    //MOVQ Tmp, 8(SP)
-    //MOVQ Counter, 16(SP)
-    //CALL ·cryptoBlockAsmX2(SB)
-    //MOVQ 0(SP), RoundKeys
-    //MOVQ 8(SP), Tmp
-    //MOVQ 16(SP), Counter
     cryptoBlockAsmX2Macro(RoundKeys, Tmp, Counter)
     xor32(Out,Tmp,In)
     ADDQ $32, Out
@@ -1268,13 +1246,6 @@ loopX1:
     JL loopX0
     MOVL $1, DI
     fillCounterX1(Counter,PreCounter,BlockCount,DI, SI, AX,BX)
-    //MOVQ RoundKeys, 0(SP)
-    //MOVQ Tmp, 8(SP)
-    //MOVQ Counter, 16(SP)
-    //CALL ·cryptoBlockAsm(SB)
-    //MOVQ 0(SP), RoundKeys
-    //MOVQ 8(SP), Tmp
-    //MOVQ 16(SP), Counter
     cryptoBlockAsmMacro(RoundKeys, Tmp, Counter)
     xor16(Out,Tmp,In)
     ADDQ $16, Out
@@ -1285,25 +1256,87 @@ loopX1:
 loopX0:
     CMPQ InLen, $0
     JLE done
-    MOVQ Counter, 0(SP)
-    MOVQ PreCounter, 8(SP)
-    MOVL BlockCount, 16(SP)
-    MOVL $1, 20(SP)
-    CALL ·fillCounterX(SB)
-    //MOVQ RoundKeys, 0(SP)
-    //MOVQ Tmp, 8(SP)
-    //MOVQ Counter, 16(SP)
-    //CALL ·cryptoBlockAsm(SB)
-    //MOVQ 0(SP), RoundKeys
-    //MOVQ 8(SP), Tmp
-    //MOVQ 16(SP), Counter
+    MOVL $1, DI
+    fillCounterX(Counter,PreCounter,BlockCount,DI, SI, AX,BX)
     cryptoBlockAsmMacro(RoundKeys, Tmp, Counter)
-
 final:
     xorAsm1(Out,Tmp,In,InLen)
-
 done:
     RET
+
+//cryptoBlocksAsm(roundKeys *uint32, out []byte, in []byte, preCounter *byte, counter *byte, tmp *byte)
+#define cryptoBlocksAsm(RoundKeys, Out, In, InLen, preCounter,Counter,tmp)   \
+    MOVL $0, BlockCount     \ //BlockCount
+loopX16:                    \
+    CMPQ InLen, $256        \
+    JL loopX8               \
+    MOVL $16, DI            \
+    fillCounterX16(Counter,PreCounter,BlockCount,DI, SI, AX,BX)  \
+    cryptoBlockAsmX16Macro(RoundKeys,Tmp,Counter)  \
+    xor256(Out,Tmp,In)   \
+    ADDQ $256, Out       \
+    ADDQ $256, In        \
+    ADDQ $16, BlockCount  \
+    SUBQ $256, InLen      \
+    JMP loopX16           \
+loopX8:                   \
+    CMPQ InLen, $128      \
+    JL loopX4             \
+    MOVL $8, DI           \
+    fillCounterX8(Counter,PreCounter,BlockCount,DI, SI, AX,BX)  \
+    cryptoBlockAsmX8Macro(RoundKeys, Tmp, Counter)     \
+    xor128(Out,Tmp,In)    \
+    ADDQ $128, Out        \
+    ADDQ $128, In         \
+    ADDQ $8, BlockCount   \
+    SUBQ $128, InLen      \
+    JMP loopX8            \
+loopX4:                   \
+    CMPQ InLen, $64       \
+    JL loopX2             \
+    MOVL $4, DI           \
+    fillCounterX4(Counter,PreCounter,BlockCount,DI, SI, AX,BX)  \
+    cryptoBlockAsmX4Macro(RoundKeys,Tmp,Counter)  \
+    xor64(Out,Tmp,In)  \
+    ADDQ $64, Out      \
+    ADDQ $64, In       \
+    ADDQ $4, BlockCount  \
+    SUBQ $64, InLen      \
+    JMP loopX4           \
+loopX2:                  \
+    CMPQ InLen, $32      \
+    JL loopX1            \
+    MOVL $2, DI          \
+    fillCounterX2(Counter,PreCounter,BlockCount,DI, SI, AX,BX)  \
+    cryptoBlockAsmX2Macro(RoundKeys, Tmp, Counter)   \
+    xor32(Out,Tmp,In)   \
+    ADDQ $32, Out       \
+    ADDQ $32, In        \
+    ADDQ $2, BlockCount  \
+    SUBQ $32, InLen      \
+    JMP loopX2           \
+loopX1:                  \
+    CMPQ InLen, $16      \
+    JL loopX0            \
+    MOVL $1, DI          \
+    fillCounterX1(Counter,PreCounter,BlockCount,DI, SI, AX,BX)  \
+    cryptoBlockAsmMacro(RoundKeys, Tmp, Counter)  \
+    xor16(Out,Tmp,In)   \
+    ADDQ $16, Out       \
+    ADDQ $16, In        \
+    ADDQ $1, BlockCount \
+    SUBQ $16, InLen     \
+    JMP loopX1          \
+loopX0:                 \
+    CMPQ InLen, $0      \
+    JLE done            \
+    MOVL $1, DI         \
+    fillCounterX(Counter,PreCounter,BlockCount,DI, SI, AX,BX)  \
+    cryptoBlockAsmMacro(RoundKeys, Tmp, Counter)  \
+final:   \
+    xorAsm1(Out,Tmp,In,InLen)   \
+done:  \
+    NOP  \
 
 // Copyright 2021 ~ 2022 bilibili. All rights reserved. Author: Guo, Weiji guoweiji@bilibili.com
 // 哔哩哔哩版权所有 2021 ~ 2022。作者：郭伟基 guoweiji@bilibili.com
@@ -1524,23 +1557,6 @@ GLOBL MERGE_H23<>(SB), (NOPTR+RODATA), $64
 //#define VzShuffle   Z26
 
 
-
-#define Enc AX
-#define Dst BX
-#define Nonce DX
-#define Plaintext DI
-#define Ciphertext DI
-#define AdditionalData SI
-#define H R10
-#define TMask R11
-#define J0 R12
-#define Tag R13
-#define TagSize CX
-#define RetLen R14
-#define RetCap DX
-#define Ret R15
-#define Res R15
-
 #define loadMasks() \
     MOVQ                $AND_MASK<>(SB), R8 \
     MOVQ                $LOWER_MASK<>(SB), R9 \
@@ -1696,10 +1712,6 @@ TEXT ·gHashBlocks(SB),NOSPLIT,$0-32
 	RET
 
 
-
-
-
-
 #define needExpandAsm(arrayLen, arrayCap, asked, res, temp1, temp2) \
     MOVQ arrayCap, temp1     \
     SUBQ arrayLen, temp1     \
@@ -1719,8 +1731,6 @@ TEXT ·needExpand(SB), $0-40
 	RET
 
 
-
-
 //func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte) []byte
 //temp:  H, TMask, J0, tag, counter, tmp, CNT-256, TMP-256
 //cryptoBlockAsm: 24, calculateFirstCounterAsm:48, ensureCapacityAsm:32  cryptoBlocksAsm:80  gHashUpdateAsm:48 gHashFinishAsm:40
@@ -1728,11 +1738,12 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-144    //80->88
     //used registers: AX, R10 (not include the function used)
     MOVQ roundKeys+0(FP), Enc
     MOVQ h+112(FP), H
-    MOVQ Enc, 0(SP)
-    MOVQ H, 8(SP)
-    MOVQ H, 16(SP)
-    CALL ·cryptoBlockAsm(SB)
-    MOVQ 8(SP), H
+    //MOVQ Enc, 0(SP)
+    //MOVQ H, 8(SP)
+    //MOVQ H, 16(SP)
+    //CALL ·cryptoBlockAsm(SB)
+    //MOVQ 8(SP), H
+    cryptoBlockAsmMacro(Enc, H, H)
 
     //used registers: DX, R9, R12, R11
     MOVQ nonce+40(FP), Nonce
@@ -1755,20 +1766,21 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-144    //80->88
     //used registers: R11, AX, R12
     SUBQ $64, TMask
     MOVQ roundKeys+0(FP), Enc
-    MOVQ Enc, 0(SP)
-    MOVQ TMask, 8(SP)
-    MOVQ J0, 16(SP)
-    CALL ·cryptoBlockAsm(SB)
+    //MOVQ Enc, 0(SP)
+    //MOVQ TMask, 8(SP)
+    //MOVQ J0, 16(SP)
+    //CALL ·cryptoBlockAsm(SB)
+    cryptoBlockAsmMacro(Enc, TMask, J0)
 
     //used registers: AX, R15, R14, DX, DI, R12  ---- R9
     MOVQ dst+16(FP), Ret
-    MOVQ dstLen+24(FP), RetLen
+    MOVQ dstLen+24(FP), Tmp
     MOVQ dstCap+32(FP), RetCap
     MOVQ roundKeys+0(FP), Enc
     MOVQ Enc, 0(SP)
-    ADDQ RetLen, Ret
+    ADDQ Tmp, Ret
     MOVQ Ret, 8(SP)
-    SUBQ RetLen, RetCap
+    SUBQ Tmp, RetCap
     MOVQ RetCap, 16(SP)
     MOVQ RetCap, 24(SP)
     MOVQ plaintext+64(FP), Plaintext
@@ -1789,8 +1801,8 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-144    //80->88
     MOVQ h+112(FP), H
     MOVQ H, 0(SP)
     MOVQ dst+16(FP), Ret
-    MOVQ dstLen+24(FP), RetLen
-    ADDQ RetLen, Ret
+    MOVQ dstLen+24(FP), Tmp
+    ADDQ Tmp, Ret
     MOVQ plaintextLen+72(FP), Plaintext
     ADDQ Plaintext, Ret
     MOVQ Ret, 8(SP)
@@ -1933,17 +1945,18 @@ done:
 
 //func openAsm(roundKeys *uint32, tagSize int,dst []byte, nonce []byte, ciphertext []byte, additionalData []byte, temp *byte) ([]byte, int)
 ////temp: H, J0, TMask, expectedTag, tmp, Counter-256, TMP-256
-
-
+//used registers: Enc, H, Nonce, Tmp, J0, TMask, Ciphertext, AdditionalData, Dst
 TEXT ·openAsm(SB), NOSPLIT, $80-148
     //used registers: AX, R10 (not include the function used)
     MOVQ roundKeys+0(FP), Enc
     MOVQ h+112(FP), H
-    MOVQ Enc, 0(SP)
-    MOVQ H, 8(SP)
-    MOVQ H, 16(SP)
-    CALL ·cryptoBlockAsm(SB)
-    MOVQ 8(SP), H
+    //MOVQ Enc, 0(SP)
+    //MOVQ H, 8(SP)
+    //MOVQ H, 16(SP)
+    //CALL ·cryptoBlockAsm(SB)
+    //MOVQ 8(SP), H
+
+    cryptoBlockAsmMacro(Enc, H, H)
 
     //used registers: DX, R9, R12, R11
     MOVQ nonce+40(FP), Nonce
@@ -1966,11 +1979,11 @@ TEXT ·openAsm(SB), NOSPLIT, $80-148
     //used registers: R11, AX, R12
     SUBQ $32, TMask
     MOVQ roundKeys+0(FP), Enc
-    MOVQ Enc, 0(SP)
-    MOVQ TMask, 8(SP)
-    MOVQ J0, 16(SP)
-    CALL ·cryptoBlockAsm(SB)
-
+    //MOVQ Enc, 0(SP)
+    //MOVQ TMask, 8(SP)
+    //MOVQ J0, 16(SP)
+    //CALL ·cryptoBlockAsm(SB)
+    cryptoBlockAsmMacro(Enc, TMask, J0)
 
     MOVQ h+112(FP), H
     MOVQ H, 0(SP)
