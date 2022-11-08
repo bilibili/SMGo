@@ -217,17 +217,19 @@ GLOBL MERGE_H23<>(SB), (NOPTR+RODATA), $64
 //***********************//
 
 // X/Y/Z 18~20 Src, Interim, Dst for affine instructions
-#define VxSrc       X18
-#define VxInterim   X19
-#define VxDst       X20
+//*******************change VxSrc,VxInterim, VxDst from X18-X20 to be as the following
+#define VxSrc       X4
+#define VxInterim   X0
+#define VxDst       X5
 
-#define VySrc       Y18
-#define VyInterim   Y19
-#define VyDst       Y20
+#define VySrc       Y4
+#define VyInterim   Y0
+#define VyDst       Y5
 
-#define VzSrc       Z18
-#define VzInterim   Z19
-#define VzDst       Z20
+#define VzSrc       Z4
+#define VzInterim   Z0
+#define VzDst       Z5
+//*****************************
 
 // X/Y/Z 21~24 for states
 //**** has changed ****//
@@ -703,10 +705,10 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
 //gHash consider h and tag in Vx register by default
 //required Vx Registers later: VzReduce, VxH, VxTag, VxAndMask, VxHigherMask, VxLowerMask, VxHs
 #define gHashBlocksPre(reg1, reg2, reg3) \
-	loadMasks(reg1, reg2, reg3)    \      //change later, loadMasks only once enough
+	\//loadMasks(reg1, reg2, reg3)    \      //change later, loadMasks only once enough
 	MOVQ	            $GCM_POLY<>(SB), reg3  \
 	VBROADCASTI32X2     (reg3), VzReduce     \  // latency 3, CPI 1
-	reverseBits(VxH, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x) \ //change later
+	\//reverseBits(VxH, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x) \ //change later
 	VPSRLDQ     $8, VxH, VxHs      \
 	VPXORD      VxH, VxHs, VxHs    \  //h^l in lower Hs
 
@@ -939,7 +941,8 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
     MOVQ $1, reg \
     gHashBlocksLoopBy1(reg,VxState4) \
 
-#define cryptoPrepare(reg1, reg2) \
+#define cryptoPrepare(reg1, reg2, reg3) \
+    loadMasks(reg1, reg2, reg3) \
     loadShuffle512(reg1) \
     loadMatrix(VzPreMatrix, VzPostMatrix, reg1, reg2) \
 
@@ -1129,9 +1132,8 @@ done:    \
     JMP -7(PC)       \
     NOP             \
 
-
 //With it, VxState4 -> VxH
-#define cryptoBlockAsmMacro(rk)  \
+#define cryptoBlockAsmMacroH(rk)  \
     \//loadShuffle128()   \
     \//loadInputX1(src, VxState1)  \
     \//loadMatrix(VxPreMatrix, VxPostMatrix)  \
@@ -1150,6 +1152,21 @@ done:    \
     \//moveToVxH(VxState4)   \ //move VxState4 to VxH
     rev32(VxShuffle, VxState4)  \
     \//storeOutputX1(VxState4, dst)  \
+
+#define cryptoBlockAsmMacro(rk)  \
+    rev32(VxShuffle, VxState1)   \ // latency hiden successfully   change later, move rev32 to register, save time for zero block
+    transpose1x4(VxState1, VxState2, VxState3, VxState4, T0x, T1x)  \
+    roundX(rk)  \
+    //roundX(rk)  \
+    //roundX(rk)  \
+    //roundX(rk)  \
+    //roundX(rk)  \
+    //roundX(rk)  \
+    //roundX(rk)  \
+    //roundX(rk)  \
+    //SUBQ $128, rk \
+    //transpose4x1(VxState4, VxState3, VxState2, VxState1, T0x, T1x) \
+    //rev32(VxShuffle, VxState4)  \
 
 //VxH = VxState4, J0 is put in Vxtag,
 #define calculateJ0Branch2(nonce,nonceLen,blockCount,remain,tmp,reg1, reg2, reg3) \
@@ -1716,45 +1733,46 @@ TEXT ·cryptoBlockAsm(SB),NOSPLIT,$0-24
 TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
     MOVQ tagSize+8(FP), TagSize  //Where tagSize is needed, consider later
 
-    cryptoPrepare(Reg1, Reg2)   //Z26, Z16, Z17 is used to load constant
+    cryptoPrepare(Reg1, Reg2, Reg31)   //Z26, Z16, Z17 is used to load constant
     MOVQ h+112(FP), H
     loadState1(H)
 
     MOVQ rk+0(FP), RK
-    cryptoBlockAsmMacro(RK) //H stored in VxH, not need reverse
-    movv(VxState4, VxH)
-    //loadH(VxState4, VxH)
+    cryptoBlockAsmMacroH(RK) //H stored in VxH, keep order
+    //movv(VxState4, VxH)
+    loadH(VxState4, VxH)
 
-    storeOutputX1(VxH, H)
-
-    //MOVQ temp+112(FP), Tmp
-    //ADDQ $80, Tmp
-    //storeOutputX1(VxH, Tmp) //store H for debug
+    //storeOutputX1(VxH, H)
 
     MOVQ nonce+40(FP), Nonce
     MOVQ nonceLen+48(FP), NonceLen
     MOVQ temp+112(FP), Tmp
     ADDQ $80, Tmp
     setZero(VzTag) // change later at last.  here setZero can be deleted
-    calculateJ0(Nonce,NonceLen,BlockCount1,Remain1,Tmp,Reg1, Reg2, Reg31)  //J0 store in VxJ0, not need reverse
+    calculateJ0(Nonce,NonceLen,BlockCount1,Remain1,Tmp,Reg1, Reg2, Reg31)  //J0 store in VxJ0, not need reverse  VxH reverse order
     //storeOutputX1(VxJ0, Tmp) //store VxJ0 in Tmp for debug
+    //reverseBits(VxH, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)  //for debug
+    //storeOutputX1(VxH, H)
 
     movv(VxJ0, VxState1)
-    cryptoBlockAsmMacro(RK)
+    cryptoBlockAsmMacroH(RK)
     movv(VxState4, VxTMask) // the cipher of J0 is stored in VxTMask, keep order, no reverse
     //storeOutputX1(VxState4, Tmp)
+
+    //reverseBits(VxH, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)  //for debug
+    //MOVQ temp+112(FP), Tmp
+    //ADDQ $80, Tmp
+    //storeOutputX1(VxH, Tmp)
 
     setZero(VxTag)
     MOVQ aData+88(FP), AData
     MOVQ aLen+96(FP), ALen
+    //reverseBits(VxH, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
     CalculateSPre(AData,ALen, BlockCount2, Remain2, Tmp, Reg1, Reg2, Reg32) //GHash(A||0) is stored in VxTag
+    //for debug
     reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
-    //storeOutputX1(VxTag, Tmp)
-
-
-
-
-
+    //reverseBits(VxH, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
+    storeOutputX1(VxTag, Tmp)
 
 
     RET
@@ -1807,13 +1825,14 @@ cmpDone:                \
 ////temp: H, J0, TMask, expectedTag, tmp, Counter-256, TMP-256
 //used registers: Enc, H, Nonce, Tmp, J0, TMask, Ciphertext, AdditionalData, Dst
 TEXT ·openAsm(SB), NOSPLIT, $80-148
-    cryptoPrepare(Reg1, Reg2)   //Z26, Z16, Z17 is used to load constant
+    cryptoPrepare(Reg1, Reg2, Reg31)   //Z26, Z16, Z17 is used to load constant
     MOVQ h+112(FP), H
     loadState1(H)
 
     MOVQ rk+0(FP), RK
     cryptoBlockAsmMacro(RK) //H stored in VxH, not need reverse
-    movv(VxState4, VxH)
+    //movv(VxState4, VxH)
+    loadH(VxState4, VxH)
 
     MOVQ nonce+40(FP), Nonce
     MOVQ nonceLen+48(FP), NonceLen
