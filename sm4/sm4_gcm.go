@@ -8,6 +8,7 @@ package sm4
 import (
 	"crypto/cipher"
 	"errors"
+	"fmt"
 )
 
 const (
@@ -47,11 +48,10 @@ func (g *sm4GcmAsm) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 	var temp [6*BlockSize+512] byte
 	//temp:  H, TMask, J0, tag, counter, tmp, CNT-256, tmp-256
 	ret := ensureCapacity(dst, len(plaintext)+g.tagSize)
-	//
-	//c:=&temp[80]
-	//fmt.Println(c)
-	ret = sealAsm(&g.roundKeys[0], g.tagSize, ret, nonce, plaintext, additionalData, &temp[0])
-	//fmt.Printf("0x%x",arg)
+	c:=&temp[80]
+	fmt.Println(c)
+	ret, arg := sealAsm(&g.roundKeys[0], g.tagSize, ret, nonce, plaintext, additionalData, &temp[0])
+	fmt.Printf("0x%x",arg)
 	return ret
 }
 
@@ -219,7 +219,7 @@ func copyAsm(dst *byte, src *byte, len int)
 func needExpand(array []byte, asked int) int
 
 //go:noescape
-func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte) []byte
+func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte) ([]byte,int64)
 
 //go:noescape
 func constantTimeCompareAsm(x *byte, y *byte, l int) int32

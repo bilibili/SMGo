@@ -58,13 +58,13 @@ var aesGCMTests = []struct {
 	key, nonce, plaintext, aad string
 	tagSize                    int
 }{
-	{
-		"0123456789abcdeffedcba9876543210",
-		"0123456789ab0123456789ab",
-		"0123456789abcdeffedcba9876543210",
-		"0123456789abcdeffedcba9876543210",
-		16,
-	},
+	//{
+	//	"0123456789abcdeffedcba9876543210",
+	//	"0123456789ab0123456789ab",
+	//	"0123456789abcdeffedcba9876543210",
+	//	"0123456789abcdeffedcba9876543210",
+	//	16,
+	//},
 	{
 		"0123456789abcdeffedcba9876543210",
 		"0123456789ab0123456789abAAAA", // non-standard nonce size
