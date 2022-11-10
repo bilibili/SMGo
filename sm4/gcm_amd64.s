@@ -819,8 +819,8 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
 #define gHashBlocksBlocksEnd(tag) \
     \//MOVQ tmp2, count         \
 	\//MOVQ tmp1, data           \
-	VPXORD      VxTag, VxTMask, VxTag   \
 	reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)  \
+	VPXORD      VxTag, VxTMask, VxTag   \
 	VMOVDQU32   VxTag, (tag)   \
 
 #define reverseBitsZ4(Vz1, Vz2, Vz3, Vz4) \
@@ -1310,6 +1310,8 @@ endSPre:
     loadADataX1(tmp, VxAData) \
     MOVQ $1, blockCount  \
     gHashBlocksLoopBy1(blockCount, VxAData) \
+    \//reverseBits(VxTMask, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)  \ // for debug
+    \//storeOutputX1(VxTMask, Tmp)   \ //for debug
     cryptoBlocksEnd(tag) \
 
 #define loadState1(H) \
@@ -1894,8 +1896,6 @@ TEXT ·broadcastJ0(SB), NOSPLIT, $0-8
 //func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte) []byte
 //temp:  H, TMask, J0, tag, counter, tmp, CNT-256, tmp-256
 TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
-    MOVQ tagSize+8(FP), TagSize  //Where tagSize is needed, consider later
-
     cryptoPrepare(Reg1, Reg2, Reg31)   //Z26, Z16, Z17 is used to load constant
     MOVQ h+112(FP), H
     loadState1(H)
@@ -1940,16 +1940,27 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
     MOVQ plaintext+64(FP), Plaintext
     MOVQ plainLen+72(FP), PlainLen
     cryptoBlocksAsm(RK,Dst,Plaintext,PlainLen,Tmp,BlockCount3,Reg1,Reg2,Reg33)
-    MOVQ temp+112(FP), Tmp   //for debug use
-    ADDQ $80, Tmp
+    //MOVQ temp+112(FP), Tmp   //for debug use
+    //ADDQ $80, Tmp
     //for debug
     //MOVQ        $Counter_Constant<>(SB), Reg1
     //VMOVDQU32   (Reg1), VzConst1
-    reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
-    storeOutputX1(VxTag, Tmp)
+    //reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
+    //storeOutputX1(VxTag, Tmp)
+
+    MOVQ dst+16(FP), Dst
+    MOVQ aLen+96(FP), ALen
+    MOVQ plainLen+72(FP), PlainLen
+    ADDQ PlainLen, Dst
+    MOVQ temp+112(FP), Tmp
+    CalculateSPost(Dst, ALen, PlainLen, Tmp, BlockCount3)  //Tag is stored in tag = &dst[len(plaintext)] plainLen = cipherLen
+    //storeOutputX1(VxTag, Tmp)  //for debug
+
     MOVQ dst+16(FP), Dst
     MOVQ Dst, ret1+120(FP)
     MOVQ plainLen+72(FP), PlainLen
+    MOVQ tagSize+8(FP), TagSize
+    ADDQ TagSize, PlainLen
     MOVQ PlainLen, ret2+128(FP)
     MOVQ PlainLen, ret3+136(FP)
     RET
