@@ -1890,11 +1890,12 @@ TEXT ·broadcastJ0(SB), NOSPLIT, $0-8
     VMOVDQA64 VxState1, VxJ0 \            // : + (1)
 
 
-//func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte) []byte
+
+//func sealAsm(roundKeys *uint32, tagSize int, dst *byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte)
 //temp:  H, TMask, J0, tag, counter, tmp, CNT-256, tmp-256
 TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
     cryptoPrepare(Reg1, Reg2, Reg31)   //Z26, Z16, Z17 is used to load constant
-    MOVQ h+112(FP), H
+    MOVQ h+96(FP), H
     loadState1(H)
 
     MOVQ rk+0(FP), RK
@@ -1904,9 +1905,9 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
 
     //storeOutputX1(VxH, H)
 
-    MOVQ nonce+40(FP), Nonce
-    MOVQ nonceLen+48(FP), NonceLen
-    MOVQ temp+112(FP), Tmp
+    MOVQ nonce+24(FP), Nonce
+    MOVQ nonceLen+32(FP), NonceLen
+    MOVQ tmp+96(FP), Tmp
     ADDQ $80, Tmp
     setZero(VzTag) // change later at last.  here setZero can be deleted
     calculateJ0(Nonce,NonceLen,BlockCount1,Remain1,Tmp,Reg1, Reg2, Reg31)  //J0 store in VxJ0, keep order,  VxH reverse order
@@ -1925,8 +1926,8 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
     //storeOutputX1(VxH, Tmp)
 
     setZero(VxTag)
-    MOVQ aData+88(FP), AData
-    MOVQ aLen+96(FP), ALen
+    MOVQ aData+72(FP), AData
+    MOVQ aLen+80(FP), ALen
     CalculateSPre(AData,ALen, BlockCount2, Remain2, Tmp, Reg1, Reg2, Reg32) //GHash(A||0) is stored in VxTag and is reverseBits, VxH is also reversebits
     //for debug
     //reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
@@ -1934,8 +1935,8 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
     //storeOutputX1(VxTag, Tmp)
 
     MOVQ dst+16(FP), Dst
-    MOVQ plaintext+64(FP), Plaintext
-    MOVQ plainLen+72(FP), PlainLen
+    MOVQ plaintext+48(FP), Plaintext
+    MOVQ plainLen+56(FP), PlainLen
     cryptoBlocksAsm(RK,Dst,Plaintext,PlainLen,Tmp,BlockCount3,Reg1,Reg2,Reg33)
     //MOVQ temp+112(FP), Tmp   //for debug use
     //ADDQ $80, Tmp
@@ -1946,21 +1947,21 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
     //storeOutputX1(VxTag, Tmp)
 
     MOVQ dst+16(FP), Dst
-    MOVQ aLen+96(FP), ALen
-    MOVQ plainLen+72(FP), PlainLen
+    MOVQ aLen+80(FP), ALen
+    MOVQ plainLen+56(FP), PlainLen
     ADDQ PlainLen, Dst
     MOVQ tagSize+8(FP), TagSize
-    MOVQ temp+112(FP), Tmp
+    MOVQ tmp+96(FP), Tmp
     CalculateSPost(Dst, ALen, PlainLen, Tmp, BlockCount3, TagSize)  //Tag is stored in tag = &dst[len(plaintext)] plainLen = cipherLen
     //storeOutputX1(VxTag, Tmp)  //for debug
 
-    MOVQ dst+16(FP), Dst
-    MOVQ Dst, ret1+120(FP)
-    MOVQ plainLen+72(FP), PlainLen
-    MOVQ tagSize+8(FP), TagSize
-    ADDQ TagSize, PlainLen
-    MOVQ PlainLen, ret2+128(FP)
-    MOVQ PlainLen, ret3+136(FP)
+    //MOVQ dst+16(FP), Dst
+    //MOVQ Dst, ret1+120(FP)
+    //MOVQ plainLen+56(FP), PlainLen
+    //MOVQ tagSize+8(FP), TagSize
+    //ADDQ TagSize, PlainLen
+    //MOVQ PlainLen, ret2+128(FP)
+    //MOVQ PlainLen, ret3+136(FP)
     RET
 
 

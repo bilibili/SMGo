@@ -47,7 +47,7 @@ func (g *sm4GcmAsm) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 	var temp [6*BlockSize+512] byte
 	//temp:  H, TMask, J0, tag, counter, tmp, CNT-256, tmp-256
 	ret := ensureCapacity(dst, len(plaintext)+g.tagSize)
-	ret,_ = sealAsm(&g.roundKeys[0], g.tagSize, ret, nonce, plaintext, additionalData, &temp[0])
+	sealAsm(&g.roundKeys[0], g.tagSize, &ret[len(dst)], nonce, plaintext, additionalData, &temp[0])
 	return ret
 }
 
@@ -105,8 +105,8 @@ func ensureCapacity(array []byte, asked int) (head []byte) {
 	if res == 0{
 		head = array
 	}else{
-		head = make([]byte,arrayLen,arrayLen+asked)
-		//head = make([]byte, arrayLen+asked)
+		//head = make([]byte,arrayLen,arrayLen+asked)
+		head = make([]byte,arrayLen+asked)
 		if arrayLen!=0 {
 			copyAsm(&head[0], &array[0], arrayLen)
 		}
@@ -215,7 +215,7 @@ func copyAsm(dst *byte, src *byte, len int)
 func needExpand(array []byte, asked int) int
 
 //go:noescape
-func sealAsm(roundKeys *uint32, tagSize int, dst []byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte) ([]byte,int64)
+func sealAsm(roundKeys *uint32, tagSize int, dst *byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte)
 
 //go:noescape
 func constantTimeCompareAsm(x *byte, y *byte, l int) int32
