@@ -816,12 +816,14 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
 	reduce(VxTag, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)   \
 	SUBQ        $1, count   \
 
-#define gHashBlocksBlocksEnd(tag) \
+#define gHashBlocksBlocksEnd(tag,tmp,tagSize,reg) \
     \//MOVQ tmp2, count         \
 	\//MOVQ tmp1, data           \
 	reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)  \
 	VPXORD      VxTag, VxTMask, VxTag   \
-	VMOVDQU32   VxTag, (tag)   \
+	VMOVDQU32   VxTag, (tmp)   \
+	copyAsm(tag,tmp,tagSize,reg)  \
+
 
 #define reverseBitsZ4(Vz1, Vz2, Vz3, Vz4) \
     reverseBits(Vz1, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
@@ -1001,8 +1003,8 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
     loadCounterConstant(reg1, reg2, reg3) \
     broadcastJ0() \  //VzJ0 = (VxJ0, VxJ0, VxJ0, VxJ0) and VxJ0 is in reverse order
 
-#define cryptoBlocksEnd(tag) \
-    gHashBlocksBlocksEnd(tag) \
+#define cryptoBlocksEnd(tag, tmp,tagSize,blockCount) \
+    gHashBlocksBlocksEnd(tag, tmp,tagSize,blockCount) \
 
 
 //func fillSingleBlockAsm(dst *byte, src *byte, count uint32)  --- used registers: DI, SI,AX
@@ -1071,7 +1073,6 @@ loopX16:   \
     \//xor256(dst,dst,src)
     ADDQ $256, dst   \
     ADDQ $256, src   \
-    ADDQ $16, blockCount  \  //blockCount can be deleted
     SUBQ $256, len   \
     JMP loopX16   \
 loopX8:   \
@@ -1081,7 +1082,6 @@ loopX8:   \
     cryptoBlockAsmX8Macro(rk, dst, src, reg1)  \
     ADDQ $128, dst   \
     ADDQ $128, src   \
-    ADDQ $8, blockCount  \
     SUBQ $128, len   \
     JMP loopX8   \
 loopX4:   \
@@ -1091,7 +1091,6 @@ loopX4:   \
     cryptoBlockAsmX4Macro(rk, dst, src, reg1)   \
     ADDQ $64, dst   \
     ADDQ $64, src   \
-    ADDQ $4, blockCount  \
     SUBQ $64, len  \
     JMP loopX4    \
 loopX2:    \
@@ -1101,7 +1100,6 @@ loopX2:    \
     cryptoBlockAsmX2Macro(rk, dst, src, reg1)   \
     ADDQ $32, dst   \
     ADDQ $32, src   \
-    ADDQ $2, blockCount   \
     SUBQ $32, len    \
     JMP loopX2     \
 loopX1:     \
@@ -1117,7 +1115,6 @@ loopX1:     \
     \//storeOutputX1(VxTag, Tmp) \ //for debug here, need to be deleted
     ADDQ $16, dst   \
     ADDQ $16, src   \
-    ADDQ $1, blockCount  \
     SUBQ $16, len    \
     JMP loopX1   \
 loopX0:    \
@@ -1300,7 +1297,7 @@ withRemain:  \
 endSPre:
     NOP
 
-#define CalculateSPost(tag, aLen, cLen, tmp, blockCount) \
+#define CalculateSPost(tag, aLen, cLen, tmp, blockCount,tagSize) \
     SHLQ $3, aLen \
     SHLQ $3, cLen  \
     putUint64(tmp, aLen)  \
@@ -1312,7 +1309,7 @@ endSPre:
     gHashBlocksLoopBy1(blockCount, VxAData) \
     \//reverseBits(VxTMask, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)  \ // for debug
     \//storeOutputX1(VxTMask, Tmp)   \ //for debug
-    cryptoBlocksEnd(tag) \
+    cryptoBlocksEnd(tag,tmp,tagSize,blockCount) \
 
 #define loadState1(H) \
     loadInputX1(H, VxState1)
@@ -1952,8 +1949,9 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
     MOVQ aLen+96(FP), ALen
     MOVQ plainLen+72(FP), PlainLen
     ADDQ PlainLen, Dst
+    MOVQ tagSize+8(FP), TagSize
     MOVQ temp+112(FP), Tmp
-    CalculateSPost(Dst, ALen, PlainLen, Tmp, BlockCount3)  //Tag is stored in tag = &dst[len(plaintext)] plainLen = cipherLen
+    CalculateSPost(Dst, ALen, PlainLen, Tmp, BlockCount3, TagSize)  //Tag is stored in tag = &dst[len(plaintext)] plainLen = cipherLen
     //storeOutputX1(VxTag, Tmp)  //for debug
 
     MOVQ dst+16(FP), Dst
@@ -2045,7 +2043,7 @@ TEXT ·openAsm(SB), NOSPLIT, $80-148
     SUBQ TagSize, CipherLen
     cryptoBlocksAsm(RK,Dst,Cipher,CipherLen,Tmp,BlockCount3,Reg1,Reg2,Reg33)
 
-    CalculateSPost(Tmp, ALen, CipherLen, Tmp, BlockCount3)
+    CalculateSPost(Tmp, ALen, CipherLen, Tmp, BlockCount3,TagSize)
 
     ADDQ CipherLen, Cipher
     constantTimeCompare(Tmp,Cipher,TagSize, Reg1, Reg2, Reg33) // the origin tag is put in cipher[len(ciphertext)-tagsize : ]
