@@ -565,10 +565,10 @@ GLOBL MERGE_H23<>(SB), (NOPTR+RODATA), $64
     VPXORD      Y2, Vy2, Vy2     \
     VPXORD      Y3, Vy3, Vy3     \
     VPXORD      Y4, Vy4, Vy4     \
-    VMOVDQU32   Vy1,    (dst)    \
-    VMOVDQU32   Vy2,  32(dst)    \
-    VMOVDQU32   Vy3,  64(dst)    \
-    VMOVDQU32   Vy4,  96(dst)    \
+    \//VMOVDQU32   Vy1,    (dst)    \
+    \//VMOVDQU32   Vy2,  32(dst)    \
+    \//VMOVDQU32   Vy3,  64(dst)    \
+    \//VMOVDQU32   Vy4,  96(dst)    \
 
 #define xor64(dst, src, Vx1, Vx2, Vx3, Vx4) \
     VMOVDQU32   (src),   X1      \
@@ -579,10 +579,10 @@ GLOBL MERGE_H23<>(SB), (NOPTR+RODATA), $64
     VPXORD      X2, Vx2, Vx2     \
     VPXORD      X3, Vx3, Vx3     \
     VPXORD      X4, Vx4, Vx4     \
-    VMOVDQU32   Vx1,    (dst)    \
-    VMOVDQU32   Vx2,  16(dst)    \
-    VMOVDQU32   Vx3,  32(dst)    \
-    VMOVDQU32   Vx4,  48(dst)    \
+    \//VMOVDQU32   Vx1,    (dst)    \
+    \//VMOVDQU32   Vx2,  16(dst)    \
+    \//VMOVDQU32   Vx3,  32(dst)    \
+    \//VMOVDQU32   Vx4,  48(dst)    \
 
 //func xor32(dst *byte, src1 *byte, src2 *byte)
 #define xor32(dst, src, Vx1, Vx2) \
@@ -886,9 +886,11 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
     xor128(dst,src,VyState4,VyState3,VyState2,VyState1) \
     MOVQ $8, reg  \
     concatenateY(VyState4, VyState3, VzState4)  \
+    VMOVDQU32   VzState4,    (dst)  \
     reverseBits(VzState4, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
     gHashBlocksLoopBy4(reg,VzState4) \
     concatenateY(VyState2, VyState1, VzState2)  \
+    VMOVDQU32   VzState2,    64(dst)  \
     reverseBits(VzState2, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
     gHashBlocksLoopBy4(reg,VzState2) \ //truncate VySt
 
@@ -912,6 +914,7 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
     xor64(dst, src, VxState4, VxState3, VxState2, VxState1)         \
     MOVQ $4, reg \
     concatenateX(VxState4, VxState3,VxState2, VxState1,VzState4)  \   //the order, need judge
+    VMOVDQU32   VzState4,    (dst) \
     reverseBits(VzState4, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
     gHashBlocksLoopBy4(reg,VzState4) \ //truncate VySt
 
@@ -999,7 +1002,7 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
     VMOVDQU32   (reg3), VzConst3   \ //VzConst3: (2,2,2,2)
 
 #define cryptoBlocksPrepare(reg1, reg2, reg3) \
-    gHashBlocksPre(reg1, reg2, reg3) \
+    \//gHashBlocksPre(reg1, reg2, reg3) \
     loadCounterConstant(reg1, reg2, reg3) \
     broadcastJ0() \  //VzJ0 = (VxJ0, VxJ0, VxJ0, VxJ0) and VxJ0 is in reverse order
 
@@ -1063,7 +1066,7 @@ TEXT ·clearRight(SB),NOSPLIT,$0-16
     cryptoBlocksPrepare(reg1,reg2,reg3)   \  //now suppose const1,2,3 has in the right place
     CMPQ len, $64    \
     JL loopX2        \
-    gHashBlocksLoopBy4Pre(reg1)  \
+    \//gHashBlocksLoopBy4Pre(reg1)  \
 loopX16:   \
     CMPQ len, $256  \
     JL loopX8   \
@@ -1205,12 +1208,12 @@ cryptoBlocksDone: \
     MOVQ nonceLen, remain    \
     ANDQ $15, remain     \
     SHRQ $4, blockCount \
-    gHashBlocksPre(reg1, reg2, reg3) \
+    \//gHashBlocksPre(reg1, reg2, reg3) \
     CMPQ nonceLen, $16  \
     JL last    \
     CMPQ blockCount, $8 \
     JL loopBy1 \
-    gHashBlocksLoopBy4Pre(reg1) \
+    \//gHashBlocksLoopBy4Pre(reg1) \
     loopBy4:         \
     loadNonceX4(nonce, VzNonce) \ //load nonce
     gHashBlocksLoopBy4(blockCount, VzNonce) \
@@ -1265,12 +1268,12 @@ endJ0:
     MOVQ aLen, remain    \
     ANDQ $15, remain     \
     SHRQ $4, blockCount \
-    gHashBlocksPre(reg1, reg2, reg3) \
+    \//gHashBlocksPre(reg1, reg2, reg3) \
     CMPQ aLen, $16 \
     JL withRemain \
     CMPQ blockCount, $8  \
     JL loopWith1  \
-    gHashBlocksLoopBy4Pre(reg1) \
+    \//gHashBlocksLoopBy4Pre(reg1) \
 loopWith4:         \
     loadADataX4(aData, VzAData) \ //load additionalData
     gHashBlocksLoopBy4(blockCount, VzAData) \
@@ -1889,12 +1892,15 @@ TEXT ·broadcastJ0(SB), NOSPLIT, $0-8
     VPADDD VxJ0, VxConst1, VxState1 \     // + (1)
     VMOVDQA64 VxState1, VxJ0 \            // : + (1)
 
-
+#define gHashPre(reg1,reg2,reg3) \
+    gHashBlocksPre(reg1, reg2, reg3) \
+    gHashBlocksLoopBy4Pre(reg1) \
 
 //func sealAsm(roundKeys *uint32, tagSize int, dst *byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte)
 //temp:  H, TMask, J0, tag, counter, tmp, CNT-256, tmp-256
 TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
     cryptoPrepare(Reg1, Reg2, Reg31)   //Z26, Z16, Z17 is used to load constant
+
     MOVQ h+96(FP), H
     loadState1(H)
 
@@ -1902,6 +1908,8 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
     cryptoBlockAsmMacro(RK) //H stored in VxH, keep order
     //movv(VxState4, VxH)
     loadH(VxState4, VxH)
+
+    gHashPre(Reg1, Reg2, Reg31)
 
     //storeOutputX1(VxH, H)
 

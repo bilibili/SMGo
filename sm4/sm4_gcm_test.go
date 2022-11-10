@@ -93,13 +93,13 @@ var aesGCMTests = []struct {
 	//	"0123456789abcdeffedcba9876543210",
 	//	16,
 	//},
-	//{
-	//	"0123456789abcdeffedcba9876543210",
-	//	"0123456789ab0123456789ab",
-	//	"0123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210AAAAAA", // long & non-full plain block
-	//	"0123456789abcdeffedcba9876543210",
-	//	16,
-	//},
+	{
+		"0123456789abcdeffedcba9876543210",
+		"0123456789ab0123456789ab",
+		"0123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210AAAAAA", // long & non-full plain block
+		"0123456789abcdeffedcba9876543210",
+		16,
+	},
 	{
 		"0123456789abcdeffedcba9876543210",
 		"0123456789ab0123456789ab",
