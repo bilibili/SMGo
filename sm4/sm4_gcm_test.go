@@ -65,34 +65,34 @@ var aesGCMTests = []struct {
 	//	"0123456789abcdeffedcba9876543210",
 	//	16,
 	//},
-	{
-		"0123456789abcdeffedcba9876543210",
-		"0123456789ab0123456789abAAAA", // non-standard nonce size
-		"0123456789abcdeffedcba9876543210",
-		"0123456789abcdeffedcba9876543210",
-		16,
-	},
-	{
-		"0123456789abcdeffedcba9876543210",
-		"0123456789ab0123456789ab",
-		"0123456789abcdeffedcba9876543210",
-		"0123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210AAA", // long & non-16X long aad
-		16,
-	},
-	{
-		"0123456789abcdeffedcba9876543210",
-		"0123456789ab0123456789ab",
-		"0123456789abcdeffedcba9876543210",
-		"", // empty aad
-		16,
-	},
-	{
-		"0123456789abcdeffedcba9876543210",
-		"0123456789ab0123456789ab",
-		"0123456789abcdeffedcba9876543210AAAAAA", // non-full plain block
-		"0123456789abcdeffedcba9876543210",
-		16,
-	},
+	//{
+	//	"0123456789abcdeffedcba9876543210",
+	//	"0123456789ab0123456789abAAAA", // non-standard nonce size
+	//	"0123456789abcdeffedcba9876543210",
+	//	"0123456789abcdeffedcba9876543210",
+	//	16,
+	//},
+	//{
+	//	"0123456789abcdeffedcba9876543210",
+	//	"0123456789ab0123456789ab",
+	//	"0123456789abcdeffedcba9876543210",
+	//	"0123456789abcdeffedcba98765432100123456789abcdeffedcba98765432100123456789abcdeffedcba9876543210AAA", // long & non-16X long aad
+	//	16,
+	//},
+	//{
+	//	"0123456789abcdeffedcba9876543210",
+	//	"0123456789ab0123456789ab",
+	//	"0123456789abcdeffedcba9876543210",
+	//	"", // empty aad
+	//	16,
+	//},
+	//{
+	//	"0123456789abcdeffedcba9876543210",
+	//	"0123456789ab0123456789ab",
+	//	"0123456789abcdeffedcba9876543210AAAAAA", // non-full plain block
+	//	"0123456789abcdeffedcba9876543210",
+	//	16,
+	//},
 	{
 		"0123456789abcdeffedcba9876543210",
 		"0123456789ab0123456789ab",
