@@ -2199,6 +2199,8 @@ TEXT ·openAsm(SB), NOSPLIT, $80-148
     MOVQ dst+16(FP), Dst
     MOVQ cipher+48(FP), Cipher
     MOVQ cipherLen+56(FP), CipherLen
+    MOVQ tagSize+8(FP), TagSize
+    SUBQ TagSize, CipherLen
     MOVQ tmp+96(FP), Tmp
     ADDQ $48, Tmp
     MOVQ $0, HashFlag
