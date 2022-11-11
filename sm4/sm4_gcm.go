@@ -75,9 +75,9 @@ func (g *sm4GcmAsm) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte,
 
 	ret := ensureCapacity(dst, len(ciphertext)-g.tagSize)
 
-	ret, flag:=openAsm(&g.roundKeys[0], g.tagSize,ret, nonce, ciphertext, additionalData, &temp[0])
+	flag:=openAsm(&g.roundKeys[0], g.tagSize,&ret[len(dst)], nonce, ciphertext, additionalData, &temp[0])
 
-	if flag!=0{
+	if flag!=0xA5A5{
 		return nil, errOpen
 	}
 
@@ -221,7 +221,7 @@ func sealAsm(roundKeys *uint32, tagSize int, dst *byte, nonce []byte, plaintext 
 func constantTimeCompareAsm(x *byte, y *byte, l int) int32
 
 //go:noescape
-func openAsm(roundKeys *uint32, tagSize int,dst []byte, nonce []byte, ciphertext []byte, additionalData []byte, temp *byte) ([]byte, int32)
+func openAsm(roundKeys *uint32, tagSize int,dst *byte, nonce []byte, ciphertext []byte, additionalData []byte, temp *byte) int
 
 
 ////func putUint32(b *byte, v uint32)    --- used registers: DI, SI

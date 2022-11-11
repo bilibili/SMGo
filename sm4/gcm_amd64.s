@@ -831,7 +831,7 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
     reverseBits(Vz3, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
     reverseBits(Vz4, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
 
-#define cryptoBlockAsmX16Macro(rk,dst, src, reg)  \
+#define cryptoBlockAsmX16Macro(rk,dst, src, reg, hashFlag)  \
     \//loadShuffle512() \
     \//loadInputX16(src, VzState1, VzState2, VzState3, VzState4)  \ // latency: 8  put forward
     \//loadMatrix(VzPreMatrix, VzPostMatrix) \
@@ -849,6 +849,8 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
     transpose4x4(VzState4, VzState3, VzState2, VzState1, T0z, T1z) \
     revStates(VzShuffle, VzState1, VzState2, VzState3, VzState4)   \
     xor256(src,dst, VzState4, VzState3, VzState2, VzState1, T0z, T1z, T2z, T3z) \
+    CMPQ hashFlag, $0  \
+    JE X16Done     \
     MOVQ $16, reg  \
     \//seal: input is VzState1 to VzState4, open: input load ciphertext to VzState1 to VzState2 first
     reverseBitsZ4(VzState4, VzState3, VzState2, VzState1) \
@@ -856,6 +858,8 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
     gHashBlocksLoopBy4(reg,VzState3) \
     gHashBlocksLoopBy4(reg,VzState2) \
     gHashBlocksLoopBy4(reg,VzState1) \
+X16Done: \
+    NOP \
 
 //for 512-bit lanes,
 //Suppose we have V1z=(a0, a1, -, -), and V2z=(b0,b1,-,-), we want to have V=(a0, a1, b0, b1)
@@ -866,7 +870,7 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
     VPADDD T2z, T3z, V1z      \    //V1z = (a0, a1, b0, b1)
 
 
-#define cryptoBlockAsmX8Macro(rk, dst, src, reg) \
+#define cryptoBlockAsmX8Macro(rk, dst, src, reg, hashFlag) \
     \//loadShuffle256()  \
     \//loadInputX8(src, VyState1, VyState2, VyState3, VyState4)  \
     \//loadMatrix(VyPreMatrix, VyPostMatrix)  \
@@ -884,17 +888,21 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
     transpose4x4(VyState4, VyState3, VyState2, VyState1, T0y, T1y) \
     revStates(VyShuffle, VyState1, VyState2, VyState3, VyState4)  \
     xor128(dst,src,VyState4,VyState3,VyState2,VyState1) \
-    MOVQ $8, reg  \
     concatenateY(VyState4, VyState3, VzState4)  \
-    VMOVDQU32   VzState4,    (dst)  \
-    reverseBits(VzState4, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
-    gHashBlocksLoopBy4(reg,VzState4) \
     concatenateY(VyState2, VyState1, VzState2)  \
+    VMOVDQU32   VzState4,    (dst)  \
     VMOVDQU32   VzState2,    64(dst)  \
+    CMPQ hashFlag, $0  \
+    JE X8Done   \
+    MOVQ $8, reg  \
+    reverseBits(VzState4, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
     reverseBits(VzState2, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
+    gHashBlocksLoopBy4(reg,VzState4) \
     gHashBlocksLoopBy4(reg,VzState2) \ //truncate VySt
+X8Done:   \
+    NOP   \
 
-#define cryptoBlockAsmX4Macro(rk, dst, src, reg)  \
+#define cryptoBlockAsmX4Macro(rk, dst, src, reg, hashFlag)  \
     \//loadShuffle128()  \
     \//loadInputX4(src, VxState1, VxState2, VxState3, VxState4)  \
     \//loadMatrix(VxPreMatrix, VxPostMatrix)  \
@@ -912,13 +920,17 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
     transpose4x4(VxState4, VxState3, VxState2, VxState1, T0x, T1x)  \
     revStates(VxShuffle, VxState1, VxState2, VxState3, VxState4)    \
     xor64(dst, src, VxState4, VxState3, VxState2, VxState1)         \
-    MOVQ $4, reg \
     concatenateX(VxState4, VxState3,VxState2, VxState1,VzState4)  \   //the order, need judge
     VMOVDQU32   VzState4,    (dst) \
+    CMPQ hashFlag, $0 \
+    JE X4Done \
+    MOVQ $4, reg \
     reverseBits(VzState4, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
     gHashBlocksLoopBy4(reg,VzState4) \ //truncate VySt
+X4Done:  \
+    NOP  \
 
-#define cryptoBlockAsmX2Macro(rk,dst, src, reg) \
+#define cryptoBlockAsmX2Macro(rk,dst, src, reg, hashFlag) \
     \//loadShuffle128()   \
     \//loadInputX2(src, VxState1, VxState2)   \
     \//loadMatrix(VxPreMatrix, VxPostMatrix)  \
@@ -938,13 +950,17 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
     rev32(VxShuffle, VxState4)  \
     rev32(VxShuffle, VxState3)  \
     xor32(dst, src, VxState4, VxState3)   \
+    CMPQ hashFlag, $0 \
+    JE X2Done \
     MOVQ $2, reg \
     reverseBits(VxState4, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
-    gHashBlocksLoopBy1(reg,VxState4) \
     reverseBits(VxState3, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
+    gHashBlocksLoopBy1(reg,VxState4) \
     gHashBlocksLoopBy1(reg,VxState3) \
+X2Done:  \
+    NOP  \
 
-#define cryptoBlockAsmX1Macro(rk,dst,src,reg)    \
+#define cryptoBlockAsmX1Macro(rk,dst,src,reg, hashFlag)    \
     \//loadShuffle128()   \
     \//loadInputX1(src, VxState1)  \
     \//loadMatrix(VxPreMatrix, VxPostMatrix)  \
@@ -962,9 +978,13 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
     transpose4x1(VxState4, VxState3, VxState2, VxState1, T0x, T1x) \
     rev32(VxShuffle, VxState4)  \
     xor16(dst, src, VxState4) \
+    CMPQ hashFlag, $0 \
+    JE X1Done \
     MOVQ $1, reg \
     reverseBits(VxState4, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
     gHashBlocksLoopBy1(reg,VxState4) \
+X1Done: \
+    NOP \
 
 #define cryptoBlockAsmRemain(rk,dst,src,reg)    \
     \//loadShuffle128()   \
@@ -1061,7 +1081,7 @@ TEXT ·clearRight(SB),NOSPLIT,$0-16
     RET
 
 //cryptoBlocksAsm(roundKeys *uint32, out []byte, in []byte, preCounter *byte, counter *byte, tmp *byte) --- used registers: R8-R15, SI,DI,AX-DX  something happend between uint and int,need check again
-#define cryptoBlocksAsm(rk,dst,src,len,tmp,blockCount,reg1,reg2,reg3) \    //tmp include counter and tmp
+#define cryptoBlocksAsm(rk,dst,src,len,tmp,blockCount,reg1,reg2,reg3,hashFlag) \    //tmp include counter and tmp
     MOVL $0, blockCount \
     cryptoBlocksPrepare(reg1,reg2,reg3)   \  //now suppose const1,2,3 has in the right place
     CMPQ len, $64    \
@@ -1072,7 +1092,7 @@ loopX16:   \
     JL loopX8   \
     fillCounterX16()   \
     \//loadInputX16(tmp, VzState1, VzState2, VzState3, VzState4)  \
-    cryptoBlockAsmX16Macro(rk,dst,src, reg1)   \
+    cryptoBlockAsmX16Macro(rk,dst,src, reg1,hashFlag)   \
     \//xor256(dst,dst,src)
     ADDQ $256, dst   \
     ADDQ $256, src   \
@@ -1082,7 +1102,7 @@ loopX8:   \
     CMPQ len, $128   \
     JL loopX4   \
     fillCounterX8()  \
-    cryptoBlockAsmX8Macro(rk, dst, src, reg1)  \
+    cryptoBlockAsmX8Macro(rk, dst, src, reg1,hashFlag)  \
     ADDQ $128, dst   \
     ADDQ $128, src   \
     SUBQ $128, len   \
@@ -1091,7 +1111,7 @@ loopX4:   \
     CMPQ len, $64  \
     JL loopX2  \
     fillCounterX4()   \
-    cryptoBlockAsmX4Macro(rk, dst, src, reg1)   \
+    cryptoBlockAsmX4Macro(rk, dst, src, reg1,hashFlag)   \
     ADDQ $64, dst   \
     ADDQ $64, src   \
     SUBQ $64, len  \
@@ -1100,7 +1120,7 @@ loopX2:    \
     CMPQ len, $32   \
     JL loopX1    \
     fillCounterX2()   \
-    cryptoBlockAsmX2Macro(rk, dst, src, reg1)   \
+    cryptoBlockAsmX2Macro(rk, dst, src, reg1,hashFlag)   \
     ADDQ $32, dst   \
     ADDQ $32, src   \
     SUBQ $32, len    \
@@ -1113,7 +1133,7 @@ loopX1:     \
     fillCounterX1()   \
     \//rev32(VxShuffle,VxJ0) \  //for debug here, need to be delete
     \//storeOutputX1(VxJ0, Tmp) \ //for debug here, need to be deleted
-    cryptoBlockAsmX1Macro(rk, dst,src, reg1)  \
+    cryptoBlockAsmX1Macro(rk, dst,src, reg1,hashFlag)  \
     \//reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x) \  //for debug here
     \//storeOutputX1(VxTag, Tmp) \ //for debug here, need to be deleted
     ADDQ $16, dst   \
@@ -1129,6 +1149,8 @@ loopX0:    \
     MOVQ len, reg2 \
     copyAsm(dst,tmp,len,reg3)  \
     SUBQ reg2, tmp \
+    CMPQ hashFlag, $0 \
+    JE cryptoBlocksDone \
     MOVQ $1, reg3 \
     loadInputX1(tmp, VxState4) \
     reverseBits(VxState4, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
@@ -1300,6 +1322,43 @@ withRemain:  \
 endSPre:
     NOP
 
+#define CalculateSMid(aData,aLen, blockCount, remain, tmp, reg1, reg2, reg3) \
+    MOVQ aLen, blockCount   \
+    MOVQ aLen, remain    \
+    ANDQ $15, remain     \
+    SHRQ $4, blockCount \
+    \//gHashBlocksPre(reg1, reg2, reg3) \
+    CMPQ aLen, $16 \
+    JL toRemain \
+    CMPQ blockCount, $8  \
+    JL loop1  \
+    \//gHashBlocksLoopBy4Pre(reg1) \
+loop4:         \
+    loadADataX4(aData, VzAData) \ //load additionalData
+    gHashBlocksLoopBy4(blockCount, VzAData) \
+    CMPQ        blockCount, $3    \
+    JG          loop4      \
+    CMPQ        blockCount, $0    \
+    JE          toRemain    \
+loop1:  \
+    loadADataX1(aData, VxAData) \ //load additionalData
+    gHashBlocksLoopBy1(blockCount, VxAData) \
+    CMPQ        blockCount, $0   \
+    JG          loop1     \
+toRemain:  \
+    CMPQ remain, $0    \
+    JE endSMid        \
+    MOVQ remain, reg2 \
+    MOVQ $0, (tmp) \
+    MOVQ $0, 8(tmp) \
+    copyAsm(tmp,aData,remain, reg1) \
+    SUBQ reg2, tmp \
+    loadADataX1(tmp, VxAData) \
+    MOVQ $1, blockCount   \
+    gHashBlocksLoopBy1(blockCount, VxAData) \
+endSMid:
+    NOP
+
 #define CalculateSPost(tag, aLen, cLen, tmp, blockCount,tagSize) \
     SHLQ $3, aLen \
     SHLQ $3, cLen  \
@@ -1406,6 +1465,8 @@ TEXT ·expandKeyAsm(SB),NOSPLIT,$0-24
 #define Reg32 R13
 #define Tmp SI
 #define H AX
+#define ETag AX
+#define HashFlag AX
 #define J0 BX
 #define Reg1 CX
 #define Reg2 DX
@@ -1945,7 +2006,8 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
     MOVQ dst+16(FP), Dst
     MOVQ plaintext+48(FP), Plaintext
     MOVQ plainLen+56(FP), PlainLen
-    cryptoBlocksAsm(RK,Dst,Plaintext,PlainLen,Tmp,BlockCount3,Reg1,Reg2,Reg33)
+    MOVQ $1, HashFlag
+    cryptoBlocksAsm(RK,Dst,Plaintext,PlainLen,Tmp,BlockCount3,Reg1,Reg2,Reg33, HashFlag)
     //MOVQ temp+112(FP), Tmp   //for debug use
     //ADDQ $80, Tmp
     //for debug
@@ -1973,17 +2035,62 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
     RET
 
 
+TEXT ·constantTimeCompareAsm(SB), NOSPLIT, $0-28
+    MOVQ x+0(FP), DI
+    MOVQ y+8(FP), SI
+    MOVQ l+16(FP), AX
+    MOVQ $0, BX
+    MOVQ $0, CX
+fastCmp:
+    CMPQ AX, $8
+    JL slowCmp
+    MOVQ (DI), DX
+    XORQ DX, (SI)
+    ORQ (SI),BX
+    ADDQ $8, DI
+    ADDQ $8, SI
+    SUBQ $8, AX
+    JMP fastCmp
+slowCmp:
+    CMPQ AX, $1
+    JL done
+    MOVB (DI), DX
+    XORB DX, (SI)
+    ORB (SI), CX
+    ADDQ $1, DI
+    ADDQ $1, SI
+    SUBQ $1, AX
+    JMP slowCmp
+done:
+    ORB BX, CX
+    SHRQ $8, BX
+    ORB BX, CX
+    SHRQ $8, BX
+    ORB BX, CX
+    SHRQ $8, BX
+    ORB BX, CX
+    SHRQ $8, BX
+    ORB BX, CX
+    SHRQ $8, BX
+    ORB BX, CX
+    SHRQ $8, BX
+    ORB BX, CX
+    SHRQ $8, BX
+    ORB BX, CX
+    MOVL CX, ret1+24(FP)
+    RET
 
-//func constantTimeCompareAsm(x *byte, y *byte, l int) int32. the result is in temp2
+
+//func constantTimeCompareAsm(x *byte, y *byte, l int) int32. the result is in reg2
 #define constantTimeCompare(x,y,l,reg1,reg2,reg3) \
     MOVQ $0, reg1   \
     MOVQ $0, reg2   \
-fastCmp:             \
+ fastCmp:             \
     CMPQ l, $8       \
     JL slowCmp       \
-    MOVQ (x), reg3  \
-    XORQ reg3, (y)  \
-    ORQ (y),reg1    \
+    MOVQ 0(x), reg3  \
+    XORQ reg3, 0(y)   \
+    ORQ (y),reg1  \
     ADDQ $8, x       \
     ADDQ $8, y       \
     SUBQ $8, l       \
@@ -1998,7 +2105,7 @@ slowCmp:             \
     ADDQ $1, y       \
     SUBQ $1, l       \
     JMP slowCmp      \
-cmpDone:                \
+cmpDone:             \
     ORB reg1, reg2 \
     SHRQ $8, reg1   \
     ORB reg1, reg2 \
@@ -2016,45 +2123,108 @@ cmpDone:                \
     ORB reg1, reg2 \
 
 
-//func openAsm(roundKeys *uint32, tagSize int,dst []byte, nonce []byte, ciphertext []byte, additionalData []byte, temp *byte) ([]byte, int)
+//func openAsm(roundKeys *uint32, tagSize int,dst *byte, nonce []byte, ciphertext []byte, additionalData []byte, temp *byte) int
 ////temp: H, J0, TMask, expectedTag, tmp, Counter-256, TMP-256
 //used registers: Enc, H, Nonce, Tmp, J0, TMask, Ciphertext, AdditionalData, Dst
 TEXT ·openAsm(SB), NOSPLIT, $80-148
-    cryptoPrepare(Reg1, Reg2, Reg31)   //Z26, Z16, Z17 is used to load constant
-    MOVQ h+112(FP), H
+    MOVQ rk+0(FP), RK
+    MOVQ tagSize+8(FP), TagSize
+    MOVQ dst+16(FP), Dst
+    MOVQ nonce+24(FP), Nonce
+    MOVQ cipher+48(FP), Cipher
+    MOVQ aData+72(FP), AData
+    MOVQ tmp+96(FP), Tmp
+
+    cryptoPrepare(Reg1, Reg2, Reg31)
+    MOVQ h+96(FP), H
     loadState1(H)
 
     MOVQ rk+0(FP), RK
-    cryptoBlockAsmMacro(RK) //H stored in VxH, not need reverse
+    cryptoBlockAsmMacro(RK) //H stored in VxH, keep order
     //movv(VxState4, VxH)
     loadH(VxState4, VxH)
 
-    MOVQ nonce+40(FP), Nonce
-    MOVQ nonceLen+48(FP), NonceLen
-    MOVQ temp+112(FP), Tmp
+    gHashPre(Reg1, Reg2, Reg31)
+
+    MOVQ nonce+24(FP), Nonce
+    MOVQ nonceLen+32(FP), NonceLen
+    MOVQ tmp+96(FP), Tmp
     ADDQ $64, Tmp
-    setZero(VzTag)
-    calculateJ0(Nonce,NonceLen,BlockCount1,Remain1,Tmp,Reg1, Reg2, Reg31)  //J0 store in VxJ0, keep order
+    setZero(VzTag) // change later at last.  here setZero can be deleted
+    calculateJ0(Nonce,NonceLen,BlockCount1,Remain1,Tmp,Reg1, Reg2, Reg31)  //J0 store in VxJ0, keep order,  VxH reverse order
 
     movv(VxJ0, VxState1)
     cryptoBlockAsmMacro(RK)
-    movv(VxState4, VxTMask)
+    movv(VxState4, VxTMask) // the cipher of J0 is stored in VxTMask, keep order, no reverse
 
     setZero(VxTag)
-    MOVQ aData+88(FP), AData
-    MOVQ aLen+96(FP), ALen
-    CalculateSPre(AData,ALen, BlockCount2, Remain2, Tmp, Reg1, Reg2, Reg32) //GHash(A||0) is stored in VxTag
+    MOVQ aData+72(FP), AData
+    MOVQ aLen+80(FP), ALen
+    CalculateSPre(AData,ALen, BlockCount2, Remain2, Tmp, Reg1, Reg2, Reg32) //GHash(A||0) is stored in VxTag and is reverseBits, VxH is also reversebits
 
-    MOVQ dst+16(FP), Dst
-    MOVQ cipher+64(FP), Cipher
-    MOVQ cipherLen+64(FP), CipherLen
+    MOVQ cipher+48(FP), Cipher
+    MOVQ cipherLen+56(FP), CipherLen
     MOVQ tagSize+8(FP), TagSize
     SUBQ TagSize, CipherLen
-    cryptoBlocksAsm(RK,Dst,Cipher,CipherLen,Tmp,BlockCount3,Reg1,Reg2,Reg33)
+    MOVQ tmp+96(FP), Tmp
+    ADDQ $64, Tmp
+    CalculateSMid(Cipher,CipherLen, BlockCount2, Remain2, Tmp, Reg1, Reg2, Reg32)
 
-    CalculateSPost(Tmp, ALen, CipherLen, Tmp, BlockCount3,TagSize)
+    MOVQ aLen+80(FP), ALen
+    MOVQ cipherLen+56(FP), CipherLen
+    MOVQ tagSize+8(FP), TagSize
+    SUBQ TagSize, CipherLen
+    MOVQ tmp+96(FP), Tmp
+    MOVQ Tmp, ETag
+    ADDQ $64, Tmp
+    ADDQ $48, ETag
+    CalculateSPost(ETag, ALen, CipherLen, Tmp, BlockCount3, TagSize)  //Tag is stored in ETag
+    //MOVQ tmp+96(FP), Tmp   // for debug
+    ////reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
+    //storeOutputX1(VxTag, Tmp)
 
+    MOVQ tmp+96(FP), ETag
+    ADDQ $48, ETag
+    MOVQ cipher+48(FP), Cipher
+    MOVQ cipherLen+56(FP), CipherLen
+    MOVQ tagSize+8(FP), TagSize
+    SUBQ TagSize, CipherLen
     ADDQ CipherLen, Cipher
-    constantTimeCompare(Tmp,Cipher,TagSize, Reg1, Reg2, Reg33) // the origin tag is put in cipher[len(ciphertext)-tagsize : ]
+    constantTimeCompare(ETag, Cipher, TagSize,Reg1,Reg2,Reg32)
 
-    //RET   there is still a bug unsolved, ret may contain in some macros
+    CMPQ Reg2, $0
+    JNE tagUnMatch
+    MOVQ $0xA5A5, ret1+104(FP)
+
+    MOVQ dst+16(FP), Dst
+    MOVQ cipher+48(FP), Cipher
+    MOVQ cipherLen+56(FP), CipherLen
+    MOVQ tmp+96(FP), Tmp
+    ADDQ $48, Tmp
+    MOVQ $0, HashFlag
+    cryptoBlocksAsm(RK,Dst,Cipher,CipherLen,Tmp,BlockCount3,Reg1,Reg2,Reg33,HashFlag)
+
+    JMP openDone
+
+tagUnMatch:
+    MOVQ $0x5A5A, ret1+104(FP)    //tag unmatch
+
+openDone:
+    RET
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
