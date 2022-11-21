@@ -200,8 +200,8 @@ func fillCounterX(dst *byte, src *byte, count uint32, blockNum uint32)
 //go:noescape
 func cryptoBlocksAsm(roundKeys *uint32, out []byte, in []byte, preCounter *byte, counter *byte, tmp *byte)
 
-//go:noescape
-func xorAsm(src1 *byte, src2 *byte, len int32, dst *byte)
+////go:noescape
+//func xorAsm(src1 *byte, src2 *byte, len int32, dst *byte)
 
 //go:noescape
 func calculateFirstCounterAsm(nonce []byte, counter *byte, H *byte, tmp *byte)

@@ -51,6 +51,12 @@ func Test_clearRight(t *testing.T){
 	fmt.Println(state)
 }
 
+func Test_makeCounterNew(t *testing.T){
+	src := [12]byte{1,2,3,4,5,6,7,8,9,10,11,12}
+	dst := [16]byte{}
+	makeCounterNew(&src[0], &dst[0])
+	fmt.Println(dst)
+}
 
 func Test_transpose4x4(t *testing.T) {
 	plain := makeMatrix()

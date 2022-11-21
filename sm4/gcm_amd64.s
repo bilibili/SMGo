@@ -43,7 +43,6 @@ DATA CK<>+0x7c(SB)/4, $0x646b7279
 GLOBL CK<>(SB), (NOPTR+RODATA), $128
 
 //********        CIPH related      ********
-
 DATA Counter_Add1<>+0x00(SB)/8, $0x0000000000000000
 DATA Counter_Add1<>+0x08(SB)/8, $0x0000000100000000
 DATA Counter_Add1<>+0x10(SB)/8, $0x0000000000000000
@@ -366,12 +365,7 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
 #define VzH          Z17
 
 //X/Y/Z 18 Nonce/Additional Data/Data
-#define VxNonce      X18       // 18
-#define VxAData      X18
 #define VxDat        X18
-
-#define VzNonce      Z18
-#define VzAData      Z18
 #define VzDat        Z18
 
 #define VxTag        X19
@@ -423,10 +417,122 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
 
 #define VzIdx        Z31
 
+//consider at last *******
+#define needExpandAsm(arrayLen, arrayCap, asked, res, temp1, temp2) \
+    MOVQ arrayCap, temp1     \
+    SUBQ arrayLen, temp1     \
+    MOVQ $0, temp2           \
+    CMPQ temp1, asked         \
+    JGE 2(PC)                \
+    MOVQ $1, temp2           \
+    MOVQ temp2, res          \
 
-//*****************************
+TEXT ·needExpand(SB), $0-40
+	MOVQ array+0(FP), DI
+	MOVQ arrayLen+8(FP), SI
+	MOVQ arrayCap+16(FP), AX
+	MOVQ asked+24(FP), BX
+	needExpandAsm(SI, AX, BX, CX, R8, R9)
+	MOVQ CX, ret1+32(FP)
+	RET
 
-/////////////////////////////////////////////
+#define movv(V1, V2) \
+    \//VPXORD V2, V2, V2 \
+    \//VPADDD V2, V1, V2 \
+    VMOVAPD V1, V2 \
+
+//for 512-bit lanes,
+//Suppose we have V1z=(a0, a1, -, -), and V2z=(b0,b1,-,-), we want to have V=(a0, a1, b0, b1)
+#define concatenateY(V1y,V2y,V1z) \
+    VMOVDQA64 V1y, T2y        \           //T2z = (a0, a1, 0, 0)
+    VMOVDQA64 V2y, T3y         \     //T3z = (b0, b1, 0,0)
+    VALIGND $8, T2z, T3z, T3z \  //T3z = (0,0, b0 b1)
+    VPADDD T2z, T3z, V1z      \    //V1z = (a0, a1, b0, b1)
+
+#define makeCounterNew(VxD, src, reg) \
+    MOVQ $0b0111, reg     \
+    KMOVW reg, MASK       \
+    VPXORD VxD, VxD, VxD  \
+    VMOVDQU32 (src), MASK, VxD \
+    VMOVAPD VxAdd1, T0x \
+    PSLLDQ $3, T0x \
+    VPADDD VxD, T0x, VxD   \
+
+#define copyAsm(dst,src,len,tmp)  \
+    CMPQ len, $8    \
+    JL 7(PC)     \
+    MOVQ 0(src), tmp \
+    MOVQ tmp, 0(dst) \
+    ADDQ $8, src    \
+    ADDQ $8, dst    \
+    SUBQ $8, len    \
+    JMP  -7(PC)      \
+    CMPQ len, $4    \
+    JL  7(PC)       \
+    MOVL 0(src), tmp \
+    MOVL tmp, 0(dst) \
+    ADDQ $4, src    \
+    ADDQ $4, dst    \
+    SUBQ $4, len    \
+    JMP -7(PC)       \
+    CMPQ len, $2    \
+    JL  7(PC)       \
+    MOVW 0(src), tmp \
+    MOVW tmp, 0(dst) \
+    ADDQ $2, src    \
+    ADDQ $2, dst    \
+    SUBQ $2, len    \
+    JMP -7(PC)       \
+    CMPQ len, $1    \
+    JL 7(PC)         \
+    MOVB 0(src), tmp \
+    MOVB tmp, 0(dst) \
+    ADDQ $1, src    \
+    ADDQ $1, dst    \
+    SUBQ $1, len    \
+    JMP -7(PC)       \
+    NOP             \
+
+
+#define setZero(V1) \
+    VPXORD V1, V1, V1 \
+
+
+
+#define clearRight(dst,len,reg1,reg2) \
+    MOVQ dst, reg2 \
+    ADDQ len, reg2 \
+    MOVQ $16, reg1 \
+    SUBQ len, reg1 \
+loop:             \
+    CMPQ reg1, $0 \
+    JLE end       \
+    MOVB $0, (reg2) \
+    ADDQ $1, reg2   \
+    SUBQ $1, reg1  \
+    JMP loop       \
+end:               \
+    NOP            \
+
+//func clearRight(dst *byte, len int)
+TEXT ·clearRight(SB),NOSPLIT,$0-16
+    MOVQ d+0(FP), AX
+    MOVQ len+8(FP), BX
+    clearRight(AX,BX,CX, DX)
+    RET
+
+
+// **************       related with rev        ***************
+// related with reverse bytes
+#define rev32(Const, R) \
+    VPSHUFB     Const, R, R \ // AVX512F(512) or SSE2(128) or AVX2(256), latency 1, CPI 0.5(256)/1(128;512)
+
+#define revStates(Const, S1, S2, S3, S4) \
+    rev32(Const, S1) \
+    rev32(Const, S2) \
+    rev32(Const, S3) \
+    rev32(Const, S4) \
+
 #define rev64(reg,src,VxD)           \
     MOVQ        $Shuffle2<>(SB), reg \
     VMOVDQU32   (reg), T0x           \
@@ -445,16 +551,33 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
     KMOVW       reg1, MASK            \
     VPSHUFB     T0x, T2x, MASK, VxD   \
 
+//related with reverse bits  - load consts
+#define loadMasks(tmp1,tmp2,tmp3) \
+    MOVQ                $AND_MASK<>(SB), tmp1 \
+    MOVQ                $LOWER_MASK<>(SB), tmp2 \
+    MOVQ                $HIGHER_MASK<>(SB), tmp3 \
+    VBROADCASTI32X4     (tmp1), VzAndMask \ // latency 8, CPI 0.5
+    VBROADCASTI32X4     (tmp2), VzLowerMask \
+    VBROADCASTI32X4     (tmp3), VzHigherMask \
 
-#define needExpandAsm(arrayLen, arrayCap, asked, res, temp1, temp2) \
-    MOVQ arrayCap, temp1     \
-    SUBQ arrayLen, temp1     \
-    MOVQ $0, temp2           \
-    CMPQ temp1, asked         \
-    JGE 2(PC)                \
-    MOVQ $1, temp2           \
-    MOVQ temp2, res          \
+//reverse bits
+#define reverseBits(V, And, Higher, Lower, T0, T1) \
+    VPSRLW      $4, V, T0 \ //AVX512BW
+    VPANDD      V, And, T1 \ // the lower part
+    VPANDD      T0, And, T0 \ // the higher part
+    VPSHUFB     T1, Higher, T1 \
+    VPSHUFB     T0, Lower, T0 \
+    VPXORD      T0, T1, V \
+    //VPSHUFB     VxBSwapMask, T0, V \
 
+#define reverseBitsZ4(Vz1, Vz2, Vz3, Vz4) \
+    reverseBits(Vz1, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
+    reverseBits(Vz2, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
+    reverseBits(Vz3, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
+    reverseBits(Vz4, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
+
+// **************       related with load        ***************
+//load shuffle constant
 #define loadShuffle512(reg) \
     MOVQ                $Shuffle<>(SB), reg \
     VBROADCASTI32X4     (reg), VzShuffle \ // AVX512F, latency 8? CPI 0.5
@@ -467,122 +590,140 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
     MOVQ        $Shuffle<>(SB), reg \
     VMOVDQU32   (reg), VxShuffle \
 
-#define storeOutputX8(V1, V2, V3, V4, Dst) \
-        VMOVDQU32   V1, (Dst) \ //AVX, latency 5, CPI 1
-        VMOVDQU32   V2, (32)(Dst) \
-        VMOVDQU32   V3, (64)(Dst) \
-        VMOVDQU32   V4, (96)(Dst) \
-
+//load input with 16 blocks
 #define loadInputX16(Src, V1, V2, V3, V4) \ // FIXME: little endian
     VMOVDQU32   (Src), V1 \ //AVX512F, latency 8, CPI 0.5 -- we should delay the transpose operations
     VMOVDQU32   (64)(Src), V2 \
     VMOVDQU32   (128)(Src), V3 \
     VMOVDQU32   (192)(Src), V4 \
 
+//load input with 8 blocks
 #define loadInputX8(Src, V1, V2, V3, V4) \
     VMOVDQU32   (Src), V1 \ //AVX, latency 7, CPI 0.5
     VMOVDQU32   (32)(Src), V2 \ // we should perform transpose later
     VMOVDQU32   (64)(Src), V3 \
     VMOVDQU32   (96)(Src), V4 \
 
+//load input with 4 blocks
 #define loadInputX4(Src, V1, V2, V3, V4) \
     VMOVDQU32   (Src), V1 \
     VMOVDQU32   (16)(Src), V2 \
     VMOVDQU32   (32)(Src), V3 \
     VMOVDQU32   (48)(Src), V4 \
 
+//load input with 2 blocks
 #define loadInputX2(Src, V1, V2) \ // we should perform transpose/rev later
     VMOVDQU32   (Src), V1 \
     VMOVDQU32   (16)(Src), V2 \
 
+//load input with 1 blocks
 #define loadInputX1(Src, V1) \ // we should perform transpose/rev later
     VMOVDQU32   (Src), V1 \
 
+//load data with 4 blocks and store in VzDat
+#define load4X(data) \
+    VMOVDQU32   (data), VzDat \
+    ADDQ        $64, data \
+    reverseBits(VzDat, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
+
+//load data with 1 block and store in VxDat
+#define load1X(data) \
+    VMOVDQU32   (data), VxDat \
+    ADDQ        $16, data \
+    reverseBits(VxDat, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
+
+//load temp block
+#define loadTmp(Src, V1) \
+    VMOVDQU32   (Src), V1 \
+    reverseBits(V1, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
+
+//load H
+#define loadH(V1, V2) \
+    VPXORD V2, V2, V2 \
+    VPADDD V2, V1, V2 \
+    reverseBits(V2, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
+
+// **************       related with store        ***************
+//store output with 16 blocks
 #define storeOutputX16(V1, V2, V3, V4, Dst) \ // FIXME: little endian
     VMOVDQU32   V1, (Dst) \ //AVX512F, latency 5, CPI 1
     VMOVDQU32   V2, (64)(Dst) \
     VMOVDQU32   V3, (128)(Dst) \
     VMOVDQU32   V4, (192)(Dst) \
 
+//store output with 8 blocks
+#define storeOutputX8(V1, V2, V3, V4, Dst) \
+        VMOVDQU32   V1, (Dst) \ //AVX, latency 5, CPI 1
+        VMOVDQU32   V2, (32)(Dst) \
+        VMOVDQU32   V3, (64)(Dst) \
+        VMOVDQU32   V4, (96)(Dst) \
+
+//store output with 4 blocks
 #define storeOutputX4(V1, V2, V3, V4, Dst) \
         VMOVDQU32   V1, (Dst) \ //SSE2, latency 5, CPI 1
         VMOVDQU32   V2, (16)(Dst) \
         VMOVDQU32   V3, (32)(Dst) \
         VMOVDQU32   V4, (48)(Dst) \
 
+//store output with 2 blocks
 #define storeOutputX2(V1, V2, Dst) \
         VMOVDQU32   V1, (Dst) \ //SSE2, latency 5, CPI 1
         VMOVDQU32   V2, (16)(Dst) \
 
+//store output with 1 blocks
 #define storeOutputX1(V1, Dst) \
         VMOVDQU32   V1, (Dst) \
-    
-#define loadJ0(Src, V1) \
-    VMOVDQU32   (Src), V1 \
-    \//rev32(VxShuffle, V1)  \    //maybe here can improve the performance by use the following second method
-    \//reverseBits(V1, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
 
-#define loadNonceX4(Src, V1) \
-    VMOVDQU32   (Src), V1 \
-    ADDQ $64, Src \
-    reverseBits(V1, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
+// **************       related with xor        ***************
+#define xor256(dst,src, Vz1, Vz2, Vz3, Vz4)    \
+    VMOVDQU32   (src),    Z0        \
+    VMOVDQU32   64(src),  Z1        \
+    VMOVDQU32   128(src), Z2        \
+    VMOVDQU32   192(src), Z3        \
+    VPXORD      Vz1, Z0, Vz1        \
+    VPXORD      Vz2, Z1, Vz2        \
+    VPXORD      Vz3, Z2, Vz3        \
+    VPXORD      Vz4, Z3, Vz4        \
+    VMOVDQU32   Vz1,   (dst)        \
+    VMOVDQU32   Vz2,   64(dst)      \
+    VMOVDQU32   Vz3,   128(dst)     \
+    VMOVDQU32   Vz4,   192(dst)     \
 
-#define loadNonceX1(Src, V1) \
-    VMOVDQU32   (Src), V1 \
-    ADDQ $16, Src \
-    reverseBits(V1, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
+//func xor128(dst *byte, src1 *byte, src2 *byte)
+#define xor128(dst,src,Vy1,Vy2,Vy3,Vy4) \
+    VMOVDQU32   (src),   Y1      \
+    VMOVDQU32   32(src), Y2      \
+    VMOVDQU32   64(src), Y3      \
+    VMOVDQU32   96(src), Y4      \
+    VPXORD      Y1, Vy1, Vy1     \
+    VPXORD      Y2, Vy2, Vy2     \
+    VPXORD      Y3, Vy3, Vy3     \
+    VPXORD      Y4, Vy4, Vy4     \
 
-#define loadADataX4(Src, V1) \
-    VMOVDQU32   (Src), V1 \
-    ADDQ $64, Src \
-    reverseBits(V1, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
+#define xor64(dst, src, Vx1, Vx2, Vx3, Vx4) \
+    VMOVDQU32   (src),   X1      \
+    VMOVDQU32   16(src), X2      \
+    VMOVDQU32   32(src), X3      \
+    VMOVDQU32   48(src), X4      \
+    VPXORD      X1, Vx1, Vx1     \
+    VPXORD      X2, Vx2, Vx2     \
+    VPXORD      X3, Vx3, Vx3     \
+    VPXORD      X4, Vx4, Vx4     \
 
-#define loadADataX1(Src, V1) \
-    VMOVDQU32   (Src), V1 \
-    ADDQ $16, Src \
-    reverseBits(V1, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
+//func xor32(dst *byte, src1 *byte, src2 *byte)
+#define xor32(dst, src, Vx1, Vx2) \
+    VMOVDQU32   (src), X1     \
+    VMOVDQU32   16(src), X2   \
+    VPXORD      X1, Vx1, Vx1  \
+    VPXORD      X2, Vx2, Vx2  \
+    VMOVDQU32   Vx1, (dst)    \
+    VMOVDQU32   Vx2, 16(dst)  \
 
-#define loadTmp(Src, V1) \
-    VMOVDQU32   (Src), V1 \
-    reverseBits(V1, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
-
-#define load4X(data) \
-    VMOVDQU32   (data), VzDat \
-    ADDQ        $64, data \
-    reverseBits(VzDat, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
-
-#define load1X(data) \
-    VMOVDQU32   (data), VxDat \
-    ADDQ        $16, data \
-    reverseBits(VxDat, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
-
-#define loadRoundKey(R, RK) \
-    MOVD    (R), X1 \
-    ADDQ    $4, R \ //TODO replace by offsets to R
-    VPBROADCASTD        X1, RK \ // latency is 3 for 256/512, 1 otherwise; CPI 1
-
-#define loadRoundKeyZ(R) \
-    loadRoundKey(R, VzRoundKey) \
-
-#define loadRoundKeyY(R) \
-    loadRoundKey(R, VyRoundKey) \
-
-#define loadMatrix(Pre, Post, reg1, reg2) \
-    MOVQ    $PreAffineMatrix<>(SB), reg1 \
-    MOVQ    $PostAffineMatrix<>(SB), reg2 \
-    VBROADCASTI32X2     (reg1), Pre \ // latency is 3 for 256/512, 1 otherwise; CPI 1
-    VBROADCASTI32X2     (reg2), Post \ // 128/256: AVX512DQ+AVX512VL; 512: AVX512DQ
-
-#define rev32(Const, R) \
-    VPSHUFB     Const, R, R \ // AVX512F(512) or SSE2(128) or AVX2(256), latency 1, CPI 0.5(256)/1(128;512)
-
-#define revStates(Const, S1, S2, S3, S4) \
-    rev32(Const, S1) \
-    rev32(Const, S2) \
-    rev32(Const, S3) \
-    rev32(Const, S4) \
-
-
+//func xor16(dst *byte, src1 *byte, src2 *byte)
+#define xor16(dst, src, Vx1) \
+    VMOVDQU32   (src), X0   \
+    VPXORD      X0, Vx1, Vx1  \
+    VMOVDQU32   Vx1, (dst)    \
 
 // TODO double check requirements for every instructions
 
@@ -634,90 +775,46 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
     VPUNPCKLDQ  V4, V3, Tmp2 \        // Tmp2: a2, a3, -, -
     VPUNPCKLQDQ Tmp2, Tmp1, V1 \      // V1: a0, a1, a2, a3
 
-#define xor256(src,dst, V11, V12, V13, V14, V21, V22, V23, V24)    \
-    VMOVDQU32   (src), V21        \
-    VMOVDQU32   64(src), V22       \
-    VMOVDQU32   128(src), V23      \
-    VMOVDQU32   192(src), V24     \
-    VPXORD      V11, V21, V11      \
-    VPXORD      V12, V22, V12      \
-    VPXORD      V13, V23, V13       \
-    VPXORD      V14, V24, V14       \
-    VMOVDQU32   V11, (dst)          \
-    VMOVDQU32   V12, 64(dst)        \
-    VMOVDQU32   V13, 128(dst)       \
-    VMOVDQU32   V14, 192(dst)       \
+// **************       related with round operation        ***************
+//load round key
+#define loadRoundKey(R, RK) \
+    MOVD    (R), X1 \
+    ADDQ    $4, R \ //TODO replace by offsets to R
+    VPBROADCASTD        X1, RK \ // latency is 3 for 256/512, 1 otherwise; CPI 1
 
+#define loadRoundKeyX(R) \
+    loadRoundKey(R, VxRoundKey) \
 
-//func xor128(dst *byte, src1 *byte, src2 *byte)
-#define xor128(dst,src,Vy1,Vy2,Vy3,Vy4) \
-    VMOVDQU32   (src),   Y1      \
-    VMOVDQU32   32(src), Y2      \
-    VMOVDQU32   64(src), Y3      \
-    VMOVDQU32   96(src), Y4      \
-    VPXORD      Y1, Vy1, Vy1     \
-    VPXORD      Y2, Vy2, Vy2     \
-    VPXORD      Y3, Vy3, Vy3     \
-    VPXORD      Y4, Vy4, Vy4     \
-    \//VMOVDQU32   Vy1,    (dst)    \
-    \//VMOVDQU32   Vy2,  32(dst)    \
-    \//VMOVDQU32   Vy3,  64(dst)    \
-    \//VMOVDQU32   Vy4,  96(dst)    \
+#define loadRoundKeyY(R) \
+    loadRoundKey(R, VyRoundKey) \
 
-#define xor64(dst, src, Vx1, Vx2, Vx3, Vx4) \
-    VMOVDQU32   (src),   X1      \
-    VMOVDQU32   16(src), X2      \
-    VMOVDQU32   32(src), X3      \
-    VMOVDQU32   48(src), X4      \
-    VPXORD      X1, Vx1, Vx1     \
-    VPXORD      X2, Vx2, Vx2     \
-    VPXORD      X3, Vx3, Vx3     \
-    VPXORD      X4, Vx4, Vx4     \
-    \//VMOVDQU32   Vx1,    (dst)    \
-    \//VMOVDQU32   Vx2,  16(dst)    \
-    \//VMOVDQU32   Vx3,  32(dst)    \
-    \//VMOVDQU32   Vx4,  48(dst)    \
+#define loadRoundKeyZ(R) \
+    loadRoundKey(R, VzRoundKey) \
 
-//func xor32(dst *byte, src1 *byte, src2 *byte)
-#define xor32(dst, src, Vx1, Vx2) \
-    VMOVDQU32   (src), X1     \
-    VMOVDQU32   16(src), X2   \
-    VPXORD      X1, Vx1, Vx1  \
-    VPXORD      X2, Vx2, Vx2  \
-    VMOVDQU32   Vx1, (dst)    \
-    VMOVDQU32   Vx2, 16(dst)  \
+//related with sub round calculation
+#define getXorX(B, C, D, Dst) \
+    getXor(B, C, D, Dst, T0x, T1x, VxRoundKey) \
 
-//func xor16(dst *byte, src1 *byte, src2 *byte)
-#define xor16(dst, src, Vx1) \
-    VMOVDQU32   (src), X0   \
-    VPXORD      X0, Vx1, Vx1  \
-    VMOVDQU32   Vx1, (dst)    \
+#define getXorY(B, C, D, Dst) \
+        getXor(B, C, D, Dst, T0y, T1y, VyRoundKey) \
 
-#define movv(V1, V2) \
-    VPXORD V2, V2, V2 \
-    VPADDD V2, V1, V2 \
+#define getXorZ(B, C, D, Dst) \
+    getXor(B, C, D, Dst, T0z, T1z, VzRoundKey) \
 
-#define loadH(V1, V2) \
-    VPXORD V2, V2, V2 \
-    VPADDD V2, V1, V2 \
-    reverseBits(V2, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)
+#define getXor(B, C, D, Dst, T0, T1, RK) \
+    VPXORD  B, C, T0 \ // AVX512F+AVX512VL, latency 1, CPI 0.33(128;256)/0.5(512)
+    VPXORD  D, T0, T1 \
+    VPXORD  RK, T1, Dst \ // loading round key (running prior to this) costs some latency so move it last
 
-#define loadMasks(tmp1,tmp2,tmp3) \
-    MOVQ                $AND_MASK<>(SB), tmp1 \
-    MOVQ                $LOWER_MASK<>(SB), tmp2 \
-    MOVQ                $HIGHER_MASK<>(SB), tmp3 \
-    VBROADCASTI32X4     (tmp1), VzAndMask \ // latency 8, CPI 0.5
-    VBROADCASTI32X4     (tmp2), VzLowerMask \
-    VBROADCASTI32X4     (tmp3), VzHigherMask \
+#define loadMatrix(Pre, Post, reg1, reg2) \
+    MOVQ    $PreAffineMatrix<>(SB), reg1 \
+    MOVQ    $PostAffineMatrix<>(SB), reg2 \
+    VBROADCASTI32X2     (reg1), Pre \ // latency is 3 for 256/512, 1 otherwise; CPI 1
+    VBROADCASTI32X2     (reg2), Post \ // 128/256: AVX512DQ+AVX512VL; 512: AVX512DQ
 
-#define reverseBits(V, And, Higher, Lower, T0, T1) \
-    VPSRLW      $4, V, T0 \ //AVX512BW
-    VPANDD      V, And, T1 \ // the lower part
-    VPANDD      T0, And, T0 \ // the higher part
-    VPSHUFB     T1, Higher, T1 \
-    VPSHUFB     T0, Lower, T0 \
-    VPXORD      T0, T1, V \
-    //VPSHUFB     VxBSwapMask, T0, V \
+#define affine(PreMatrix, PostMatrix, Src, Interim, Dst) \
+    VGF2P8AFFINEQB $PreAffineConstant, PreMatrix, Src, Interim \ //GFNI + AVX512VL(128;256) / AVX512F(512)
+    VGF2P8AFFINEINVQB $PostAffineConstant, PostMatrix, Interim, Dst \ //latency 3?, CPI 0.5(128;256)/1(512)
 
 #define transformL(Data, T0, T1, T2, T3) \
     VPROLD    $2,  Data, T0 \ // AVX512F(512)+AVX512VL(128;256), latency 1, CPI 0.5(128;256)/1(512)
@@ -729,40 +826,42 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
     VPXORD    T0, T2, T0 \
     VPXORD    T0, Data, Data \
 
+#define transformLX(Data) \
+    transformL(Data, T0x, T1x, T2x, T3x)
+
 #define transformLY(Data) \
-        transformL(Data, T0y, T1y, T2y, T3y)
-
-#define affine(PreMatrix, PostMatrix, Src, Interim, Dst) \
-    VGF2P8AFFINEQB $PreAffineConstant, PreMatrix, Src, Interim \ //GFNI + AVX512VL(128;256) / AVX512F(512)
-    VGF2P8AFFINEINVQB $PostAffineConstant, PostMatrix, Interim, Dst \ //latency 3?, CPI 0.5(128;256)/1(512)
-
-#define getXorZ(B, C, D, Dst) \
-getXor(B, C, D, Dst, T0z, T1z, VzRoundKey) \
+    transformL(Data, T0y, T1y, T2y, T3y)
 
 #define transformLZ(Data) \
-transformL(Data, T0z, T1z, T2z, T3z) \
+    transformL(Data, T0z, T1z, T2z, T3z) \
 
-#define subRoundZ(A, B, C, D) \
-getXorZ(B, C, D, VzSrc) \
-affine(VzPreMatrix, VzPostMatrix, VzSrc, VzInterim, VzDst) \
-transformLZ(VzDst) \
-VPXORD  VzDst, A, A \
-
-#define roundZ(R) \
-loadRoundKeyZ(R) \
-subRoundZ(VzState1, VzState2, VzState3, VzState4) \
-loadRoundKeyZ(R) \
-subRoundZ(VzState2, VzState3, VzState4, VzState1) \
-loadRoundKeyZ(R) \
-subRoundZ(VzState3, VzState4, VzState1, VzState2) \
-loadRoundKeyZ(R) \
-subRoundZ(VzState4, VzState1, VzState2, VzState3) \
+#define subRoundX(A, B, C, D) \
+    getXorX(B, C, D, VxSrc) \
+    affine(VxPreMatrix, VxPostMatrix, VxSrc, VxInterim, VxDst) \
+    transformLX(VxDst) \
+    VPXORD  VxDst, A, A \
 
 #define subRoundY(A, B, C, D) \
     getXorY(B, C, D, VySrc) \
     affine(VyPreMatrix, VyPostMatrix, VySrc, VyInterim, VyDst) \
     transformLY(VyDst) \
     VPXORD  VyDst, A, A \
+
+#define subRoundZ(A, B, C, D) \
+    getXorZ(B, C, D, VzSrc) \
+    affine(VzPreMatrix, VzPostMatrix, VzSrc, VzInterim, VzDst) \
+    transformLZ(VzDst) \
+    VPXORD  VzDst, A, A \
+
+#define roundX(R) \
+    loadRoundKeyX(R) \
+    subRoundX(VxState1, VxState2, VxState3, VxState4) \
+    loadRoundKeyX(R) \
+    subRoundX(VxState2, VxState3, VxState4, VxState1) \
+    loadRoundKeyX(R) \
+    subRoundX(VxState3, VxState4, VxState1, VxState2) \
+    loadRoundKeyX(R) \
+    subRoundX(VxState4, VxState1, VxState2, VxState3) \
 
 #define roundY(R) \
     loadRoundKeyY(R) \
@@ -774,38 +873,15 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
     loadRoundKeyY(R) \
     subRoundY(VyState4, VyState1, VyState2, VyState3) \
 
-#define getXorX(B, C, D, Dst) \
-    getXor(B, C, D, Dst, T0x, T1x, VxRoundKey) \
-
-#define getXorY(B, C, D, Dst) \
-        getXor(B, C, D, Dst, T0y, T1y, VyRoundKey) \
-
-#define getXor(B, C, D, Dst, T0, T1, RK) \
-    VPXORD  B, C, T0 \ // AVX512F+AVX512VL, latency 1, CPI 0.33(128;256)/0.5(512)
-    VPXORD  D, T0, T1 \
-    VPXORD  RK, T1, Dst \ // loading round key (running prior to this) costs some latency so move it last
-
-#define transformLX(Data) \
-    transformL(Data, T0x, T1x, T2x, T3x)
-
-#define subRoundX(A, B, C, D) \
-    getXorX(B, C, D, VxSrc) \
-    affine(VxPreMatrix, VxPostMatrix, VxSrc, VxInterim, VxDst) \
-    transformLX(VxDst) \
-    VPXORD  VxDst, A, A \
-
-#define loadRoundKeyX(R) \
-    loadRoundKey(R, VxRoundKey) \
-
-#define roundX(R) \
-    loadRoundKeyX(R) \
-    subRoundX(VxState1, VxState2, VxState3, VxState4) \
-    loadRoundKeyX(R) \
-    subRoundX(VxState2, VxState3, VxState4, VxState1) \
-    loadRoundKeyX(R) \
-    subRoundX(VxState3, VxState4, VxState1, VxState2) \
-    loadRoundKeyX(R) \
-    subRoundX(VxState4, VxState1, VxState2, VxState3) \
+#define roundZ(R) \
+    loadRoundKeyZ(R) \
+    subRoundZ(VzState1, VzState2, VzState3, VzState4) \
+    loadRoundKeyZ(R) \
+    subRoundZ(VzState2, VzState3, VzState4, VzState1) \
+    loadRoundKeyZ(R) \
+    subRoundZ(VzState3, VzState4, VzState1, VzState2) \
+    loadRoundKeyZ(R) \
+    subRoundZ(VzState4, VzState1, VzState2, VzState3) \
 
 //gHash consider h and tag in Vx register by default
 //required Vx Registers later: VzReduce, VxH, VxTag, VxAndMask, VxHigherMask, VxLowerMask, VxHs
@@ -871,8 +947,13 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
 	VPSRLDQ     $8, VzH4, VzH4s     \
 	VPXORD      VzH4, VzH4s, VzH4s  \ //h^l in lower Hs
 
+#define gHashBlocksLoopBy1(count,data) \
+	VPXORD     VxTag, data, data  \
+	mul(VxH, VxHs, data, VxLow, VxMid, VxHigh, T0x)  \
+	reduce(VxTag, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)   \
+	SUBQ        $1, count   \
+
 #define gHashBlocksLoopBy4(count,data) \
-    \//load4X(data)         \
 	VPXORD     VzTag, data, data  \
 	mul(VzH4, VzH4s, data, VzLow, VzMid, VzHigh, T0z)  \
 	reduce(VzTag, VzReduce, VzLow, VzMid, VzHigh, T0z, T1z, T2z, T3z)  \
@@ -882,33 +963,13 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
 	VPXORD      T0x, T1x, VxTag     \ // VzTag: 0^1^2^3 : 0: 0: 0 (the higher lanes are cleared automatically - X version has lower CPI)
 	SUBQ        $4, count           \
 
-#define gHashBlocksLoopBy1(count,data) \
-    \//load1X(data)   \
-	VPXORD     VxTag, data, data  \
-	mul(VxH, VxHs, data, VxLow, VxMid, VxHigh, T0x)  \
-	reduce(VxTag, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)   \
-	SUBQ        $1, count   \
-
 #define gHashBlocksBlocksEnd(tag,tmp,tagSize,reg) \
-    \//MOVQ tmp2, count         \
-	\//MOVQ tmp1, data           \
 	reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)  \
 	VPXORD      VxTag, VxTMask, VxTag   \
 	VMOVDQU32   VxTag, (tmp)   \
 	copyAsm(tag,tmp,tagSize,reg)  \
 
-
-#define reverseBitsZ4(Vz1, Vz2, Vz3, Vz4) \
-    reverseBits(Vz1, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
-    reverseBits(Vz2, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
-    reverseBits(Vz3, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
-    reverseBits(Vz4, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
-
 #define cryptoBlockAsmX16Macro(rk,dst, src, reg, hashFlag)  \
-    \//loadShuffle512() \
-    \//loadInputX16(src, VzState1, VzState2, VzState3, VzState4)  \ // latency: 8  put forward
-    \//loadMatrix(VzPreMatrix, VzPostMatrix) \
-    \//revStates(VzShuffle, VzState1, VzState2, VzState3, VzState4)  \ // latency hiden successfully rev is not needed, as VzState1-4 is already in Vz
     transpose4x4(VzState1, VzState2, VzState3, VzState4, T0z, T1z) \
     roundZ(rk) \
     roundZ(rk) \
@@ -921,11 +982,10 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
     SUBQ $128, rk \
     transpose4x4(VzState4, VzState3, VzState2, VzState1, T0z, T1z) \
     revStates(VzShuffle, VzState1, VzState2, VzState3, VzState4)   \
-    xor256(src,dst, VzState4, VzState3, VzState2, VzState1, T0z, T1z, T2z, T3z) \
+    xor256(dst,src, VzState4, VzState3, VzState2, VzState1) \
     CMPQ hashFlag, $0  \
     JE X16Done     \
     MOVQ $16, reg  \
-    \//seal: input is VzState1 to VzState4, open: input load ciphertext to VzState1 to VzState2 first
     reverseBitsZ4(VzState4, VzState3, VzState2, VzState1) \
     gHashBlocksLoopBy4(reg,VzState4) \
     gHashBlocksLoopBy4(reg,VzState3) \
@@ -934,20 +994,7 @@ subRoundZ(VzState4, VzState1, VzState2, VzState3) \
 X16Done: \
     NOP \
 
-//for 512-bit lanes,
-//Suppose we have V1z=(a0, a1, -, -), and V2z=(b0,b1,-,-), we want to have V=(a0, a1, b0, b1)
-#define concatenateY(V1y,V2y,V1z) \
-    VMOVDQA64 V1y, T2y        \           //T2z = (a0, a1, 0, 0)
-    VMOVDQA64 V2y, T3y         \     //T3z = (b0, b1, 0,0)
-    VALIGND $8, T2z, T3z, T3z \  //T3z = (0,0, b0 b1)
-    VPADDD T2z, T3z, V1z      \    //V1z = (a0, a1, b0, b1)
-
-
 #define cryptoBlockAsmX8Macro(rk, dst, src, reg, hashFlag) \
-    \//loadShuffle256()  \
-    \//loadInputX8(src, VyState1, VyState2, VyState3, VyState4)  \
-    \//loadMatrix(VyPreMatrix, VyPostMatrix)  \
-    \//revStates(VyShuffle, VyState1, VyState2, VyState3, VyState4)  \// latency hiden successfully
     transpose4x4(VyState1, VyState2, VyState3, VyState4, T0y, T1y)  \
     roundY(rk)  \
     roundY(rk)  \
@@ -976,10 +1023,6 @@ X8Done:   \
     NOP   \
 
 #define cryptoBlockAsmX4Macro(rk, dst, src, reg, hashFlag)  \
-    \//loadShuffle128()  \
-    \//loadInputX4(src, VxState1, VxState2, VxState3, VxState4)  \
-    \//loadMatrix(VxPreMatrix, VxPostMatrix)  \
-    \//revStates(VxShuffle, VxState1, VxState2, VxState3, VxState4)  \ // latency hiden successfully
     transpose4x4(VxState1, VxState2, VxState3, VxState4, T0x, T1x)  \
     roundX(rk)  \
     roundX(rk)  \
@@ -1004,11 +1047,6 @@ X4Done:  \
     NOP  \
 
 #define cryptoBlockAsmX2Macro(rk,dst, src, reg, hashFlag) \
-    \//loadShuffle128()   \
-    \//loadInputX2(src, VxState1, VxState2)   \
-    \//loadMatrix(VxPreMatrix, VxPostMatrix)  \
-    \//rev32(VxShuffle, VxState1)   \ // latency hiden successfully
-    \//rev32(VxShuffle, VxState2)   \
     transpose2x4(VxState1, VxState2, VxState3, VxState4, T0x, T1x)  \
     roundX(rk)   \
     roundX(rk)   \
@@ -1034,10 +1072,6 @@ X2Done:  \
     NOP  \
 
 #define cryptoBlockAsmX1Macro(rk,dst,src,reg, hashFlag)    \
-    \//loadShuffle128()   \
-    \//loadInputX1(src, VxState1)  \
-    \//loadMatrix(VxPreMatrix, VxPostMatrix)  \
-    \//rev32(VxShuffle, VxState1)   \ // latency hiden successfully  how to avoid rev32 for state1, J1,J2, Jn rev32 -> rev
     transpose1x4(VxState1, VxState2, VxState3, VxState4, T0x, T1x)  \
     roundX(rk)  \
     roundX(rk)  \
@@ -1060,10 +1094,6 @@ X1Done: \
     NOP \
 
 #define cryptoBlockAsmRemain(rk,dst,src,reg)    \
-    \//loadShuffle128()   \
-    \//loadInputX1(src, VxState1)  \
-    \//loadMatrix(VxPreMatrix, VxPostMatrix)  \
-    \//rev32(VxShuffle, VxState1)   \ // latency hiden successfully  how to avoid rev32 for state1, J1,J2, Jn rev32 -> rev
     transpose1x4(VxState1, VxState2, VxState3, VxState4, T0x, T1x)  \
     roundX(rk)  \
     roundX(rk)  \
@@ -1077,14 +1107,12 @@ X1Done: \
     transpose4x1(VxState4, VxState3, VxState2, VxState1, T0x, T1x) \
     rev32(VxShuffle, VxState4)  \
     xor16(dst, src, VxState4) \
-    \//MOVQ $1, reg \
-    \//reverseBits(VxState4, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
-    \//gHashBlocksLoopBy1(reg,VxState4) \
 
 #define cryptoPrepare(reg1, reg2, reg3) \
     loadMasks(reg1, reg2, reg3) \
     loadShuffle512(reg1) \
     loadMatrix(VzPreMatrix, VzPostMatrix, reg1, reg2) \
+    loadCounterConstant(reg1, reg2, reg3) \
 
 #define loadCounterConstant(reg1, reg2, reg3)   \
     MOVQ        $Counter_Add1<>(SB), reg1  \
@@ -1094,64 +1122,20 @@ X1Done: \
     VMOVDQU32   (reg2), VzAdd2   \ //VzAdd2: (4,4,4,4)
     VMOVDQU32   (reg3), VzAdd3   \ //VzAdd3: (2,2,2,2)
 
+//makeCounterNew(src *byte, dst *byte)
+TEXT ·makeCounterNew(SB),NOSPLIT,$0-16
+    MOVQ src+0(FP), AX
+    MOVQ dst+8(FP), BX
+    loadCounterConstant(CX, DX, SI)
+    makeCounterNew(VxJ0, AX, DX)
+    VMOVDQU32 VxJ0, (BX)
+    RET
+
 #define cryptoBlocksPrepare(reg1, reg2, reg3) \
-    \//gHashBlocksPre(reg1, reg2, reg3) \
-    loadCounterConstant(reg1, reg2, reg3) \
     broadcastJ0() \  //VzJ0 = (VxJ0, VxJ0, VxJ0, VxJ0) and VxJ0 is in reverse order
 
 #define cryptoBlocksEnd(tag, tmp,tagSize,blockCount) \
     gHashBlocksBlocksEnd(tag, tmp,tagSize,blockCount) \
-
-
-//func fillSingleBlockAsm(dst *byte, src *byte, count uint32)  --- used registers: DI, SI,AX
-#define fillSingleBlockAsm(dst, src, count, temp) \
-    copy12(dst, src, temp) \
-    ADDQ $12, dst          \
-    MOVQ count, temp       \
-    putUint32(dst, temp)  \
-    ADDQ $4, dst          \
-
-
-#define setZero(V1) \
-    VPXORD V1, V1, V1 \
-
-#define xorAsm(dst,src1,src2,len) \
-    loop:                 \
-        CMPQ len, $0      \
-        JLE end           \
-        SUBQ $1, len      \
-        MOVB (src1), SIB  \
-        MOVB (src2), DIB  \
-        XORB DIB, SIB     \
-        MOVB SIB, (dst)   \
-        ADDQ $1, src1     \
-        ADDQ $1, src2     \
-        ADDQ $1, dst      \
-        JMP loop          \
-    end:                  \
-        NOP               \
-
-#define clearRight(dst,len,reg1,reg2) \
-    MOVQ dst, reg2 \
-    ADDQ len, reg2 \
-    MOVQ $16, reg1 \
-    SUBQ len, reg1 \
-loop:             \
-    CMPQ reg1, $0 \
-    JLE end       \
-    MOVB $0, (reg2) \
-    ADDQ $1, reg2   \
-    SUBQ $1, reg1  \
-    JMP loop       \
-end:               \
-    NOP            \
-
-//func clearRight(dst *byte, len int)
-TEXT ·clearRight(SB),NOSPLIT,$0-16
-    MOVQ d+0(FP), AX
-    MOVQ len+8(FP), BX
-    clearRight(AX,BX,CX, DX)
-    RET
 
 //cryptoBlocksAsm(roundKeys *uint32, out []byte, in []byte, preCounter *byte, counter *byte, tmp *byte) --- used registers: R8-R15, SI,DI,AX-DX  something happend between uint and int,need check again
 #define cryptoBlocksAsm(rk,dst,src,len,tmp,blockCount,reg1,reg2,reg3,hashFlag) \    //tmp include counter and tmp
@@ -1159,14 +1143,11 @@ TEXT ·clearRight(SB),NOSPLIT,$0-16
     cryptoBlocksPrepare(reg1,reg2,reg3)   \  //now suppose const1,2,3 has in the right place
     CMPQ len, $64    \
     JL loopX2        \
-    \//gHashBlocksLoopBy4Pre(reg1)  \
 loopX16:   \
     CMPQ len, $256  \
     JL loopX8   \
     fillCounterX16()   \
-    \//loadInputX16(tmp, VzState1, VzState2, VzState3, VzState4)  \
     cryptoBlockAsmX16Macro(rk,dst,src, reg1,hashFlag)   \
-    \//xor256(dst,dst,src)
     ADDQ $256, dst   \
     ADDQ $256, src   \
     SUBQ $256, len   \
@@ -1201,14 +1182,8 @@ loopX2:    \
 loopX1:     \
     CMPQ len, $16  \
     JL loopX0   \
-    \//rev32(VxShuffle,VxJ0) \  //for debug here, need to be delete
-    \//storeOutputX1(VxAdd1, Tmp) \ //for debug here, need to be deleted
     fillCounterX1()   \
-    \//rev32(VxShuffle,VxJ0) \  //for debug here, need to be delete
-    \//storeOutputX1(VxJ0, Tmp) \ //for debug here, need to be deleted
     cryptoBlockAsmX1Macro(rk, dst,src, reg1,hashFlag)  \
-    \//reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x) \  //for debug here
-    \//storeOutputX1(VxTag, Tmp) \ //for debug here, need to be deleted
     ADDQ $16, dst   \
     ADDQ $16, src   \
     SUBQ $16, len    \
@@ -1231,56 +1206,8 @@ loopX0:    \
 cryptoBlocksDone: \
     NOP \
 
-
-    
-//func makeCounter(dst *byte, src *byte) --- used registers: DI, SI, AX
-#define makeCounter(dst, src, temp) \
-    MOVQ   0(src),     temp    \
-    MOVQ   temp,        0(dst) \
-    MOVL   8(src),     temp    \
-    MOVL   temp,         8(dst) \
-    MOVB   $1,        15(dst)   \
-
-#define copyAsm(dst,src,len,tmp)  \
-    CMPQ len, $8    \
-    JL 7(PC)     \
-    MOVQ 0(src), tmp \
-    MOVQ tmp, 0(dst) \
-    ADDQ $8, src    \
-    ADDQ $8, dst    \
-    SUBQ $8, len    \
-    JMP  -7(PC)      \
-    CMPQ len, $4    \
-    JL  7(PC)       \
-    MOVL 0(src), tmp \
-    MOVL tmp, 0(dst) \
-    ADDQ $4, src    \
-    ADDQ $4, dst    \
-    SUBQ $4, len    \
-    JMP -7(PC)       \
-    CMPQ len, $2    \
-    JL  7(PC)       \
-    MOVW 0(src), tmp \
-    MOVW tmp, 0(dst) \
-    ADDQ $2, src    \
-    ADDQ $2, dst    \
-    SUBQ $2, len    \
-    JMP -7(PC)       \
-    CMPQ len, $1    \
-    JL 7(PC)         \
-    MOVB 0(src), tmp \
-    MOVB tmp, 0(dst) \
-    ADDQ $1, src    \
-    ADDQ $1, dst    \
-    SUBQ $1, len    \
-    JMP -7(PC)       \
-    NOP             \
-
 //With it, VxState4 -> VxH
 #define cryptoBlockAsmMacro(rk)  \
-    \//loadShuffle128()   \
-    \//loadInputX1(src, VxState1)  \
-    \//loadMatrix(VxPreMatrix, VxPostMatrix)  \
     rev32(VxShuffle, VxState1)   \ // latency hiden successfully   change later, move rev32 to register, save time for zero block
     transpose1x4(VxState1, VxState2, VxState3, VxState4, T0x, T1x)  \
     roundX(rk)  \
@@ -1293,9 +1220,7 @@ cryptoBlocksDone: \
     roundX(rk)  \
     SUBQ $128, rk \
     transpose4x1(VxState4, VxState3, VxState2, VxState1, T0x, T1x) \
-    \//moveToVxH(VxState4)   \ //move VxState4 to VxH
     rev32(VxShuffle, VxState4)  \
-    \//storeOutputX1(VxState4, dst)  \
 
 //VxH = VxState4, J0 is put in Vxtag,
 #define calculateJ0Branch2(nonce,nonceLen,blockCount,remain,tmp,reg1, reg2, reg3) \
@@ -1303,22 +1228,20 @@ cryptoBlocksDone: \
     MOVQ nonceLen, remain    \
     ANDQ $15, remain     \
     SHRQ $4, blockCount \
-    \//gHashBlocksPre(reg1, reg2, reg3) \
     CMPQ nonceLen, $16  \
     JL last    \
     CMPQ blockCount, $8 \
     JL loopBy1 \
-    \//gHashBlocksLoopBy4Pre(reg1) \
     loopBy4:         \
-    loadNonceX4(nonce, VzNonce) \ //load nonce
-    gHashBlocksLoopBy4(blockCount, VzNonce) \
+    load4X(nonce) \
+    gHashBlocksLoopBy4(blockCount, VzDat) \
     CMPQ        blockCount, $3    \
     JG          loopBy4      \
     CMPQ        blockCount, $0    \
     JE          last    \
     loopBy1:  \
-    loadNonceX1(nonce, VxNonce) \ //load nonce
-    gHashBlocksLoopBy1(blockCount, VxNonce) \
+    load1X(nonce)  \
+    gHashBlocksLoopBy1(blockCount, VxDat) \
     CMPQ        blockCount, $0   \
     JG          loopBy1     \
     last:   \
@@ -1329,21 +1252,15 @@ cryptoBlocksDone: \
     MOVQ $0, 8(tmp)   \
     copyAsm(tmp,nonce,remain,reg1) \
     SUBQ reg2, tmp \   //recover the tmp address
-    loadTmp(tmp, VxNonce) \
+    loadTmp(tmp, VxDat) \
     MOVQ $1, blockCount   \
-    gHashBlocksLoopBy1(blockCount, VxNonce) \
+    gHashBlocksLoopBy1(blockCount, VxDat) \
     doneJ0:   \
     SHLQ $3, nonceLen  \
-    \//MOVQ $0, (tmp) \
-    \//ADDQ $8, tmp   \
-    \//putUint64(tmp,nonceLen)  \
-    \//SUBQ $8, tmp  \
-    \//SHRQ $3, nonceLen    \
-    \//loadTmp(tmp, VxNonce)  \
-    rev64(reg1,nonceLen,VxNonce)  \
-    reverseBits(VxNonce, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
+    rev64(reg1,nonceLen,VxDat)  \
+    reverseBits(VxDat, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
     MOVQ $1, blockCount  \
-    gHashBlocksLoopBy1(blockCount, VxNonce) \
+    gHashBlocksLoopBy1(blockCount, VxDat) \
     reverseBits(VxTag, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x) \
 
 
@@ -1352,11 +1269,9 @@ cryptoBlocksDone: \
     JE branch1 \
     calculateJ0Branch2(nonce,nonceLen,blockCount,remain,tmp,reg1, reg2, reg3) \
     movv(VxTag,VxJ0) \
-    \//VMOVDQU32   VxTag, (J0) \
     JMP endJ0 \
 branch1: \
-    makeCounter(tmp, nonce, remain)   \ //use remain as the temp variable
-    loadJ0(tmp, VxJ0) \
+    makeCounterNew(VxJ0, nonce, remain) \ //add for opt, remain used as temp variable
 endJ0:
     NOP
 
@@ -1365,22 +1280,20 @@ endJ0:
     MOVQ aLen, remain    \
     ANDQ $15, remain     \
     SHRQ $4, blockCount \
-    \//gHashBlocksPre(reg1, reg2, reg3) \
     CMPQ aLen, $16 \
     JL withRemain \
     CMPQ blockCount, $8  \
     JL loopWith1  \
-    \//gHashBlocksLoopBy4Pre(reg1) \
 loopWith4:         \
-    loadADataX4(aData, VzAData) \ //load additionalData
-    gHashBlocksLoopBy4(blockCount, VzAData) \
+    load4X(aData)  \
+    gHashBlocksLoopBy4(blockCount, VzDat) \
     CMPQ        blockCount, $3    \
     JG          loopWith4      \
     CMPQ        blockCount, $0    \
     JE          withRemain    \
 loopWith1:  \
-    loadADataX1(aData, VxAData) \ //load additionalData
-    gHashBlocksLoopBy1(blockCount, VxAData) \
+    load1X(aData) \
+    gHashBlocksLoopBy1(blockCount, VxDat) \
     CMPQ        blockCount, $0   \
     JG          loopWith1     \
 withRemain:  \
@@ -1391,9 +1304,9 @@ withRemain:  \
     MOVQ $0, 8(tmp) \
     copyAsm(tmp,aData,remain, reg1) \
     SUBQ reg2, tmp \
-    loadADataX1(tmp, VxAData) \
+    load1X(tmp) \
     MOVQ $1, blockCount   \
-    gHashBlocksLoopBy1(blockCount, VxAData) \
+    gHashBlocksLoopBy1(blockCount, VxDat) \
 endSPre:
     NOP
 
@@ -1402,22 +1315,20 @@ endSPre:
     MOVQ aLen, remain    \
     ANDQ $15, remain     \
     SHRQ $4, blockCount \
-    \//gHashBlocksPre(reg1, reg2, reg3) \
     CMPQ aLen, $16 \
     JL toRemain \
     CMPQ blockCount, $8  \
     JL loop1  \
-    \//gHashBlocksLoopBy4Pre(reg1) \
 loop4:         \
-    loadADataX4(aData, VzAData) \ //load additionalData
-    gHashBlocksLoopBy4(blockCount, VzAData) \
+    load4X(aData) \
+    gHashBlocksLoopBy4(blockCount, VzDat) \
     CMPQ        blockCount, $3    \
     JG          loop4      \
     CMPQ        blockCount, $0    \
     JE          toRemain    \
 loop1:  \
-    loadADataX1(aData, VxAData) \ //load additionalData
-    gHashBlocksLoopBy1(blockCount, VxAData) \
+    load1X(aData) \
+    gHashBlocksLoopBy1(blockCount, VxDat) \
     CMPQ        blockCount, $0   \
     JG          loop1     \
 toRemain:  \
@@ -1428,26 +1339,19 @@ toRemain:  \
     MOVQ $0, 8(tmp) \
     copyAsm(tmp,aData,remain, reg1) \
     SUBQ reg2, tmp \
-    loadADataX1(tmp, VxAData) \
+    load1X(tmp) \
     MOVQ $1, blockCount   \
-    gHashBlocksLoopBy1(blockCount, VxAData) \
+    gHashBlocksLoopBy1(blockCount, VxDat) \
 endSMid:
     NOP
 
 #define CalculateSPost(tag, aLen, cLen, tmp, blockCount,tagSize, reg) \
     SHLQ $3, aLen \
     SHLQ $3, cLen  \
-    \// putUint64(tmp, aLen)  \
-    \// ADDQ $8, tmp   \
-    \// putUint64(tmp, cLen)  \
-    \// SUBQ $8, tmp  \
-    \// loadADataX1(tmp, VxAData) \
-    rev64X2(blockCount,reg, aLen, cLen, VxAData)   \ //blockCount used as reg1
-    reverseBits(VxAData, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \  //add for opt
+    rev64X2(blockCount,reg, aLen, cLen, VxDat)   \ //blockCount used as reg1
+    reverseBits(VxDat, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \  //add for opt
     MOVQ $1, blockCount  \
-    gHashBlocksLoopBy1(blockCount, VxAData) \
-    \//reverseBits(VxTMask, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)  \ // for debug
-    \//storeOutputX1(VxTMask, Tmp)   \ //for debug
+    gHashBlocksLoopBy1(blockCount, VxDat) \
     cryptoBlocksEnd(tag,tmp,tagSize,blockCount) \
 
 #define loadState1(H) \
@@ -1520,14 +1424,7 @@ TEXT ·expandKeyAsm(SB),NOSPLIT,$0-24
 
     RET
 
-TEXT ·needExpand(SB), $0-40
-	MOVQ array+0(FP), DI
-	MOVQ arrayLen+8(FP), SI
-	MOVQ arrayCap+16(FP), AX
-	MOVQ asked+24(FP), BX
-	needExpandAsm(SI, AX, BX, CX, R8, R9)
-	MOVQ CX, ret1+32(FP)
-	RET
+
 
 TEXT ·copyAsm(SB),NOSPLIT,$0-24
     MOVQ dst+0(FP), DI
@@ -1634,25 +1531,7 @@ TEXT ·transpose1x4(SB),NOSPLIT,$0-16
 
     RET
 
-TEXT ·xorAsm(SB),NOSPLIT,$0-16
-    MOVQ src1+0(FP), AX
-    MOVQ src2+8(FP), BX
-    MOVQ len+16(FP), CX
-    MOVQ dst+24(FP), DX
-    loop:
-    CMPQ CX, $0
-    JLE done
-    SUBQ $1, CX
-    MOVB (AX), SIB
-    MOVB (BX), DIB
-    XORB DIB, SIB
-    MOVB SIB, (DX)
-    ADDQ $1, AX
-    ADDQ $1, BX
-    ADDQ $1, DX
-    JMP loop
-    done:
-    RET
+
 
 //func gHashBlocks(H *byte, tag *byte, data *byte, count int)
 TEXT ·gHashBlocks(SB),NOSPLIT,$0-32
@@ -2049,7 +1928,7 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
     MOVQ tagSize+8(FP), TagSize
     MOVQ tmp+96(FP), Tmp
     CalculateSPost(Dst, ALen, PlainLen, Tmp, BlockCount1, TagSize,Reg1)  //Tag is stored in tag = &dst[len(plaintext)] plainLen = cipherLen
-    
+
     RET
 
 
@@ -2170,6 +2049,7 @@ TEXT ·openAsm(SB), NOSPLIT, $80-148
     ADDQ $64, Tmp
     setZero(VzTag) // change later at last.  here setZero can be deleted
     calculateJ0(Nonce,NonceLen,BlockCount2,Remain2,Tmp,Reg1, Reg2, RegT3)  //J0 store in VxJ0, keep order,  VxH reverse order
+
 
     movv(VxJ0, VxState1)
     cryptoBlockAsmMacro(RK)

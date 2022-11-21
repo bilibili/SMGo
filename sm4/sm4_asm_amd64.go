@@ -31,3 +31,6 @@ func broadcastJ0(j0 *byte)
 
 //go:noescape
 func clearRight(dst *byte, len int)
+
+//go:noescape
+func makeCounterNew(src *byte, dst *byte)
