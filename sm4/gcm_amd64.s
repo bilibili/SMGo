@@ -754,10 +754,21 @@ cmpDone:             \
 #define loadRoundKey(R, RK) \
     MOVD    (R), X1 \
     ADDQ    $4, R \ //TODO replace by offsets to R
-    VPBROADCASTD        X1, RK \ // latency is 3 for 256/512, 1 otherwise; CPI 1
+    VPBROADCASTD  X1, RK \ // latency is 3 for 256/512, 1 otherwise; CPI 1
+
+#define loadRoundKeyNew(R, RK, reg1, reg2, reg3, reg4) \
+    MOVD    (R),   reg1 \
+    MOVD    4(R),  reg2 \
+    MOVD    8(R),  reg3 \
+    MOVD    12(R), reg4 \
+    \//ADDQ    $4, R \ //TODO replace by offsets to R
+    \//VPBROADCASTD  X1, RK \ // latency is 3 for 256/512, 1 otherwise; CPI 1
 
 #define loadRoundKeyX(R) \
     loadRoundKey(R, VxRoundKey) \
+
+#define loadRoundKeyXNew(R, reg1, reg2, reg3, reg4) \
+    loadRoundKeyNew(R, VxRoundKey, reg1, reg2, reg3, reg4) \
 
 #define loadRoundKeyY(R) \
     loadRoundKey(R, VyRoundKey) \
@@ -768,9 +779,10 @@ cmpDone:             \
 //related with sub round calculation
 #define getXorX(B, C, D, Dst) \
     getXor(B, C, D, Dst, T0x, T1x, VxRoundKey) \
+    \//getXor(B, C, D, Dst, VxMid, VxHigh, VxRoundKey) \
 
 #define getXorY(B, C, D, Dst) \
-        getXor(B, C, D, Dst, T0y, T1y, VyRoundKey) \
+    getXor(B, C, D, Dst, T0y, T1y, VyRoundKey) \
 
 #define getXorZ(B, C, D, Dst) \
     getXor(B, C, D, Dst, T0z, T1z, VzRoundKey) \
@@ -831,15 +843,20 @@ cmpDone:             \
     loadRoundKeyX(R) \
     subRoundX(VxState4, VxState1, VxState2, VxState3) \
 
-#define roundXNew(R,VxS1, VxS4) \
-    loadRoundKeyX(R) \
+#define roundXNew(R,VxS1, VxS4,reg1,reg2,reg3,reg4) \
+    loadRoundKeyXNew(R,reg1,reg2,reg3,reg4) \
+    VMOVD reg1, VxRoundKey \
     subRoundX(VxS1, VxState2, VxState3, VxS4) \
-    loadRoundKeyX(R) \
+    \//loadRoundKeyX(R) \
+    VMOVD reg2, VxRoundKey \
     subRoundX(VxState2, VxState3, VxS4, VxS1) \
-    loadRoundKeyX(R) \
+    \//loadRoundKeyX(R) \
+    VMOVD reg3, VxRoundKey \
     subRoundX(VxState3, VxS4, VxS1, VxState2) \
-    loadRoundKeyX(R) \
+    \//loadRoundKeyX(R) \
+    VMOVD reg4, VxRoundKey \
     subRoundX(VxS4, VxS1, VxState2, VxState3) \
+    ADDQ    $16, R \
 
 #define roundY(R) \
     loadRoundKeyY(R) \
@@ -1023,17 +1040,17 @@ X1Done: \
     rev32(VxShuffle, VxState4)  \
     xor16(dst, src, VxState4) \
 
-#define cryptoBlockAsmMacro(rk,VxIn, VxOut)  \
+#define cryptoBlockAsmMacro(rk,VxIn, VxOut,reg1,reg2,reg3,reg4)  \
     rev32(VxShuffle, VxIn)   \ // latency hiden successfully   change later, move rev32 to register, save time for zero block
     transpose1x4(VxIn, VxState2, VxState3, VxOut, T0x, T1x)  \
-    roundXNew(rk,VxIn,VxOut)  \
-    roundXNew(rk,VxIn,VxOut)  \
-    roundXNew(rk,VxIn,VxOut)  \
-    roundXNew(rk,VxIn,VxOut)  \
-    roundXNew(rk,VxIn,VxOut)  \
-    roundXNew(rk,VxIn,VxOut)  \
-    roundXNew(rk,VxIn,VxOut)  \
-    roundXNew(rk,VxIn,VxOut)  \
+    roundXNew(rk,VxIn,VxOut,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxIn,VxOut,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxIn,VxOut,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxIn,VxOut,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxIn,VxOut,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxIn,VxOut,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxIn,VxOut,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxIn,VxOut,reg1,reg2,reg3,reg4)  \
     SUBQ $128, rk \
     transpose4x1(VxOut, VxState3, VxState2, VxIn, T0x, T1x) \
     rev32(VxShuffle, VxOut)  \
@@ -1979,7 +1996,7 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
     cryptoPrepare(Reg1, Reg2, RegT3)   //Z26, Z16, Z17 is used to load constant
 
     MOVQ rk+0(FP), RK
-    cryptoBlockAsmMacro(RK,VxState1, VxH) //H stored in VxH, keep order
+    cryptoBlockAsmMacro(RK,VxState1, VxH,Reg1,Reg2,RegT1,RegT2) //H stored in VxH, keep order
 
     gHashPre(Reg1, Reg2, RegT3)
 
@@ -1988,7 +2005,7 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
     MOVQ tmp+96(FP), Tmp
     calculateJ0(Nonce,NonceLen,BlockCount2,Remain2,Tmp,Reg1, Reg2, RegT3)  //J0 store in VxJ0, keep order,  VxH reverse order
 
-    cryptoBlockAsmMacro(RK,VxState1, VxTMask)
+    cryptoBlockAsmMacro(RK,VxState1, VxTMask,Reg1,Reg2,RegT1,RegT2)
 
     MOVQ aData+72(FP), AData
     MOVQ aLen+80(FP), ALen
@@ -2026,7 +2043,7 @@ TEXT ·openAsm(SB), NOSPLIT, $80-148
     cryptoPrepare(Reg1, Reg2, RegT3)
 
     MOVQ rk+0(FP), RK
-    cryptoBlockAsmMacro(RK,VxState1,VxH) //H stored in VxH, keep order
+    cryptoBlockAsmMacro(RK,VxState1,VxH,Reg1,Reg2,RegT1,RegT2) //H stored in VxH, keep order
 
     gHashPre(Reg1, Reg2, RegT3)
 
@@ -2035,7 +2052,7 @@ TEXT ·openAsm(SB), NOSPLIT, $80-148
     MOVQ tmp+96(FP), Tmp
     calculateJ0(Nonce,NonceLen,BlockCount2,Remain2,Tmp,Reg1, Reg2, RegT3)  //J0 store in VxJ0, keep order,  VxH reverse order
 
-    cryptoBlockAsmMacro(RK,VxState1,VxTMask)
+    cryptoBlockAsmMacro(RK,VxState1,VxTMask,Reg1,Reg2,RegT1,RegT2)
 
     MOVQ aData+72(FP), AData
     MOVQ aLen+80(FP), ALen
