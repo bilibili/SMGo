@@ -1520,6 +1520,35 @@ TEXT ·expandKeyAsm(SB),NOSPLIT,$0-24
     RET
 
 // **************       function related with CIPH       ***************
+//func cryptoBlockAsmX16(rk *uint32, dst, src *byte)
+TEXT ·cryptoBlockAsmX16(SB),NOSPLIT,$0-24
+    loadShuffle512(CX)
+	MOVQ    src+16(FP), CX
+    loadInputX16(CX, VzState1, VzState2, VzState3, VzState4) // latency: 8
+    loadMatrix(VzPreMatrix, VzPostMatrix,AX,BX)
+
+	MOVQ    rk+0(FP), AX
+	MOVQ    dst+8(FP), BX
+
+    revStates(VzShuffle, VzState1, VzState2, VzState3, VzState4) // latency hiden successfully
+    transpose4x4(VzState1, VzState2, VzState3, VzState4, T0z, T1z)
+
+    roundZ(AX)
+    roundZ(AX)
+    roundZ(AX)
+    roundZ(AX)
+    roundZ(AX)
+    roundZ(AX)
+    roundZ(AX)
+    roundZ(AX)
+
+    transpose4x4(VzState4, VzState3, VzState2, VzState1, T0z, T1z)
+    revStates(VzShuffle, VzState1, VzState2, VzState3, VzState4)
+
+    storeOutputX16(VzState4, VzState3, VzState2, VzState1, BX)
+
+    RET
+
 //func cryptoBlockAsmX8(rk *uint32, dst, src *byte)
 TEXT ·cryptoBlockAsmX8(SB),NOSPLIT,$0-24
     loadShuffle256(CX)
