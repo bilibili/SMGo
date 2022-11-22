@@ -44,7 +44,7 @@ func (g *sm4GcmAsm) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 		panic("crypto/cipher: message too large for GCM")
 	}
 
-	var temp [6*BlockSize+512] byte
+	var temp [2*BlockSize] byte
 	//temp:  H, TMask, J0, tag, counter, tmp, CNT-256, tmp-256
 	ret := ensureCapacity(dst, len(plaintext)+g.tagSize)
 	sealAsm(&g.roundKeys[0], g.tagSize, &ret[len(dst)], nonce, plaintext, additionalData, &temp[0])
@@ -71,7 +71,7 @@ func (g *sm4GcmAsm) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte,
 	}
 
 	//temp: H, J0, TMask, expectedTag, tmp, Counter-256, TMP-256
-	var temp [5*BlockSize+512] byte
+	var temp [2*BlockSize] byte
 
 	ret := ensureCapacity(dst, len(ciphertext)-g.tagSize)
 

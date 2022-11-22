@@ -418,13 +418,6 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
 #define VzIdx        Z31
 
 //consider at last *******
-#define movv(V1, V2) \
-    \//VPXORD V2, V2, V2 \
-    \//VPADDD V2, V1, V2 \
-    VMOVAPD V1, V2 \
-
-
-
 #define copyAsm(dst,src,len,tmp)  \
     CMPQ len, $8    \
     JL 7(PC)     \
@@ -461,9 +454,6 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
     NOP             \
 
 
-#define setZero(V1) \
-    VPXORD V1, V1, V1 \
-
 #define clearRight(dst,len,reg1,reg2) \
     MOVQ dst, reg2 \
     ADDQ len, reg2 \
@@ -493,8 +483,8 @@ end:               \
 
 #define rev64(reg,src,VxD)           \
     MOVQ        $Shuffle2<>(SB), reg \
-    VMOVDQU32   (reg), T0x           \
     MOVQ         src, T1x            \
+    VMOVDQU32   (reg), T0x           \
     VPSHUFB     T0x, T1x, VxD        \
 
 #define rev64X2(reg1,reg2, src1, src2, VxD)  \
@@ -1203,7 +1193,7 @@ cryptoBlocksDone: \
 #define gHashPre(reg1,reg2,reg3) \
     reverseBits(VxH, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x)  \
     gHashBlocksPre(reg1, reg2, reg3) \
-    gHashBlocksLoopBy4Pre(reg1) \
+    gHashBlocksLoopBy4Pre(reg1,reg2) \
 
 #define gHashBlocksPre(reg1, reg2, reg3) \
 	MOVQ	            $GCM_POLY<>(SB), reg3  \
@@ -1241,23 +1231,23 @@ cryptoBlocksDone: \
 
 //used Vx: VzIdx, VyIdxH01, VzIdxH23, MASK_Mov0_1, MASK_Mov01_23, VxH, VxHs, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x
 //U2y, VyH4, VyH, U1y U1z, VzH4, VzH4s,
-#define gHashBlocksLoopBy4Pre(reg)  \
-    MOVQ        $SHUFFLE_X_LANES<>(SB), reg  \
-    VMOVDQU32   (reg), VzIdx   \
-    MOVQ        $0b00001100, reg  \
-    KMOVW       reg, MASK_Mov0_1   \
-    MOVQ        $0b11110000, reg  \
-    KMOVW       reg, MASK_Mov01_23  \
+#define gHashBlocksLoopBy4Pre(reg1, reg2)  \
+    MOVQ        $SHUFFLE_X_LANES<>(SB), reg1  \
+    VMOVDQU32   (reg1), VzIdx   \
+    MOVQ        $0b00001100, reg1  \
+    MOVQ        $0b11110000, reg2  \
+    KMOVW       reg1, MASK_Mov0_1   \
+    KMOVW       reg2, MASK_Mov01_23  \
 	mul(VxH, VxHs, VxH, VxLow, VxMid, VxHigh, T0x)   \
 	reduce(U1x, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)  \
 	mul(VxH, VxHs, U1x, VxLow, VxMid, VxHigh, T0x)    \
 	reduce(U2x, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)  \
 	mul(VxH, VxHs, U2x, VxLow, VxMid, VxHigh, T0x)   \
 	reduce(VxH4, VxReduce, VxLow, VxMid, VxHigh, T0x, T1x, T2x, T3x)  \
-	MOVQ        $MERGE_H01<>(SB), reg  \
-    VMOVDQU32   (reg), VyIdxH01  \
-    MOVQ        $MERGE_H23<>(SB), reg  \
-    VMOVDQU32   (reg), VzIdxH23  \
+	MOVQ        $MERGE_H01<>(SB), reg1  \
+    MOVQ        $MERGE_H23<>(SB), reg2  \
+    VMOVDQU32   (reg1), VyIdxH01  \
+    VMOVDQU32   (reg2), VzIdxH23  \
 	VPERMQ      U2y, VyIdxH01, MASK_Mov0_1, VyH4   \
 	VPERMQ      VyH, VyIdxH01, MASK_Mov0_1, U1y    \
 	VPERMQ      U1z, VzIdxH23, MASK_Mov01_23, VzH4 \
@@ -1359,7 +1349,7 @@ cryptoBlocksDone: \
     reverseBits(VxJ0, VxAndMask, VxHigherMask, VxLowerMask, T1x, T2x) \
 
 #define calculateJ0(nonce,nonceLen,blockCount,remain,tmp,reg1, reg2, reg3) \
-    setZero(VzJ0) \
+    VPXORD VzJ0, VzJ0, VzJ0 \
     CMPQ nonceLen, $12 \
     JE branch1 \
     calculateJ0Branch2(nonce,nonceLen,blockCount,remain,tmp,reg1, reg2, reg3) \
@@ -1367,13 +1357,13 @@ cryptoBlocksDone: \
 branch1: \
     makeCounterNew(VxJ0, nonce, remain) \
 endJ0:  \
-    movv(VxJ0, VxState1)   \ // J0 store in VxJ0, keep order -> fillCounter, reverse first (only once), then add number (in reverse order)
+    VMOVAPD VxJ0, VxState1 \
     NOP  \
 
 
 // **************       macro function related with S        ***************
 #define CalculateSPre(aData,aLen, blockCount, remain, tmp, reg1, reg2, reg3) \
-    setZero(VxTag) \
+    VPXORD VxTag, VxTag, VxTag \
     MOVQ aLen, blockCount   \
     MOVQ aLen, remain    \
     ANDQ $15, remain     \
@@ -1804,8 +1794,6 @@ TEXT ·transpose2x4(SB),NOSPLIT,$0-16
 
     RET
 
-
-
 //func transpose1x4(dst *uint32, src *uint32)
 TEXT ·transpose1x4(SB),NOSPLIT,$0-16
 
@@ -2096,11 +2084,11 @@ TEXT ·openAsm(SB), NOSPLIT, $80-148
     SUBQ TagSize, CipherLen
     MOVQ tmp+96(FP), Tmp
     MOVQ Tmp, ETag
-    ADDQ $48, ETag
+    ADDQ $16, ETag
     CalculateSPost(ETag, ALen, CipherLen, Tmp, BlockCount1, TagSize,Reg1)  //Tag is stored in ETag
 
     MOVQ tmp+96(FP), ETag
-    ADDQ $48, ETag
+    ADDQ $16, ETag
     MOVQ cipher+48(FP), Cipher
     MOVQ cipherLen+56(FP), CipherLen
     MOVQ tagSize+8(FP), TagSize
