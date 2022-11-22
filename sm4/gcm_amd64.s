@@ -144,41 +144,12 @@ DATA AND_MASK<>+0x08(SB)/4, $0x0f0f0f0f
 DATA AND_MASK<>+0x0c(SB)/4, $0x0f0f0f0f
 GLOBL AND_MASK<>(SB), (NOPTR+RODATA), $16
 
-DATA LOWER_MASK<>+0x00(SB)/1, $0x00
-DATA LOWER_MASK<>+0x01(SB)/1, $0x08
-DATA LOWER_MASK<>+0x02(SB)/1, $0x04
-DATA LOWER_MASK<>+0x03(SB)/1, $0x0c
-DATA LOWER_MASK<>+0x04(SB)/1, $0x02
-DATA LOWER_MASK<>+0x05(SB)/1, $0x0a
-DATA LOWER_MASK<>+0x06(SB)/1, $0x06
-DATA LOWER_MASK<>+0x07(SB)/1, $0x0e
-DATA LOWER_MASK<>+0x08(SB)/1, $0x01
-DATA LOWER_MASK<>+0x09(SB)/1, $0x09
-DATA LOWER_MASK<>+0x0a(SB)/1, $0x05
-DATA LOWER_MASK<>+0x0b(SB)/1, $0x0d
-DATA LOWER_MASK<>+0x0c(SB)/1, $0x03
-DATA LOWER_MASK<>+0x0d(SB)/1, $0x0b
-DATA LOWER_MASK<>+0x0e(SB)/1, $0x07
-DATA LOWER_MASK<>+0x0f(SB)/1, $0x0f
+DATA LOWER_MASK<>+0x00(SB)/4, $0x0c040800
+DATA LOWER_MASK<>+0x04(SB)/4, $0x0e060a02
+DATA LOWER_MASK<>+0x08(SB)/4, $0x0d050901
+DATA LOWER_MASK<>+0x0c(SB)/4, $0x0f070b03
 GLOBL LOWER_MASK<>(SB), (NOPTR+RODATA), $16
 
-DATA HIGHER_MASK<>+0x00(SB)/1, $0x00
-DATA HIGHER_MASK<>+0x01(SB)/1, $0x80
-DATA HIGHER_MASK<>+0x02(SB)/1, $0x40
-DATA HIGHER_MASK<>+0x03(SB)/1, $0xc0
-DATA HIGHER_MASK<>+0x04(SB)/1, $0x20
-DATA HIGHER_MASK<>+0x05(SB)/1, $0xa0
-DATA HIGHER_MASK<>+0x06(SB)/1, $0x60
-DATA HIGHER_MASK<>+0x07(SB)/1, $0xe0
-DATA HIGHER_MASK<>+0x08(SB)/1, $0x10
-DATA HIGHER_MASK<>+0x09(SB)/1, $0x90
-DATA HIGHER_MASK<>+0x0a(SB)/1, $0x50
-DATA HIGHER_MASK<>+0x0b(SB)/1, $0xd0
-DATA HIGHER_MASK<>+0x0c(SB)/1, $0x30
-DATA HIGHER_MASK<>+0x0d(SB)/1, $0xb0
-DATA HIGHER_MASK<>+0x0e(SB)/1, $0x70
-DATA HIGHER_MASK<>+0x0f(SB)/1, $0xf0
-GLOBL HIGHER_MASK<>(SB), (NOPTR+RODATA), $16
 
 DATA SHUFFLE_X_LANES<>+0x00(SB)/8, $0x06
 DATA SHUFFLE_X_LANES<>+0x08(SB)/8, $0x07
@@ -500,13 +471,12 @@ end:               \
     VPSHUFB     T0x, T2x, MASK, VxD   \
 
 //related with reverse bits  - load consts
-#define loadMasks(tmp1,tmp2,tmp3) \
+#define loadMasks(tmp1,tmp2) \
     MOVQ                $AND_MASK<>(SB), tmp1 \
     MOVQ                $LOWER_MASK<>(SB), tmp2 \
-    MOVQ                $HIGHER_MASK<>(SB), tmp3 \
-    VBROADCASTI32X4     (tmp1), VzAndMask \ // latency 8, CPI 0.5
+    VBROADCASTI32X2     (tmp1), VzAndMask \ // latency 8, CPI 0.5
     VBROADCASTI32X4     (tmp2), VzLowerMask \
-    VBROADCASTI32X4     (tmp3), VzHigherMask \
+    VPSLLQ $4, VzLowerMask, VzHigherMask \
 
 //reverse bits
 #define reverseBits(V, And, Higher, Lower, T0, T1) \
@@ -609,26 +579,26 @@ end:               \
 
 //store output with 8 blocks
 #define storeOutputX8(V1, V2, V3, V4, Dst) \
-        VMOVDQU32   V1, (Dst) \ //AVX, latency 5, CPI 1
-        VMOVDQU32   V2, (32)(Dst) \
-        VMOVDQU32   V3, (64)(Dst) \
-        VMOVDQU32   V4, (96)(Dst) \
+    VMOVDQU32   V1, (Dst) \ //AVX, latency 5, CPI 1
+    VMOVDQU32   V2, (32)(Dst) \
+    VMOVDQU32   V3, (64)(Dst) \
+    VMOVDQU32   V4, (96)(Dst) \
 
 //store output with 4 blocks
 #define storeOutputX4(V1, V2, V3, V4, Dst) \
-        VMOVDQU32   V1, (Dst) \ //SSE2, latency 5, CPI 1
-        VMOVDQU32   V2, (16)(Dst) \
-        VMOVDQU32   V3, (32)(Dst) \
-        VMOVDQU32   V4, (48)(Dst) \
+    VMOVDQU32   V1, (Dst) \ //SSE2, latency 5, CPI 1
+    VMOVDQU32   V2, (16)(Dst) \
+    VMOVDQU32   V3, (32)(Dst) \
+    VMOVDQU32   V4, (48)(Dst) \
 
 //store output with 2 blocks
 #define storeOutputX2(V1, V2, Dst) \
-        VMOVDQU32   V1, (Dst) \ //SSE2, latency 5, CPI 1
-        VMOVDQU32   V2, (16)(Dst) \
+    VMOVDQU32   V1, (Dst) \ //SSE2, latency 5, CPI 1
+    VMOVDQU32   V2, (16)(Dst) \
 
 //store output with 1 blocks
 #define storeOutputX1(V1, Dst) \
-        VMOVDQU32   V1, (Dst) \
+    VMOVDQU32   V1, (Dst) \
 
 // **************       related with xor        ***************
 #define xor256(dst,src, Vz1, Vz2, Vz3, Vz4)    \
@@ -774,7 +744,7 @@ cmpDone:             \
 
 // **************       macro function related with CIPH        ***************
 #define cryptoPrepare(reg1, reg2, reg3) \
-    loadMasks(reg1, reg2, reg3) \
+    loadMasks(reg1, reg2) \
     loadShuffle512(reg1) \
     loadMatrix(VzPreMatrix, VzPostMatrix, reg1, reg2) \
     loadCounterConstant(reg1, reg2, reg3) \
@@ -1669,7 +1639,7 @@ TEXT ·gHashBlocks(SB),NOSPLIT,$0-32
 	VMOVDQU32   (AX), VxH // latency 7, CPI 0.5
 	VMOVDQU32   (BX), VxTag // higher lanes will be cleared automatically
 
-	loadMasks(R8,R9,R10)
+	loadMasks(R8,R9)
 
 	MOVQ	            $GCM_POLY<>(SB), R8
 	VBROADCASTI32X2     (R8), VzReduce // latency 3, CPI 1
