@@ -761,8 +761,6 @@ cmpDone:             \
     MOVD    4(R),  reg2 \
     MOVD    8(R),  reg3 \
     MOVD    12(R), reg4 \
-    \//ADDQ    $4, R \ //TODO replace by offsets to R
-    \//VPBROADCASTD  X1, RK \ // latency is 3 for 256/512, 1 otherwise; CPI 1
 
 #define loadRoundKeyX(R) \
     loadRoundKey(R, VxRoundKey) \
@@ -980,14 +978,14 @@ X4Done:  \
 
 #define cryptoBlockAsmX2Macro(rk,dst, src, reg, hashFlag) \
     transpose2x4(VxState1, VxState2, VxState3, VxState4, T0x, T1x)  \
-    roundX(rk)   \
-    roundX(rk)   \
-    roundX(rk)   \
-    roundX(rk)   \
-    roundX(rk)   \
-    roundX(rk)   \
-    roundX(rk)   \
-    roundX(rk)   \
+    roundX(rk)  \
+    roundX(rk)  \
+    roundX(rk)  \
+    roundX(rk)  \
+    roundX(rk)  \
+    roundX(rk)  \
+    roundX(rk)  \
+    roundX(rk)  \
     SUBQ $128, rk \
     transpose4x2(VxState4, VxState3, VxState2, VxState1, T0x, T1x)   \
     rev32(VxShuffle, VxState4)  \
@@ -1003,16 +1001,16 @@ X4Done:  \
 X2Done:  \
     NOP  \
 
-#define cryptoBlockAsmX1Macro(rk,dst,src,reg, hashFlag)    \
+#define cryptoBlockAsmX1Macro(rk,dst,src,reg, hashFlag,reg1,reg2,reg3,reg4)    \
     transpose1x4(VxState1, VxState2, VxState3, VxState4, T0x, T1x)  \
-    roundX(rk)  \
-    roundX(rk)  \
-    roundX(rk)  \
-    roundX(rk)  \
-    roundX(rk)  \
-    roundX(rk)  \
-    roundX(rk)  \
-    roundX(rk)  \
+    roundXNew(rk,VxState1,VxState4,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxState1,VxState4,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxState1,VxState4,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxState1,VxState4,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxState1,VxState4,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxState1,VxState4,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxState1,VxState4,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxState1,VxState4,reg1,reg2,reg3,reg4)  \
     SUBQ $128, rk \
     transpose4x1(VxState4, VxState3, VxState2, VxState1, T0x, T1x) \
     rev32(VxShuffle, VxState4)  \
@@ -1025,16 +1023,16 @@ X2Done:  \
 X1Done: \
     NOP \
 
-#define cryptoBlockAsmRemain(rk,dst,src,reg)    \
+#define cryptoBlockAsmRemain(rk,dst,src,reg,reg1,reg2,reg3,reg4)    \
     transpose1x4(VxState1, VxState2, VxState3, VxState4, T0x, T1x)  \
-    roundX(rk)  \
-    roundX(rk)  \
-    roundX(rk)  \
-    roundX(rk)  \
-    roundX(rk)  \
-    roundX(rk)  \
-    roundX(rk)  \
-    roundX(rk)  \
+    roundXNew(rk,VxState1,VxState4,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxState1,VxState4,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxState1,VxState4,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxState1,VxState4,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxState1,VxState4,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxState1,VxState4,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxState1,VxState4,reg1,reg2,reg3,reg4)  \
+    roundXNew(rk,VxState1,VxState4,reg1,reg2,reg3,reg4)  \
     SUBQ $128, rk \
     transpose4x1(VxState4, VxState3, VxState2, VxState1, T0x, T1x) \
     rev32(VxShuffle, VxState4)  \
@@ -1150,7 +1148,7 @@ loopX1:     \
     CMPQ len, $16  \
     JL loopX0   \
     fillCounterX1()   \
-    cryptoBlockAsmX1Macro(rk, dst,src, reg1,hashFlag)  \
+    cryptoBlockAsmX1Macro(rk, dst,src, reg1,hashFlag,reg1,reg2,reg3,blockCount)  \
     ADDQ $16, dst   \
     ADDQ $16, src   \
     SUBQ $16, len    \
@@ -1159,7 +1157,7 @@ loopX0:    \
     CMPQ len, $0   \
     JLE cryptoBlocksDone     \
     fillCounterX1()   \
-    cryptoBlockAsmRemain(rk,tmp,src,reg3)  \
+    cryptoBlockAsmRemain(rk,tmp,src,reg3,reg1,reg2,reg3,blockCount)  \
     clearRight(tmp,len,reg3,reg2) \
     MOVQ len, reg2 \
     copyAsm(dst,tmp,len,reg3)  \
