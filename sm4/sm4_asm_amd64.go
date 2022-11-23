@@ -6,7 +6,7 @@
 package sm4
 
 //go:noescape
-func cryptoBlockAsmX16(rk *uint32, dst, src *byte)
+func copyAsm(dst *byte, src *byte, len int)
 
 //go:noescape
 func transpose4x4(dst *uint32, src *uint32)

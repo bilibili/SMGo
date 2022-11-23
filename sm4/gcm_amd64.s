@@ -388,58 +388,6 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
 
 #define VzIdx        Z31
 
-//consider at last *******
-#define copyAsm(dst,src,len,tmp)  \
-    CMPQ len, $8    \
-    JL 7(PC)     \
-    MOVQ 0(src), tmp \
-    MOVQ tmp, 0(dst) \
-    ADDQ $8, src    \
-    ADDQ $8, dst    \
-    SUBQ $8, len    \
-    JMP  -7(PC)      \
-    CMPQ len, $4    \
-    JL  7(PC)       \
-    MOVL 0(src), tmp \
-    MOVL tmp, 0(dst) \
-    ADDQ $4, src    \
-    ADDQ $4, dst    \
-    SUBQ $4, len    \
-    JMP -7(PC)       \
-    CMPQ len, $2    \
-    JL  7(PC)       \
-    MOVW 0(src), tmp \
-    MOVW tmp, 0(dst) \
-    ADDQ $2, src    \
-    ADDQ $2, dst    \
-    SUBQ $2, len    \
-    JMP -7(PC)       \
-    CMPQ len, $1    \
-    JL 7(PC)         \
-    MOVB 0(src), tmp \
-    MOVB tmp, 0(dst) \
-    ADDQ $1, src    \
-    ADDQ $1, dst    \
-    SUBQ $1, len    \
-    JMP -7(PC)       \
-    NOP             \
-
-
-#define clearRight(dst,len,reg1,reg2) \
-    MOVQ dst, reg2 \
-    ADDQ len, reg2 \
-    MOVQ $16, reg1 \
-    SUBQ len, reg1 \
-loop:             \
-    CMPQ reg1, $0 \
-    JLE end       \
-    MOVB $0, (reg2) \
-    ADDQ $1, reg2   \
-    SUBQ $1, reg1  \
-    JMP loop       \
-end:               \
-    NOP            \
-
 
 // **************       related with rev        ***************
 // related with reverse bytes
@@ -650,6 +598,58 @@ end:               \
     VMOVDQU32   (src), X0   \
     VPXORD      X0, Vx1, Vx1  \
     VMOVDQU32   Vx1, (dst)    \
+
+//copy *******
+#define copyAsm(dst,src,len,tmp)  \
+    CMPQ len, $8    \
+    JL 7(PC)     \
+    MOVQ 0(src), tmp \
+    MOVQ tmp, 0(dst) \
+    ADDQ $8, src    \
+    ADDQ $8, dst    \
+    SUBQ $8, len    \
+    JMP  -7(PC)      \
+    CMPQ len, $4    \
+    JL  7(PC)       \
+    MOVL 0(src), tmp \
+    MOVL tmp, 0(dst) \
+    ADDQ $4, src    \
+    ADDQ $4, dst    \
+    SUBQ $4, len    \
+    JMP -7(PC)       \
+    CMPQ len, $2    \
+    JL  7(PC)       \
+    MOVW 0(src), tmp \
+    MOVW tmp, 0(dst) \
+    ADDQ $2, src    \
+    ADDQ $2, dst    \
+    SUBQ $2, len    \
+    JMP -7(PC)       \
+    CMPQ len, $1    \
+    JL 7(PC)         \
+    MOVB 0(src), tmp \
+    MOVB tmp, 0(dst) \
+    ADDQ $1, src    \
+    ADDQ $1, dst    \
+    SUBQ $1, len    \
+    JMP -7(PC)       \
+    NOP             \
+
+//clear right part
+#define clearRight(dst,len,reg1,reg2) \
+    MOVQ dst, reg2 \
+    ADDQ len, reg2 \
+    MOVQ $16, reg1 \
+    SUBQ len, reg1 \
+loop:             \
+    CMPQ reg1, $0 \
+    JLE end       \
+    MOVB $0, (reg2) \
+    ADDQ $1, reg2   \
+    SUBQ $1, reg1  \
+    JMP loop       \
+end:               \
+    NOP            \
 
 //func constantTimeCompareAsm(x *byte, y *byte, l int) int32. the result is in reg2
 #define constantTimeCompare(x,y,l,reg1,reg2,reg3) \
@@ -2030,24 +2030,24 @@ TEXT ·needExpand(SB), $0-40
 
 //func sealAsm(roundKeys *uint32, tagSize int, dst *byte, nonce []byte, plaintext []byte, additionalData []byte, temp *byte)
 //temp:  H, TMask, J0, tag, counter, tmp, CNT-256, tmp-256
-TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
-    cryptoPrepare(Reg1, Reg2, RegT3)   //Z26, Z16, Z17 is used to load constant
+TEXT ·sealAsm(SB), NOSPLIT, $0-104
+    cryptoPrepare(Reg1, Reg2, RegT3)
 
     MOVQ rk+0(FP), RK
-    cryptoBlockAsmMacro(RK,VxState1, VxH,Reg1,Reg2,RegT1,RegT2) //H stored in VxH, keep order
+    cryptoBlockAsmMacro(RK,VxState1, VxH,Reg1,Reg2,RegT1,RegT2) //H stored in VxH
 
     gHashPre(Reg1, Reg2, RegT3)
 
     MOVQ nonce+24(FP), Nonce
     MOVQ nonceLen+32(FP), NonceLen
     MOVQ tmp+96(FP), Tmp
-    calculateJ0(Nonce,NonceLen,BlockCount2,Remain2,Tmp,Reg1, Reg2, RegT3)  //J0 store in VxJ0, keep order,  VxH reverse order
+    calculateJ0(Nonce,NonceLen,BlockCount2,Remain2,Tmp,Reg1, Reg2, RegT3)  //J0 store in VxJ0
 
     cryptoBlockAsmMacro(RK,VxState1, VxTMask,Reg1,Reg2,RegT1,RegT2)
 
     MOVQ aData+72(FP), AData
     MOVQ aLen+80(FP), ALen
-    CalculateSPre(AData,ALen, BlockCount1, Remain1, Tmp, Reg1, Reg2, RegT1) //GHash(A||0) is stored in VxTag and is reverseBits, VxH is also reversebits
+    CalculateSPre(AData,ALen, BlockCount1, Remain1, Tmp, Reg1, Reg2, RegT1) //GHash(A||0) is stored in VxTag
 
     MOVQ dst+16(FP), Dst
     MOVQ plaintext+48(FP), Plaintext
@@ -2068,33 +2068,24 @@ TEXT ·sealAsm(SB), NOSPLIT, $80-152    //change later
 
 //func openAsm(roundKeys *uint32, tagSize int,dst *byte, nonce []byte, ciphertext []byte, additionalData []byte, temp *byte) int
 ////temp: H, J0, TMask, expectedTag, tmp, Counter-256, TMP-256
-//used registers: Enc, H, Nonce, Tmp, J0, TMask, Ciphertext, AdditionalData, Dst
-TEXT ·openAsm(SB), NOSPLIT, $80-148
-    MOVQ rk+0(FP), RK
-    MOVQ tagSize+8(FP), TagSize
-    MOVQ dst+16(FP), Dst
-    MOVQ nonce+24(FP), Nonce
-    MOVQ cipher+48(FP), Cipher
-    MOVQ aData+72(FP), AData
-    MOVQ tmp+96(FP), Tmp
-
+TEXT ·openAsm(SB), NOSPLIT, $0-104
     cryptoPrepare(Reg1, Reg2, RegT3)
 
     MOVQ rk+0(FP), RK
-    cryptoBlockAsmMacro(RK,VxState1,VxH,Reg1,Reg2,RegT1,RegT2) //H stored in VxH, keep order
+    cryptoBlockAsmMacro(RK,VxState1,VxH,Reg1,Reg2,RegT1,RegT2) //H stored in VxH
 
     gHashPre(Reg1, Reg2, RegT3)
 
     MOVQ nonce+24(FP), Nonce
     MOVQ nonceLen+32(FP), NonceLen
     MOVQ tmp+96(FP), Tmp
-    calculateJ0(Nonce,NonceLen,BlockCount2,Remain2,Tmp,Reg1, Reg2, RegT3)  //J0 store in VxJ0, keep order,  VxH reverse order
+    calculateJ0(Nonce,NonceLen,BlockCount2,Remain2,Tmp,Reg1, Reg2, RegT3)  //J0 store in VxJ0
 
     cryptoBlockAsmMacro(RK,VxState1,VxTMask,Reg1,Reg2,RegT1,RegT2)
 
     MOVQ aData+72(FP), AData
     MOVQ aLen+80(FP), ALen
-    CalculateSPre(AData,ALen, BlockCount1, Remain1, Tmp, Reg1, Reg2, RegT1) //GHash(A||0) is stored in VxTag and is reverseBits, VxH is also reversebits
+    CalculateSPre(AData,ALen, BlockCount1, Remain1, Tmp, Reg1, Reg2, RegT1) //GHash(A||0) is stored in VxTag
 
     MOVQ cipher+48(FP), Cipher
     MOVQ cipherLen+56(FP), CipherLen
@@ -2131,7 +2122,6 @@ TEXT ·openAsm(SB), NOSPLIT, $80-148
     MOVQ tagSize+8(FP), TagSize
     SUBQ TagSize, CipherLen
     MOVQ tmp+96(FP), Tmp
-    //ADDQ $48, Tmp
     MOVQ $0, HashFlag
     cryptoBlocksAsm(RK,Dst,Cipher,CipherLen,Tmp,BlockCount1,Reg1,Reg2,RegT2,HashFlag)
 
