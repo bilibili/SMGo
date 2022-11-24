@@ -48,6 +48,7 @@ GLOBL PostAffineMatrix<>(SB), (NOPTR+RODATA), $8
 #define PreAffineConstant 0b00111110
 #define PostAffineConstant 0b11010011
 
+//mask
 #define MASK  K1
 
 // X/Y/Z 0~5 draft registers
@@ -115,26 +116,25 @@ GLOBL PostAffineMatrix<>(SB), (NOPTR+RODATA), $8
 #define VzState3    Z8
 #define VzState4    Z9
 
-// X/Y/Z 12  pre-inverse affine matrix
-#define VxPreMatrix X12
-#define VyPreMatrix Y12
-#define VzPreMatrix Z12
+// X/Y/Z 10  pre-inverse affine matrix
+#define VxPreMatrix X10
+#define VyPreMatrix Y10
+#define VzPreMatrix Z10
 
-// X/Y/Z 13  post-inverse affine matrix
-#define VxPostMatrix X13
-#define VyPostMatrix Y13
-#define VzPostMatrix Z13
+// X/Y/Z 11  post-inverse affine matrix
+#define VxPostMatrix X11
+#define VyPostMatrix Y11
+#define VzPostMatrix Z11
 
-// X/Y/X 20 for byte order shuffle
-#define VxShuffle   X20
-#define VyShuffle   Y20
-#define VzShuffle   Z20
+// X/Y/X 12 for byte order shuffle
+#define VxShuffle   X12
+#define VyShuffle   Y12
+#define VzShuffle   Z12
 
-// X/Y/Z 27 for round key
-#define VxRoundKey   X27
-#define VyRoundKey   Y27
-#define VzRoundKey   Z27
-
+// X/Y/Z 13 for round key
+#define VxRoundKey   X13
+#define VyRoundKey   Y13
+#define VzRoundKey   Z13
 
 // **************       related with rev        ***************
 // related with reverse bytes
@@ -146,14 +146,6 @@ GLOBL PostAffineMatrix<>(SB), (NOPTR+RODATA), $8
     rev32(Const, S2) \
     rev32(Const, S3) \
     rev32(Const, S4) \
-
-//related with reverse bits  - load consts
-#define loadMasks(tmp1,tmp2) \
-    MOVQ                $AND_MASK<>(SB), tmp1 \
-    MOVQ                $LOWER_MASK<>(SB), tmp2 \
-    VBROADCASTI32X2     (tmp1), VzAndMask \ // latency 8, CPI 0.5
-    VBROADCASTI32X4     (tmp2), VzLowerMask \
-    VPSLLQ $4, VzLowerMask, VzHigherMask \
 
 // **************       related with load        ***************
 //load shuffle constant
@@ -438,4 +430,6 @@ GLOBL PostAffineMatrix<>(SB), (NOPTR+RODATA), $8
     subRoundZ(VzState3, VzState4, VzState1, VzState2) \
     loadRoundKeyZ(R) \
     subRoundZ(VzState4, VzState1, VzState2, VzState3) \
+
+
 

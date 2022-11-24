@@ -11,18 +11,6 @@ import (
 	"testing"
 )
 
-func Test_fillCounterX1(t *testing.T) {
-	j0 := []byte{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}
-	fillCounterX1(&j0[0])
-	fmt.Println(j0)
-}
-
-func Test_fillCounterX4(t *testing.T) {
-	j0 := []byte{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}
-	fillCounterX4(&j0[0])
-	fmt.Println(j0)
-}
-
 func Test_concatenateX(t *testing.T){
 	x0 := [64]byte{1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,}
 	x1 := [64]byte{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,}
@@ -37,30 +25,6 @@ func Test_concatenateY(t *testing.T){
 	y1 := []byte{2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,5,}
 	concatenateY(&y0[0],&y1[0])
 	fmt.Println(y0)
-}
-
-func Test_broadcastJ0(t *testing.T){
-	j0 := [64]byte{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,}
-	broadcastJ0(&j0[0])
-	fmt.Println(j0)
-}
-
-func Test_clearRight(t *testing.T){
-	state := [16]byte{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,}
-	clearRight(&state[0],12)
-	fmt.Println(state)
-}
-
-func Test_makeCounterNew(t *testing.T){
-	src := [12]byte{1,2,3,4,5,6,7,8,9,10,11,12}
-	dst := [16]byte{}
-	makeCounterNew(&src[0], &dst[0])
-	fmt.Println(dst)
-}
-
-func Test_rev12(t *testing.T){
-	rev1()
-	rev2()
 }
 
 func Test_transpose4x4(t *testing.T) {
