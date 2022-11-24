@@ -1,46 +1,10 @@
-#include "textflag.h"
+// Copyright 2021 ~ 2022 bilibili. All rights reserved. Author: Guo, Weiji guoweiji@bilibili.com
+// 哔哩哔哩版权所有 2021 ~ 2022。作者：郭伟基 guoweiji@bilibili.com
 
-//********    EXPAND KEY related    ********
+// optimized partially based on the Intel document "Optimized Galois-Counter-Mode Implementation on Intel Architecture Processors"
+// https://www.intel.com/content/dam/www/public/us/en/documents/white-papers/communications-ia-galois-counter-mode-paper.pdf
 
-DATA FK<>+0x00(SB)/4, $0xa3b1bac6
-DATA FK<>+0x04(SB)/4, $0x56aa3350
-DATA FK<>+0x08(SB)/4, $0x677d9197
-DATA FK<>+0x0c(SB)/4, $0xb27022dc
-GLOBL FK<>(SB), (NOPTR+RODATA), $16
-
-DATA CK<>+0x00(SB)/4, $0x00070e15
-DATA CK<>+0x04(SB)/4, $0x1c232a31
-DATA CK<>+0x08(SB)/4, $0x383f464d
-DATA CK<>+0x0c(SB)/4, $0x545b6269
-DATA CK<>+0x10(SB)/4, $0x70777e85
-DATA CK<>+0x14(SB)/4, $0x8c939aa1
-DATA CK<>+0x18(SB)/4, $0xa8afb6bd
-DATA CK<>+0x1c(SB)/4, $0xc4cbd2d9
-DATA CK<>+0x20(SB)/4, $0xe0e7eef5
-DATA CK<>+0x24(SB)/4, $0xfc030a11
-DATA CK<>+0x28(SB)/4, $0x181f262d
-DATA CK<>+0x2c(SB)/4, $0x343b4249
-DATA CK<>+0x30(SB)/4, $0x50575e65
-DATA CK<>+0x34(SB)/4, $0x6c737a81
-DATA CK<>+0x38(SB)/4, $0x888f969d
-DATA CK<>+0x3c(SB)/4, $0xa4abb2b9
-DATA CK<>+0x40(SB)/4, $0xc0c7ced5
-DATA CK<>+0x44(SB)/4, $0xdce3eaf1
-DATA CK<>+0x48(SB)/4, $0xf8ff060d
-DATA CK<>+0x4c(SB)/4, $0x141b2229
-DATA CK<>+0x50(SB)/4, $0x30373e45
-DATA CK<>+0x54(SB)/4, $0x4c535a61
-DATA CK<>+0x58(SB)/4, $0x686f767d
-DATA CK<>+0x5c(SB)/4, $0x848b9299
-DATA CK<>+0x60(SB)/4, $0xa0a7aeb5
-DATA CK<>+0x64(SB)/4, $0xbcc3cad1
-DATA CK<>+0x68(SB)/4, $0xd8dfe6ed
-DATA CK<>+0x6c(SB)/4, $0xf4fb0209
-DATA CK<>+0x70(SB)/4, $0x10171e25
-DATA CK<>+0x74(SB)/4, $0x2c333a41
-DATA CK<>+0x78(SB)/4, $0x484f565d
-DATA CK<>+0x7c(SB)/4, $0x646b7279
-GLOBL CK<>(SB), (NOPTR+RODATA), $128
+#include "com_amd64.s"
 
 //********        CIPH related      ********
 DATA Counter_Add1<>+0x00(SB)/8, $0x0000000000000000
@@ -73,34 +37,7 @@ DATA Counter_Add3<>+0x30(SB)/8, $0x0000000000000000
 DATA Counter_Add3<>+0x38(SB)/8, $0x0000000200000000
 GLOBL Counter_Add3<>(SB), (NOPTR+RODATA), $64
 
-// pre- and post-inverse affine matrix
-DATA PreAffineMatrix<>+0x00(SB)/8, $0x4c287db91a22505d
-GLOBL PreAffineMatrix<>(SB), (NOPTR+RODATA), $8
-DATA PostAffineMatrix<>+0x00(SB)/8, $0xf3ab34a974a6b589
-GLOBL PostAffineMatrix<>(SB), (NOPTR+RODATA), $8
-
-// pre- and post-inverse affine constant
-#define PreAffineConstant 0b00111110
-#define PostAffineConstant 0b11010011
-
-//*********    GHASH related          ************
-DATA Shuffle<>+0x00(SB)/1, $0x03
-DATA Shuffle<>+0x01(SB)/1, $0x02
-DATA Shuffle<>+0x02(SB)/1, $0x01
-DATA Shuffle<>+0x03(SB)/1, $0x00
-DATA Shuffle<>+0x04(SB)/1, $0x07
-DATA Shuffle<>+0x05(SB)/1, $0x06
-DATA Shuffle<>+0x06(SB)/1, $0x05
-DATA Shuffle<>+0x07(SB)/1, $0x04
-DATA Shuffle<>+0x08(SB)/1, $0x0b
-DATA Shuffle<>+0x09(SB)/1, $0x0a
-DATA Shuffle<>+0x0A(SB)/1, $0x09
-DATA Shuffle<>+0x0B(SB)/1, $0x08
-DATA Shuffle<>+0x0C(SB)/1, $0x0f
-DATA Shuffle<>+0x0D(SB)/1, $0x0e
-DATA Shuffle<>+0x0E(SB)/1, $0x0d
-DATA Shuffle<>+0x0F(SB)/1, $0x0c
-GLOBL Shuffle<>(SB), (NOPTR+RODATA), $16
+//********        GHash related      ********
 
 DATA Shuffle1<>+0x00(SB)/1, $0x07
 DATA Shuffle1<>+0x01(SB)/1, $0x06
@@ -181,7 +118,6 @@ DATA GCM_POLY<>+0x00(SB)/8, $0x0000000000000087
 DATA GCM_POLY<>+0x08(SB)/8, $0x0000000000000000
 GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
 
-
 // **************       Register allocation        ***************
 
 // R8~15, DI, SI, AX, BX, CX, DX: used as parameters or general purpose drafts
@@ -220,81 +156,17 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
 #define RegT2          R11
 #define RegT3          R8
 
-// the mask for saving round keys during key expansion
-#define MASK           K1
 #define MASK_Mov0_1    K1
 #define MASK_Mov01_23  K2
 
-// X/Y/Z 0~5 draft registers
-#define T0x X0
-
-#define T1x X1
-#define T2x X2
-#define T3x X3
-
-#define T4x X4
-#define U1x X4
-
-#define T5x X5
-#define U2x X5
-
-#define T0y Y0
 #define VyIdxH01     Y0
-
-#define T1y Y1
-#define T2y Y2
-#define T3y Y3
-
-#define T4y Y4
-#define U1y Y4
-
-#define T5y Y5
-#define U2y Y5
-
-#define T0z Z0
-
-#define T1z Z1
 #define VzIdxH23     Z1
 
-#define T2z Z2
-#define T3z Z3
-
-#define T4z Z4
+#define U1x X4
 #define U1z Z4
 
-#define T5z Z5
+#define U2x X5
 #define U2z Z5
-
-
-//**********      CIPH related     **************
-// X/Y/Z Src, Interim, Dst for affine instructions
-#define VxInterim X0
-#define VyInterim Y0
-#define VzInterim Z0
-
-#define VxSrc X4
-#define VySrc Y4
-#define VzSrc Z4
-
-#define VxDst X5
-#define VyDst Y5
-#define VzDst Z5
-
-// X/Y/Z 6~9 for states
-#define VxState1    X6
-#define VxState2    X7
-#define VxState3    X8
-#define VxState4    X9
-
-#define VyState1    Y6
-#define VyState2    Y7
-#define VyState3    Y8
-#define VyState4    Y9
-
-#define VzState1    Z6
-#define VzState2    Z7
-#define VzState3    Z8
-#define VzState4    Z9
 
 //X/Y/Z 10 for J0 and some J_k
 #define VxJ0    X10
@@ -305,16 +177,7 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
 #define VxTMask X11
 #define VzTMask Z11
 
-// X/Y/Z 12  pre-inverse affine matrix
-#define VxPreMatrix X12
-#define VyPreMatrix Y12
-#define VzPreMatrix Z12
-
-// X/Y/Z 13  post-inverse affine matrix
-#define VxPostMatrix X13
-#define VyPostMatrix Y13
-#define VzPostMatrix Z13
-
+//*********       CryptBlocks related      ********//
 #define VxAdd1  X14
 #define VyAdd1  Y14
 #define VzAdd1  Z14
@@ -323,11 +186,6 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
 
 #define VyAdd3  Y16
 #define VzAdd3  Z16
-
-// X/Y/Z 27 for round key
-#define VxRoundKey   X27
-#define VyRoundKey   Y27
-#define VzRoundKey   Z27
 
 //*********       GHASH related      ********//
 //X/Y/Z 17  H
@@ -341,11 +199,6 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
 
 #define VxTag        X19
 #define VzTag        Z19
-
-// X/Y/X 20 for byte order shuffle
-#define VxShuffle   X20
-#define VyShuffle   Y20
-#define VzShuffle   Z20
 
 // X/Y/Z 21~23 masks
 #define VxAndMask    X21
@@ -389,17 +242,7 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
 #define VzIdx        Z31
 
 
-// **************       related with rev        ***************
-// related with reverse bytes
-#define rev32(Const, R) \
-    VPSHUFB     Const, R, R \ // AVX512F(512) or SSE2(128) or AVX2(256), latency 1, CPI 0.5(256)/1(128;512)
-
-#define revStates(Const, S1, S2, S3, S4) \
-    rev32(Const, S1) \
-    rev32(Const, S2) \
-    rev32(Const, S3) \
-    rev32(Const, S4) \
-
+// **************       macro function related with CIPH        ***************
 #define rev64(reg,src,VxD)           \
     MOVQ        $Shuffle2<>(SB), reg \
     MOVQ         src, T1x            \
@@ -418,14 +261,6 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
     VPSHUFB     T1x, T3x, VxD         \    //VXD = 0..0 rev(src2)
     VPSHUFB     T0x, T2x, MASK, VxD   \
 
-//related with reverse bits  - load consts
-#define loadMasks(tmp1,tmp2) \
-    MOVQ                $AND_MASK<>(SB), tmp1 \
-    MOVQ                $LOWER_MASK<>(SB), tmp2 \
-    VBROADCASTI32X2     (tmp1), VzAndMask \ // latency 8, CPI 0.5
-    VBROADCASTI32X4     (tmp2), VzLowerMask \
-    VPSLLQ $4, VzLowerMask, VzHigherMask \
-
 //reverse bits
 #define reverseBits(V, And, Higher, Lower, T0, T1) \
     VPSRLW      $4, V, T0 \ //AVX512BW
@@ -441,163 +276,6 @@ GLOBL GCM_POLY<>(SB), (NOPTR+RODATA), $16
     reverseBits(Vz2, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
     reverseBits(Vz3, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
     reverseBits(Vz4, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
-
-// **************       related with load        ***************
-//load shuffle constant
-#define loadShuffle512(reg) \
-    MOVQ                $Shuffle<>(SB), reg \
-    VBROADCASTI32X4     (reg), VzShuffle \ // AVX512F, latency 8? CPI 0.5
-
-#define loadShuffle256(reg) \
-    MOVQ                $Shuffle<>(SB), reg \
-    VBROADCASTI32X4     (reg), VyShuffle \ // AVX512F, latency 8? CPI 0.5
-
-#define loadShuffle128(reg) \
-    MOVQ        $Shuffle<>(SB), reg \
-    VMOVDQU32   (reg), VxShuffle \
-
-#define loadMatrix(Pre, Post, reg1, reg2) \
-    MOVQ    $PreAffineMatrix<>(SB), reg1 \
-    MOVQ    $PostAffineMatrix<>(SB), reg2 \
-    VBROADCASTI32X2     (reg1), Pre \ // latency is 3 for 256/512, 1 otherwise; CPI 1
-    VBROADCASTI32X2     (reg2), Post \ // 128/256: AVX512DQ+AVX512VL; 512: AVX512DQ
-
-#define loadCounterConstant(reg1, reg2, reg3)   \
-    MOVQ        $Counter_Add1<>(SB), reg1  \
-    MOVQ        $Counter_Add2<>(SB), reg2  \
-    MOVQ        $Counter_Add3<>(SB), reg3  \
-    VMOVDQU32   (reg1), VzAdd1   \ //VzAdd1:(1,2,3,4)
-    VMOVDQU32   (reg2), VzAdd2   \ //VzAdd2: (4,4,4,4)
-    VMOVDQU32   (reg3), VzAdd3   \ //VzAdd3: (2,2,2,2)
-
-//load input with 16 blocks
-#define loadInputX16(Src, V1, V2, V3, V4) \ // FIXME: little endian
-    VMOVDQU32   (Src), V1 \ //AVX512F, latency 8, CPI 0.5 -- we should delay the transpose operations
-    VMOVDQU32   (64)(Src), V2 \
-    VMOVDQU32   (128)(Src), V3 \
-    VMOVDQU32   (192)(Src), V4 \
-
-//load input with 8 blocks
-#define loadInputX8(Src, V1, V2, V3, V4) \
-    VMOVDQU32   (Src), V1 \ //AVX, latency 7, CPI 0.5
-    VMOVDQU32   (32)(Src), V2 \ // we should perform transpose later
-    VMOVDQU32   (64)(Src), V3 \
-    VMOVDQU32   (96)(Src), V4 \
-
-//load input with 4 blocks
-#define loadInputX4(Src, V1, V2, V3, V4) \
-    VMOVDQU32   (Src), V1 \
-    VMOVDQU32   (16)(Src), V2 \
-    VMOVDQU32   (32)(Src), V3 \
-    VMOVDQU32   (48)(Src), V4 \
-
-//load input with 2 blocks
-#define loadInputX2(Src, V1, V2) \ // we should perform transpose/rev later
-    VMOVDQU32   (Src), V1 \
-    VMOVDQU32   (16)(Src), V2 \
-
-//load input with 1 blocks
-#define loadInputX1(Src, V1) \ // we should perform transpose/rev later
-    VMOVDQU32   (Src), V1 \
-
-//load data with 4 blocks and store in VzDat
-#define load4X(data) \
-    VMOVDQU32   (data), VzDat \
-    ADDQ        $64, data \
-    reverseBits(VzDat, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
-
-//load data with 1 block and store in VxDat
-#define load1X(data) \
-    VMOVDQU32   (data), VxDat \
-    ADDQ        $16, data \
-    reverseBits(VxDat, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
-
-//load temp block
-#define loadTmp(Src, V1) \
-    VMOVDQU32   (Src), V1 \
-    reverseBits(V1, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
-
-// **************       related with store        ***************
-//store output with 16 blocks
-#define storeOutputX16(V1, V2, V3, V4, Dst) \ // FIXME: little endian
-    VMOVDQU32   V1, (Dst) \ //AVX512F, latency 5, CPI 1
-    VMOVDQU32   V2, (64)(Dst) \
-    VMOVDQU32   V3, (128)(Dst) \
-    VMOVDQU32   V4, (192)(Dst) \
-
-//store output with 8 blocks
-#define storeOutputX8(V1, V2, V3, V4, Dst) \
-    VMOVDQU32   V1, (Dst) \ //AVX, latency 5, CPI 1
-    VMOVDQU32   V2, (32)(Dst) \
-    VMOVDQU32   V3, (64)(Dst) \
-    VMOVDQU32   V4, (96)(Dst) \
-
-//store output with 4 blocks
-#define storeOutputX4(V1, V2, V3, V4, Dst) \
-    VMOVDQU32   V1, (Dst) \ //SSE2, latency 5, CPI 1
-    VMOVDQU32   V2, (16)(Dst) \
-    VMOVDQU32   V3, (32)(Dst) \
-    VMOVDQU32   V4, (48)(Dst) \
-
-//store output with 2 blocks
-#define storeOutputX2(V1, V2, Dst) \
-    VMOVDQU32   V1, (Dst) \ //SSE2, latency 5, CPI 1
-    VMOVDQU32   V2, (16)(Dst) \
-
-//store output with 1 blocks
-#define storeOutputX1(V1, Dst) \
-    VMOVDQU32   V1, (Dst) \
-
-// **************       related with xor        ***************
-#define xor256(dst,src, Vz1, Vz2, Vz3, Vz4)    \
-    VMOVDQU32   (src),    Z0        \
-    VMOVDQU32   64(src),  Z1        \
-    VMOVDQU32   128(src), Z2        \
-    VMOVDQU32   192(src), Z3        \
-    VPXORD      Vz1, Z0, Vz1        \
-    VPXORD      Vz2, Z1, Vz2        \
-    VPXORD      Vz3, Z2, Vz3        \
-    VPXORD      Vz4, Z3, Vz4        \
-    VMOVDQU32   Vz1,   (dst)        \
-    VMOVDQU32   Vz2,   64(dst)      \
-    VMOVDQU32   Vz3,   128(dst)     \
-    VMOVDQU32   Vz4,   192(dst)     \
-
-//func xor128(dst *byte, src1 *byte, src2 *byte)
-#define xor128(dst,src,Vy1,Vy2,Vy3,Vy4) \
-    VMOVDQU32   (src),   Y1      \
-    VMOVDQU32   32(src), Y2      \
-    VMOVDQU32   64(src), Y3      \
-    VMOVDQU32   96(src), Y4      \
-    VPXORD      Y1, Vy1, Vy1     \
-    VPXORD      Y2, Vy2, Vy2     \
-    VPXORD      Y3, Vy3, Vy3     \
-    VPXORD      Y4, Vy4, Vy4     \
-
-#define xor64(dst, src, Vx1, Vx2, Vx3, Vx4) \
-    VMOVDQU32   (src),   X1      \
-    VMOVDQU32   16(src), X2      \
-    VMOVDQU32   32(src), X3      \
-    VMOVDQU32   48(src), X4      \
-    VPXORD      X1, Vx1, Vx1     \
-    VPXORD      X2, Vx2, Vx2     \
-    VPXORD      X3, Vx3, Vx3     \
-    VPXORD      X4, Vx4, Vx4     \
-
-//func xor32(dst *byte, src1 *byte, src2 *byte)
-#define xor32(dst, src, Vx1, Vx2) \
-    VMOVDQU32   (src), X1     \
-    VMOVDQU32   16(src), X2   \
-    VPXORD      X1, Vx1, Vx1  \
-    VPXORD      X2, Vx2, Vx2  \
-    VMOVDQU32   Vx1, (dst)    \
-    VMOVDQU32   Vx2, 16(dst)  \
-
-//func xor16(dst *byte, src1 *byte, src2 *byte)
-#define xor16(dst, src, Vx1) \
-    VMOVDQU32   (src), X0   \
-    VPXORD      X0, Vx1, Vx1  \
-    VMOVDQU32   Vx1, (dst)    \
 
 //copy *******
 #define copyAsm(dst,src,len,tmp)  \
@@ -692,57 +370,31 @@ cmpDone:             \
     SHRQ $8, reg1   \
     ORB reg1, reg2 \
 
-// TODO double check requirements for every instructions
+//load data with 4 blocks and store in VzDat
+#define load4X(data) \
+    VMOVDQU32   (data), VzDat \
+    ADDQ        $64, data \
+    reverseBits(VzDat, VzAndMask, VzHigherMask, VzLowerMask, T0z, T1z) \
 
-// for each 128-bit lane
-//      suppose we begin with: {a0, a1, a2, a3}, {b0, b1, b2, b3}, {c0, c1, c2, c3}, {d0, d1, d2, d3}
-//      we want to reach:      {a0, b0, c0, d0}, {a1, b1, c1, d1}, {a2, b2, c2, d2}, {a3, b3, c3, d3}
-// we move by 32 bits first, then by 64 bits
-#define transpose4x4(V1, V2, V3, V4, Tmp1, Tmp2) \
-    VPUNPCKHDQ  V2, V1, Tmp1 \      // Tmp1: a2, b2, a3, b3                     //128: SSE2; 256: AVX2; 512: AVX512F
-    VPUNPCKLDQ  V2, V1, V1 \        // V1: a0, b0, a1, b1                       //latency 1, CPI 1
-    VPUNPCKHDQ  V4, V3, Tmp2 \      // Tmp2: c2, d2, c3, d3
-    VPUNPCKLDQ  V4, V3, V3 \        // V3: c0, d0, c1, d1
-    \
-    VPUNPCKHQDQ V3, V1, V2 \        // V2: a1, b1, c1, d1
-    VPUNPCKHQDQ Tmp2, Tmp1, V4 \    // V4: a3, b3, c3, d3
-    VPUNPCKLQDQ V3, V1, V1 \        // V1: a0, b0, c0, d0
-    VPUNPCKLQDQ Tmp2, Tmp1, V3 \    // V3: a2, b2, c2, d2
+//load data with 1 block and store in VxDat
+#define load1X(data) \
+    VMOVDQU32   (data), VxDat \
+    ADDQ        $16, data \
+    reverseBits(VxDat, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
 
-// for 2 128-bit lanes
-//      suppose we begin with: {a0, a1, a2, a3}, {b0, b1, b2, b3}, -, -
-//      we want to reach:      {a0, b0--}, {a1, b1--}, {a2,b2--}, {a3,b3--}
-#define transpose2x4(V1, V2, V3, V4, Tmp1, Tmp2) \
-    VPUNPCKHDQ  V2, V1, V3 \      // V3: a2, b2, a3, b3                     //128: SSE2; 256: AVX2; 512: AVX512F
-    VPUNPCKLDQ  V2, V1, V1 \        // V1: a0, b0, a1, b1                       //latency 1, CPI 1
-    VPUNPCKHQDQ V1, V1, V2 \        // V2: a1, b1, -, -
-    VPUNPCKHQDQ V1, V3, V4 \      // V4: a2, b2, -, -
+//load temp block
+#define loadTmp(Src, V1) \
+    VMOVDQU32   (Src), V1 \
+    reverseBits(V1, VxAndMask, VxHigherMask, VxLowerMask, T0x, T1x) \
 
-//      suppose we begin with: {a0, b0--}, {a1, b1,--}, {a2, b2--}, {a3, b3--}
-//      we want to reach:      {a0, a1, a2, a3}, {b0, b1, b2, b3}, -, -
-#define transpose4x2(V1, V2, V3, V4, Tmp1, Tmp2) \
-    VPUNPCKLDQ  V2, V1, Tmp1 \        // Tmp1: a0, a1, b0, b1
-    VPUNPCKLDQ  V4, V3, Tmp2 \        // Tmp2: a2, a3, b2, b3
-    VPUNPCKLQDQ Tmp2, Tmp1, V1 \      // V1: a0, a1, a2, a3
-    VPUNPCKHQDQ Tmp2, Tmp1, V2 \      // V1: b0, b1, b2, b3
+#define loadCounterConstant(reg1, reg2, reg3)   \
+    MOVQ        $Counter_Add1<>(SB), reg1  \
+    MOVQ        $Counter_Add2<>(SB), reg2  \
+    MOVQ        $Counter_Add3<>(SB), reg3  \
+    VMOVDQU32   (reg1), VzAdd1   \ //VzAdd1:(1,2,3,4)
+    VMOVDQU32   (reg2), VzAdd2   \ //VzAdd2: (4,4,4,4)
+    VMOVDQU32   (reg3), VzAdd3   \ //VzAdd3: (2,2,2,2)
 
-// for ONE 128-bit lane
-//      suppose we begin with: {a0, a1, a2, a3}, -, -, -
-//      we want to reach:      {a0---}, {a1---}, {a2---}, {a3---}
-#define transpose1x4(V1, V2, V3, V4, Tmp1, Tmp2) \
-    VPUNPCKLDQ  V1, V1, Tmp1 \      // Tmp1: a0, a0, a1, a1                     //128: SSE2; 256: AVX2; 512: AVX512F
-    VPUNPCKHDQ  V1, V1, V3 \      // V3: a2, a2, a3, a3                     //latency 1, CPI 1
-    VPUNPCKHDQ  Tmp1, Tmp1, V2 \    // V2: a1 ---
-    VPUNPCKHDQ  V3, V3, V4 \    // V4: a3 ---
-
-//      suppose we begin with: {a0---}, {a1---}, {a2---}, {a3---}
-//      we want to reach:      {a0, a1, a2, a3}, -, -, -
-#define transpose4x1(V1, V2, V3, V4, Tmp1, Tmp2) \
-    VPUNPCKLDQ  V2, V1, Tmp1 \        // Tmp1: a0, a1, -, -
-    VPUNPCKLDQ  V4, V3, Tmp2 \        // Tmp2: a2, a3, -, -
-    VPUNPCKLQDQ Tmp2, Tmp1, V1 \      // V1: a0, a1, a2, a3
-
-// **************       macro function related with CIPH        ***************
 #define cryptoPrepare(reg1, reg2, reg3) \
     loadMasks(reg1, reg2) \
     loadShuffle512(reg1) \
@@ -750,102 +402,20 @@ cmpDone:             \
     loadCounterConstant(reg1, reg2, reg3) \
     VPXORD VxState1, VxState1, VxState1 \
 
-//load round key
-#define loadRoundKey(R, RK) \
-    MOVD    (R), X1 \
-    ADDQ    $4, R \ //TODO replace by offsets to R
-    VPBROADCASTD  X1, RK \ // latency is 3 for 256/512, 1 otherwise; CPI 1
-
 #define loadRoundKeyNew(R, RK, reg1, reg2, reg3, reg4) \
     MOVD    (R),   reg1 \
     MOVD    4(R),  reg2 \
     MOVD    8(R),  reg3 \
     MOVD    12(R), reg4 \
 
-#define loadRoundKeyX(R) \
-    loadRoundKey(R, VxRoundKey) \
-
 #define loadRoundKeyXNew(R, reg1, reg2, reg3, reg4) \
     loadRoundKeyNew(R, VxRoundKey, reg1, reg2, reg3, reg4) \
-
-#define loadRoundKeyY(R) \
-    loadRoundKey(R, VyRoundKey) \
 
 #define loadRoundKeyYNew(R, reg1, reg2, reg3, reg4) \
     loadRoundKeyNew(R, VyRoundKey, reg1, reg2, reg3, reg4) \
 
-#define loadRoundKeyZ(R) \
-    loadRoundKey(R, VzRoundKey) \
-
 #define loadRoundKeyZNew(R, reg1, reg2, reg3, reg4) \
     loadRoundKeyNew(R, VzRoundKey, reg1, reg2, reg3, reg4) \
-
-//related with sub round calculation
-#define getXorX(B, C, D, Dst) \
-    getXor(B, C, D, Dst, T0x, T1x, VxRoundKey) \
-    \//getXor(B, C, D, Dst, VxMid, VxHigh, VxRoundKey) \
-
-#define getXorY(B, C, D, Dst) \
-    getXor(B, C, D, Dst, T0y, T1y, VyRoundKey) \
-
-#define getXorZ(B, C, D, Dst) \
-    getXor(B, C, D, Dst, T0z, T1z, VzRoundKey) \
-
-#define getXor(B, C, D, Dst, T0, T1, RK) \
-    VPXORD  B, C, T0 \ // AVX512F+AVX512VL, latency 1, CPI 0.33(128;256)/0.5(512)
-    VPXORD  D, T0, T1 \
-    VPXORD  RK, T1, Dst \ // loading round key (running prior to this) costs some latency so move it last
-
-#define affine(PreMatrix, PostMatrix, Src, Interim, Dst) \
-    VGF2P8AFFINEQB $PreAffineConstant, PreMatrix, Src, Interim \ //GFNI + AVX512VL(128;256) / AVX512F(512)
-    VGF2P8AFFINEINVQB $PostAffineConstant, PostMatrix, Interim, Dst \ //latency 3?, CPI 0.5(128;256)/1(512)
-
-#define transformL(Data, T0, T1, T2, T3) \
-    VPROLD    $2,  Data, T0 \ // AVX512F(512)+AVX512VL(128;256), latency 1, CPI 0.5(128;256)/1(512)
-    VPROLD    $10, Data, T1 \
-    VPROLD    $18, Data, T2 \
-    VPROLD    $24, Data, T3 \
-    VPXORD    T0, T1, T0 \
-    VPXORD    T2, T3, T2 \
-    VPXORD    T0, T2, T0 \
-    VPXORD    T0, Data, Data \
-
-#define transformLX(Data) \
-    transformL(Data, T0x, T1x, T2x, T3x)
-
-#define transformLY(Data) \
-    transformL(Data, T0y, T1y, T2y, T3y)
-
-#define transformLZ(Data) \
-    transformL(Data, T0z, T1z, T2z, T3z) \
-
-#define subRoundX(A, B, C, D) \
-    getXorX(B, C, D, VxSrc) \
-    affine(VxPreMatrix, VxPostMatrix, VxSrc, VxInterim, VxDst) \
-    transformLX(VxDst) \
-    VPXORD  VxDst, A, A \
-
-#define subRoundY(A, B, C, D) \
-    getXorY(B, C, D, VySrc) \
-    affine(VyPreMatrix, VyPostMatrix, VySrc, VyInterim, VyDst) \
-    transformLY(VyDst) \
-    VPXORD  VyDst, A, A \
-
-#define subRoundZ(A, B, C, D) \
-    getXorZ(B, C, D, VzSrc) \
-    affine(VzPreMatrix, VzPostMatrix, VzSrc, VzInterim, VzDst) \
-    transformLZ(VzDst) \
-    VPXORD  VzDst, A, A \
-
-#define roundX(R) \
-    loadRoundKeyX(R) \
-    subRoundX(VxState1, VxState2, VxState3, VxState4) \
-    loadRoundKeyX(R) \
-    subRoundX(VxState2, VxState3, VxState4, VxState1) \
-    loadRoundKeyX(R) \
-    subRoundX(VxState3, VxState4, VxState1, VxState2) \
-    loadRoundKeyX(R) \
-    subRoundX(VxState4, VxState1, VxState2, VxState3) \
 
 #define roundXNew(R,VxS1, VxS4,reg1,reg2,reg3,reg4) \
     loadRoundKeyXNew(R,reg1,reg2,reg3,reg4) \
@@ -866,16 +436,6 @@ cmpDone:             \
     subRoundX(VxS4, VxS1, VxState2, VxState3) \
     ADDQ    $16, R \
 
-#define roundY(R) \
-    loadRoundKeyY(R) \
-    subRoundY(VyState1, VyState2, VyState3, VyState4) \
-    loadRoundKeyY(R) \
-    subRoundY(VyState2, VyState3, VyState4, VyState1) \
-    loadRoundKeyY(R) \
-    subRoundY(VyState3, VyState4, VyState1, VyState2) \
-    loadRoundKeyY(R) \
-    subRoundY(VyState4, VyState1, VyState2, VyState3) \
-
 #define roundYNew(R, reg1, reg2, reg3, reg4) \
     loadRoundKeyYNew(R,reg1, reg2, reg3, reg4) \
     VPBROADCASTD reg1, VyRoundKey \
@@ -890,16 +450,6 @@ cmpDone:             \
     VPBROADCASTD reg4, VyRoundKey \
     subRoundY(VyState4, VyState1, VyState2, VyState3) \
     ADDQ    $16, R \
-
-#define roundZ(R) \
-    loadRoundKeyZ(R) \
-    subRoundZ(VzState1, VzState2, VzState3, VzState4) \
-    loadRoundKeyZ(R) \
-    subRoundZ(VzState2, VzState3, VzState4, VzState1) \
-    loadRoundKeyZ(R) \
-    subRoundZ(VzState3, VzState4, VzState1, VzState2) \
-    loadRoundKeyZ(R) \
-    subRoundZ(VzState4, VzState1, VzState2, VzState3) \
 
 #define roundZNew(R, reg1, reg2, reg3, reg4) \
     loadRoundKeyZNew(R, reg1, reg2, reg3, reg4) \
@@ -1468,219 +1018,6 @@ endSMid:
     cryptoBlocksEnd(tag,tmp,tagSize,blockCount) \
 
 
-// **************       function related with expandKey       ***************
-TEXT ·expandKeyAsm(SB),NOSPLIT,$0-24
-
-    #define loadMask() \
-        MOVQ        $1, R8 \
-        KMOVW       R8, MASK \
-
-    #define saveKeys(Renc, Rdec, A) \
-        VMOVDQU32    A, MASK, (Renc) \
-        VMOVDQU32    A, MASK, (Rdec) \
-        ADDQ         $4, Renc \
-        SUBQ         $4, Rdec \
-
-    #define loadCKey(R, Dst) \
-        loadRoundKey(R, Dst) \
-
-    #define transformLPrime(Data) \
-        VPROLD    $13,  Data, T0x \ // AVX512F(512)+AVX512VL(128;256), latency 1, CPI 0.5(128;256)/1(512)
-        VPROLD    $23, Data, T1x \
-        VPXORD    T0x, T1x, T0x \
-        VPXORD    T0x, Data, Data \
-
-    #define expandSubRound(A, B, C, D, Renc, Rdec) \
-        loadCKey(DX, VxRoundKey) \
-        getXorX(B, C, D, VxSrc) \
-        affine(VxPreMatrix, VxPostMatrix, VxSrc, VxInterim, VxDst) \
-        transformLPrime(VxDst) \
-        VPXORD    VxDst, A, A \
-        saveKeys(Renc, Rdec, A) \
-
-    #define expandRound(Renc, Rdec) \
-        expandSubRound(VxState1, VxState2, VxState3, VxState4, Renc, Rdec) \
-        expandSubRound(VxState2, VxState3, VxState4, VxState1, Renc, Rdec) \
-        expandSubRound(VxState3, VxState4, VxState1, VxState2, Renc, Rdec) \
-        expandSubRound(VxState4, VxState1, VxState2, VxState3, Renc, Rdec) \
-
-    loadMask()
-    loadShuffle128(R8)
-    loadMatrix(VxPreMatrix, VxPostMatrix, AX, BX)
-
-    MOVD	mk+0(FP), AX
-    MOVD	enc+8(FP), BX
-    MOVD	dec+16(FP), CX
-    MOVD    $CK<>(SB), DX
-
-    ADDQ    $124, CX
-
-    VMOVDQU32   (AX), VxState1
-    MOVQ        $FK<>(SB), R8
-    VMOVDQU32   (R8), T0x
-    rev32(VxShuffle, VxState1)
-    VPXORD      T0x, VxState1, VxState1
-
-    transpose1x4(VxState1, VxState2, VxState3, VxState4, T0x, T1x)
-
-    expandRound(BX, CX)
-    expandRound(BX, CX)
-    expandRound(BX, CX)
-    expandRound(BX, CX)
-    expandRound(BX, CX)
-    expandRound(BX, CX)
-    expandRound(BX, CX)
-    expandRound(BX, CX)
-
-    RET
-
-// **************       function related with CIPH       ***************
-//func cryptoBlockAsmX16(rk *uint32, dst, src *byte)
-TEXT ·cryptoBlockAsmX16(SB),NOSPLIT,$0-24
-    loadShuffle512(CX)
-	MOVQ    src+16(FP), CX
-    loadInputX16(CX, VzState1, VzState2, VzState3, VzState4) // latency: 8
-    loadMatrix(VzPreMatrix, VzPostMatrix,AX,BX)
-
-	MOVQ    rk+0(FP), AX
-	MOVQ    dst+8(FP), BX
-
-    revStates(VzShuffle, VzState1, VzState2, VzState3, VzState4) // latency hiden successfully
-    transpose4x4(VzState1, VzState2, VzState3, VzState4, T0z, T1z)
-
-    roundZ(AX)
-    roundZ(AX)
-    roundZ(AX)
-    roundZ(AX)
-    roundZ(AX)
-    roundZ(AX)
-    roundZ(AX)
-    roundZ(AX)
-
-    transpose4x4(VzState4, VzState3, VzState2, VzState1, T0z, T1z)
-    revStates(VzShuffle, VzState1, VzState2, VzState3, VzState4)
-
-    storeOutputX16(VzState4, VzState3, VzState2, VzState1, BX)
-
-    RET
-
-//func cryptoBlockAsmX8(rk *uint32, dst, src *byte)
-TEXT ·cryptoBlockAsmX8(SB),NOSPLIT,$0-24
-    loadShuffle256(CX)
-	MOVQ    src+16(FP), CX
-    loadInputX8(CX, VyState1, VyState2, VyState3, VyState4)
-    loadMatrix(VyPreMatrix, VyPostMatrix, AX, BX)
-
-	MOVQ    rk+0(FP), AX
-	MOVQ    dst+8(FP), BX
-
-    revStates(VyShuffle, VyState1, VyState2, VyState3, VyState4) // latency hiden successfully
-    transpose4x4(VyState1, VyState2, VyState3, VyState4, T0y, T1y)
-
-    roundY(AX)
-    roundY(AX)
-    roundY(AX)
-    roundY(AX)
-    roundY(AX)
-    roundY(AX)
-    roundY(AX)
-    roundY(AX)
-
-    transpose4x4(VyState4, VyState3, VyState2, VyState1, T0y, T1y)
-    revStates(VyShuffle, VyState1, VyState2, VyState3, VyState4)
-
-    storeOutputX8(VyState4, VyState3, VyState2, VyState1, BX)
-
-    RET
-
-//func cryptoBlockAsmX4(rk *uint32, dst, src *byte)
-TEXT ·cryptoBlockAsmX4(SB),NOSPLIT,$0-24
-    loadShuffle128(CX)
-	MOVQ    src+16(FP), CX
-    loadInputX4(CX, VxState1, VxState2, VxState3, VxState4)
-    loadMatrix(VxPreMatrix, VxPostMatrix, AX, BX)
-
-	MOVQ    rk+0(FP), AX
-	MOVQ    dst+8(FP), BX
-
-    revStates(VxShuffle, VxState1, VxState2, VxState3, VxState4) // latency hiden successfully
-    transpose4x4(VxState1, VxState2, VxState3, VxState4, T0x, T1x)
-
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-
-    transpose4x4(VxState4, VxState3, VxState2, VxState1, T0x, T1x)
-    revStates(VxShuffle, VxState1, VxState2, VxState3, VxState4)
-
-    storeOutputX4(VxState4, VxState3, VxState2, VxState1, BX)
-
-    RET
-
-//func cryptoBlockAsmX2(rk *uint32, dst, src *byte)
-TEXT ·cryptoBlockAsmX2(SB),NOSPLIT,$0-24
-    loadShuffle128(CX)
-	MOVQ    src+16(FP), CX
-    loadInputX2(CX, VxState1, VxState2)
-    loadMatrix(VxPreMatrix, VxPostMatrix, AX, BX)
-
-	MOVQ    rk+0(FP), AX
-	MOVQ    dst+8(FP), BX
-
-    rev32(VxShuffle, VxState1) // latency hiden successfully
-    rev32(VxShuffle, VxState2)
-    transpose2x4(VxState1, VxState2, VxState3, VxState4, T0x, T1x)
-
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-
-    transpose4x2(VxState4, VxState3, VxState2, VxState1, T0x, T1x)
-    rev32(VxShuffle, VxState4)
-    rev32(VxShuffle, VxState3)
-
-    storeOutputX2(VxState4, VxState3, BX)
-
-    RET
-
-//func cryptoBlockAsm(rk *uint32, dst, src *byte)
-TEXT ·cryptoBlockAsm(SB),NOSPLIT,$0-24
-    loadShuffle128(CX)
-	MOVQ    src+16(FP), CX
-    loadInputX1(CX, VxState1)
-    loadMatrix(VxPreMatrix, VxPostMatrix, AX, BX)
-
-	MOVQ    rk+0(FP), AX
-	MOVQ    dst+8(FP), BX
-
-    rev32(VxShuffle, VxState1) // latency hiden successfully
-    transpose1x4(VxState1, VxState2, VxState3, VxState4, T0x, T1x)
-
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-    roundX(AX)
-
-    transpose4x1(VxState4, VxState3, VxState2, VxState1, T0x, T1x)
-    rev32(VxShuffle, VxState4)
-
-    storeOutputX1(VxState4, BX)
-
-    RET
 
 // **************       function related with gHash        ***************
 //func gHashBlocks(H *byte, tag *byte, data *byte, count int)

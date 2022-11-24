@@ -58,6 +58,11 @@ func Test_makeCounterNew(t *testing.T){
 	fmt.Println(dst)
 }
 
+func Test_rev12(t *testing.T){
+	rev1()
+	rev2()
+}
+
 func Test_transpose4x4(t *testing.T) {
 	plain := makeMatrix()
 	out := make([]uint32, 16)

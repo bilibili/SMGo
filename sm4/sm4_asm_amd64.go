@@ -34,3 +34,9 @@ func clearRight(dst *byte, len int)
 
 //go:noescape
 func makeCounterNew(src *byte, dst *byte)
+
+//go:noescape
+func rev1()
+
+//go:noescape
+func rev2()
