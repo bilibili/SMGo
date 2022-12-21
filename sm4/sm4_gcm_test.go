@@ -14,46 +14,6 @@ import (
 	"testing"
 )
 
-func Test_xor256(t *testing.T) {
-	testXor(xor256, 256, t)
-}
-
-func Test_xor128(t *testing.T) {
-	testXor(xor128, 128, t)
-}
-
-func Test_xor64(t *testing.T) {
-	testXor(xor64, 64, t)
-}
-
-func Test_xor32(t *testing.T) {
-	testXor(xor32, 32, t)
-}
-
-func Test_xor16(t *testing.T) {
-	testXor(xor16, 16, t)
-}
-
-func testXor(xorFunc func(*byte, *byte, *byte), count int, t *testing.T) {
-	dst := make([]byte, count)
-	dstAlternative := make([]byte, count)
-	src1 := make([]byte, count)
-	src2 := make([]byte, count)
-
-	rand.Read(src1)
-	rand.Read(src2)
-
-	for i := 0; i < count; i++ {
-		dstAlternative[i] = src1[i] ^ src2[i]
-	}
-
-	xorFunc(&dst[0], &src1[0], &src2[0])
-
-	if !reflect.DeepEqual(dst, dstAlternative) {
-		t.Fail()
-	}
-}
-
 var aesGCMTests = []struct {
 	key, nonce, plaintext, aad string
 	tagSize                    int
@@ -137,6 +97,8 @@ func Test_sm4GcmAsm_Seal(t *testing.T) {
 			gcmAsm, _ = cipher.NewGCM(sm4Asm)
 		}
 		dst := gcmAsm.Seal(nil, nonce, src, aad)
+
+		fmt.Printf("test case #%d\n%X\n", i, expected)
 
 		if !reflect.DeepEqual(dst, expected) {
 			fmt.Printf("failed test case #%d\n%X\n%X\n", i, dst, expected)
@@ -227,6 +189,7 @@ func Test_sm4GcmAsm_Seal_Random(t *testing.T) {
 		dst := gcmAsm.Seal(nil, nonce, src, aad)
 
 		if !reflect.DeepEqual(dst, expected) {
+			fmt.Println("fail")
 			fmt.Printf("#%d\n%X\n%X\n", i, dst, expected)
 			t.Fail()
 		}
