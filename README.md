@@ -76,6 +76,8 @@ We implemented optimized Galois Counter Mode for SM4.
 ## TODO list
 通过为X16函数引入block count参数，还可以平摊一次性开销，得到进一步优化。但不需要单独实施，意义不大，应该结合GCM模式做。 目前SM4和GCM是分开实现的，未来可以通过将它们"缝合"在一起而得到进一步的优化，即中间数据不写入内存而是在寄存器中直接再进行GCM计算，同时完成上述多块连续计算优化。
 
+2022-12-21更新：已经对Intel平台实现了“缝合”优化。感谢@SFNaXiao 的贡献。
+
 ## 授权协议 License
 SMGo通过BSD 3-Clause 版权协议授权，详情请参见[LICENSE](LICENSE)文件。该文件包括SMGo内部所使用第三方工具或代码所遵循的版权声明以及授权条款。
 
