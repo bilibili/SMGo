@@ -42,14 +42,14 @@ func (g *sm4GcmAsm) Open(dst, nonce, ciphertext, additionalData []byte) ([]byte,
 
 	ret := ensureCapacity(dst, len(ciphertext)-g.tagSize)
 
-	var flag int
+	var tagMatch int
 	if ret != nil {
-		flag = openAsm(&g.roundKeys[0], g.tagSize,&ret[len(dst)], nonce, ciphertext, additionalData, &temp[0])
+		tagMatch = openAsm(&g.roundKeys[0], g.tagSize,&ret[len(dst)], nonce, ciphertext, additionalData, &temp[0])
 	}else{
-		flag = openAsm(&g.roundKeys[0], g.tagSize,nil, nonce, ciphertext, additionalData, &temp[0])
+		tagMatch = openAsm(&g.roundKeys[0], g.tagSize,nil, nonce, ciphertext, additionalData, &temp[0])
 	}
 
-	if flag!=0xA5A5 {
+	if tagMatch!=0x1 {
 		return nil, errOpen
 	}
 	return ret, nil

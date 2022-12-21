@@ -1192,7 +1192,7 @@ TEXT ·openAsm(SB), NOSPLIT, $0-112
 
     CMPQ Reg2, $0
     JNE tagUnMatch
-    MOVQ $0xA5A5, ret1+104(FP)
+    MOVQ $0x1, ret1+104(FP)
 
     MOVQ dst+16(FP), Dst
     MOVQ cipher+48(FP), Cipher
@@ -1206,7 +1206,7 @@ TEXT ·openAsm(SB), NOSPLIT, $0-112
     JMP openDone
 
 tagUnMatch:
-    MOVQ $0x5A5A, ret1+104(FP)    //tag unmatch
+    MOVQ $0x0, ret1+104(FP)    //tag unmatch
 
 openDone:
     RET
