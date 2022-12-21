@@ -19,3 +19,6 @@ func concatenateY(Y1 *byte, Y2 *byte)
 
 //go:noescape
 func concatenateX(X1 *byte, X2 *byte, X3 *byte, X4 *byte)
+
+//go:noescape
+func cryptoBlockAsmX16(rk *uint32, dst, src *byte)

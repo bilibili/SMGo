@@ -44,9 +44,6 @@ func cryptoBlockAsmX4(rk *uint32, dst, src *byte)
 //go:noescape
 func cryptoBlockAsmX8(rk *uint32, dst, src *byte)
 
-//go:noescape
-func cryptoBlockAsmX16(rk *uint32, dst, src *byte)
-
 func (sm4 *sm4CipherAsm) Encrypt(dst, src []byte) {
 	cryptoBlockAsm(&sm4.enc[0], &dst[0], &src[0])
 }
