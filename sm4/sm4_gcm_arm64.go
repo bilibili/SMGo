@@ -5,6 +5,11 @@
 
 package sm4
 
+import (
+	"crypto/subtle"
+	"encoding/binary"
+)
+
 func (g *sm4GcmAsm) Seal(dst, nonce, plaintext, additionalData []byte) []byte {
 	if len(nonce) != g.nonceSize {
 		panic("crypto/cipher: incorrect nonce length given to GCM")
