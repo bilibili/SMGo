@@ -60,11 +60,11 @@ Caller needs to provide reference so that this implementation can output the ret
 
 To follow the convention of Golang standard library, we implement the sm4.NewCipher function. There is possibility that the expanded key be copied around by GC or OS. User should limit the scope of the created object.
 
-为了实现常数时间算法，我们在arm64平台上使用NEON指令集完成了SM4的密钥扩展和加解密计算，并使性能进一步提升。在amd64平台上，我们使用了AVX512F和GFNI扩展，大部分较新的Intel处理器都应该支持。参见[Efficient Constant-Time Implementation of SM4 with Intel GFNI instruction set extension and Arm NEON coprocessor](https://eprint.iacr.org/2022/1154)
+为了实现常数时间算法，我们在arm64平台上使用NEON指令集完成了SM4的密钥扩展和加解密计算，并使性能进一步提升。在amd64平台上，我们使用了AVX512F和GFNI扩展，大部分较新的Intel处理器都应该支持。参见[Efficient Constant-Time Implementation of SM4 with Intel GFNI instruction set extension and Arm NEON coprocessor](https://eprint.iacr.org/2022/1154)（[最新版本在此](./sm4-constanttime.pdf)）
 
 不支持的CPU将自动运行Go语言版本，其并非常数时间实现。
 
-To facilitate constant time implementation, we use NEON instructions in arm64 for key expansion and encryption/decryption. The performance is also improved. With amd64, we use the AVX512F and GFNI extention, which should be available in most recent Intel CPUs. See [Efficient Constant-Time Implementation of SM4 with Intel GFNI instruction set extension and Arm NEON coprocessor](https://eprint.iacr.org/2022/1154)
+To facilitate constant time implementation, we use NEON instructions in arm64 for key expansion and encryption/decryption. The performance is also improved. With amd64, we use the AVX512F and GFNI extention, which should be available in most recent Intel CPUs. See [Efficient Constant-Time Implementation of SM4 with Intel GFNI instruction set extension and Arm NEON coprocessor](https://eprint.iacr.org/2022/1154)([lastest version here](./sm4-constanttime.pdf))
 
 For those amd64 CPUs without the said GFNI feature, the Golang implementation will run, and it is NOT constant time.
 
