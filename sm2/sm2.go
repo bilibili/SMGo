@@ -173,7 +173,7 @@ func SignZa(rand io.Reader, priv, za, msg []byte) (r, s []byte, err error) {
 func SignHashed(rand io.Reader, priv, e []byte) (r, s []byte, err error) {
 	test := TestPrivateKey(priv)
 	if test != 0 {
-		err = errors.New(fmt.Sprintf("invalid private key, reason code: %d.", test))
+		err = fmt.Errorf("invalid private key, reason code: %d.", test)
 		return
 	}
 
@@ -282,8 +282,8 @@ func VerifyZa(pubx, puby, za, msg, r, s []byte) (bool, error) {
 func VerifyHashed(pubx, puby, e, r, s []byte) (bool, error) {
 
 	if len(pubx) != 32 || len(puby) != 32 || len(e) != 32 || len(r) != 32 || len(s) != 32 {
-		return false, errors.New(fmt.Sprintf("parameter not in 32 bytes: %d, %d, %d, %d, %d\n",
-			len(pubx), len(puby), len(e), len(r), len(s)))
+		return false, fmt.Errorf("parameter not in 32 bytes: %d, %d, %d, %d, %d\n",
+			len(pubx), len(puby), len(e), len(r), len(s))
 	}
 
 	var rInt, sInt, eInt, t big.Int
