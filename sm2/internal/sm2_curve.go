@@ -6,7 +6,6 @@ package internal
 import (
 	"crypto/elliptic"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"github.com/bilibili/smgo/utils"
 	"math"
@@ -245,7 +244,7 @@ func scalarBaseMult_SkipBitExtration(k []byte, first *[][][]*[4]uint64, second *
 
 	// k should be in big endian and 32 bytes or this algorithm does not work
 	if len(k) != SM2ElementLength {
-		return nil, errors.New(fmt.Sprintf("scalar length (%d) is not %d", len(k), SM2ElementLength))
+		return nil, fmt.Errorf("scalar length (%d) is not %d", len(k), SM2ElementLength)
 	}
 
 	ret := NewSM2Point()
